@@ -2,11 +2,13 @@ import * as vscode from 'vscode'
 import type { DraftBoxService } from '../features/drafts/draftBoxService'
 import type { InitService } from '../features/init/initService'
 import type { SerialConsoleController } from '../features/serialConsole/serialConsoleController'
+import type { TaskExplorerController } from '../features/taskExplorer/taskExplorerController'
 import type { TaskRunner } from '../tasks/taskRunner'
 import { registerCopyCommands } from './copyCommands'
 import { registerDraftCommands } from './draftCommands'
 import { registerPageCommands } from './pageCommands'
 import { registerSerialConsoleCommands } from './serialConsoleCommands'
+import { registerTaskExplorerCommands } from './taskExplorerCommands'
 import type { CommandRegistrar } from './shared'
 
 /** 命令层依赖集合：新增功能时在此扩展，避免参数列表无限增长。 */
@@ -24,6 +26,8 @@ export interface CommandDeps {
   drafts: DraftBoxService
   /** 单探针重检（09 方案 §6.1：环境树节点单击路由）。 */
   recheckEnvironmentItem: (label: string) => Promise<void>
+  /** 任务管理器（v2.3：工作区 .vscode/tasks.json 任务视图，10 方案） */
+  taskExplorer: TaskExplorerController
 }
 
 /**
@@ -43,4 +47,5 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
   registerSerialConsoleCommands(register, { controller: deps.serialConsole, context })
   registerDraftCommands(register, { drafts: deps.drafts })
   registerCopyCommands(register) // v2.2：拷贝示例（无宿主依赖，剪贴板即全部）
+  registerTaskExplorerCommands(register, { controller: deps.taskExplorer }) // v2.3：任务管理器
 }

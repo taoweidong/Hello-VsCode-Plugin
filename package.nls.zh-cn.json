@@ -6,6 +6,7 @@
   "view.init.name": "环境初始化",
   "view.build.name": "构建任务",
   "view.serialServers.name": "串口服务器",
+  "view.taskExplorer.name": "任务管理器",
   "command.category": "扩展模板",
   "command.refreshEnvironment.title": "刷新环境信息",
   "command.showEnvironmentOutput.title": "打开环境信息输出",
@@ -30,5 +31,13 @@
   "command.buildRefreshTasks.title": "刷新构建任务列表",
   "command.copySelection.title": "复制选中文本",
   "command.copyFileContent.title": "复制文件内容",
-  "command.copyFilePath.title": "复制文件路径"
+  "command.copyFilePath.title": "复制文件路径",
+  "command.refreshTaskExplorer.title": "刷新任务列表",
+  "command.runWorkspaceTask.title": "运行任务",
+  "command.stopWorkspaceTask.title": "停止任务",
+  "command.openTasksJson.title": "打开 tasks.json",
+  "command.locateTaskInTasksJson.title": "定位到 tasks.json 行",
+  "command.addTaskToFavorites.title": "收藏任务",
+  "command.removeTaskFromFavorites.title": "取消收藏",
+  "command.clearRecentTasks.title": "清空最近运行"
 }

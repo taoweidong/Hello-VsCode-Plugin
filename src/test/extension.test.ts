@@ -19,12 +19,93 @@ import { TaskRunner } from '../extension/tasks/taskRunner'
 import type { StartupTask, TaskResult } from '../extension/tasks/types'
 import { InitService } from '../extension/features/init/initService'
 import type { InitStep } from '../extension/features/init/initSteps'
+import {
+  loadWorkspaceTasks,
+  taskKey,
+  type WorkspaceTaskEntry,
+} from '../extension/features/taskExplorer/taskSource'
+import { TaskExplorerTreeProvider } from '../extension/features/taskExplorer/taskExplorerTreeProvider'
+import { TaskStatusTracker } from '../extension/features/taskExplorer/taskStatusTracker'
+import { TaskUsageStore } from '../extension/features/taskExplorer/taskUsageStore'
+import type { TaskExplorerNode } from '../extension/features/taskExplorer/taskExplorerTreeProvider'
 
 /**
  * 宿主集成测试（@vscode/test-electron，09 方案阶段 2 后）：
  * 条目 / 特性配置 / 静态配置 / 存储层四组已随领域删除，
- * 保留启动任务框架 / 环境初始化 / 分支编译三组（其余领域的深度覆盖在单测）。
+ * 保留启动任务框架 / 环境初始化 / 分支编译 / Task Explorer（v2.3 冒烟 + 全流程）
+ * 与「全流程真实环境验证」（其余领域的深度覆盖在单测）。
  */
+
+/** 轮询等待（支持异步谓词），超时抛出带说明的错误。 */
+async function vi_waitFor(
+  predicate: () => boolean | Promise<boolean>,
+  what: string,
+  timeoutMs = 10000
+): Promise<void> {
+  const startedAt = Date.now()
+  while (!(await predicate())) {
+    if (Date.now() - startedAt > timeoutMs) {
+      throw new Error(`等待超时（${timeoutMs}ms）：${what}`)
+    }
+    await delay(100)
+  }
+}
+
+/** 找树节点：在 provider 的分组 children 里按 label 检索 task 节点。 */
+async function findTaskNode(
+  provider: TaskExplorerTreeProvider,
+  label: string,
+  group: 'recent' | 'favorites' | 'tasks'
+): Promise<{ kind: 'task'; entry: WorkspaceTaskEntry } | undefined> {
+  const groups = (await provider.getChildren()) as Extract<TaskExplorerNode, { kind: 'group' }>[]
+  const target = groups.find((node) => node.group === group)
+  if (!target) {
+    return undefined
+  }
+  // 工作区任务组的任务嵌在 file（单根 / 多根 folder -> file）节点之下，逐层下钻
+  const drill = async (nodes: TaskExplorerNode[]): Promise<TaskExplorerNode | undefined> => {
+    for (const node of nodes) {
+      if (node.kind === 'task' && node.entry.label === label) {
+        return node
+      }
+      if (node.kind === 'file' || node.kind === 'folder') {
+        const found = await drill(await provider.getChildren(node))
+        if (found) {
+          return found
+        }
+      }
+    }
+    return undefined
+  }
+  return (await drill(await provider.getChildren(target))) as
+    { kind: 'task'; entry: WorkspaceTaskEntry } | undefined
+}
+
+/** 宿主侧 provider 装配（真实 vscode API + 内存 Memento）。 */
+function makeHostTaskProvider() {
+  const output = vscode.window.createOutputChannel('TaskExplorer E2E')
+  const backing = new Map<string, unknown>()
+  const memento = {
+    get: (key: string, defaultValue?: unknown) =>
+      backing.has(key) ? backing.get(key) : defaultValue,
+    update: async (key: string, value: unknown): Promise<void> => void backing.set(key, value),
+    keys: () => [...backing.keys()],
+    setKeysForSync: () => undefined,
+  } as unknown as vscode.Memento
+  const usage = new TaskUsageStore(memento, output)
+  const status = new TaskStatusTracker(output)
+  const provider = new TaskExplorerTreeProvider(usage, status, output)
+  return {
+    provider,
+    usage,
+    status,
+    dispose(): void {
+      provider.dispose()
+      status.dispose()
+      usage.dispose()
+    },
+  }
+}
 
 suite('启动任务框架', () => {
   function fakeTask(id: string, title: string, behavior: () => Promise<void>): StartupTask {
@@ -191,6 +272,439 @@ suite('分支编译（v2.1 端到端冒烟）', () => {
   })
 })
 
+suite('Task Explorer（v2.3 集成冒烟）', () => {
+  test('8 条任务管理器命令全部注册', async () => {
+    const commands = new Set(await vscode.commands.getCommands())
+    for (const id of [
+      'extStarter.refreshTaskExplorer',
+      'extStarter.runWorkspaceTask',
+      'extStarter.stopWorkspaceTask',
+      'extStarter.openTasksJson',
+      'extStarter.locateTaskInTasksJson',
+      'extStarter.addTaskToFavorites',
+      'extStarter.removeTaskFromFavorites',
+      'extStarter.clearRecentTasks',
+    ]) {
+      assert.ok(commands.has(id), `命令未注册：${id}`)
+    }
+  })
+
+  test('仓库自带 npm 任务可被 fetchTasks 发现且 source/scope 满足过滤条件（M0/R1 实证）', async () => {
+    // 关键假设的宿主实证：tasks.json 任务 source === 'Workspace' 且 scope 为 WorkspaceFolder
+    // （用户级 / .code-workspace 任务无文件夹 scope，是数据层过滤的依据）
+    const tasks = await vscode.tasks.fetchTasks()
+    const npmTasks = tasks.filter(
+      (task) => task.source === 'Workspace' && typeof task.scope === 'object'
+    )
+    const names = npmTasks.map((task) => task.name)
+    assert.ok(
+      names.some((name) => name.includes('compile')),
+      `应发现仓库 npm: compile 任务（实际 Workspace 任务：${names.join(', ')}）`
+    )
+    assert.ok(
+      names.some((name) => name.includes('watch')),
+      `应发现仓库 npm: watch 任务`
+    )
+    // 扩展 provider 任务（source=npm）不应混入过滤结果
+    assert.ok(
+      npmTasks.every((task) => typeof task.scope === 'object' && 'uri' in (task.scope as object)),
+      'Workspace 来源任务的 scope 应为 WorkspaceFolder'
+    )
+  })
+
+  test('定位命令可执行（仓库 tasks.json 中存在 npm: compile 的 label 行）', async () => {
+    const tasks = await vscode.tasks.fetchTasks()
+    const compile = tasks.find(
+      (task) =>
+        task.source === 'Workspace' &&
+        task.name.includes('compile') &&
+        typeof task.scope === 'object'
+    )
+    assert.ok(compile, '应能取回 compile 任务')
+    // 定位是只读操作：未命中也只提示，不抛错
+    await assert.doesNotReject(async () => {
+      await vscode.commands.executeCommand('extStarter.locateTaskInTasksJson', compile)
+    })
+  })
+})
+
+suite('Task Explorer 全流程真实环境验证（多任务类型 / 树结构 / 运行停止 / 定位）', () => {
+  /**
+   * 真实宿主 E2E：向仓库 `.vscode/tasks.json` **临时**合并多种任务 fixtures
+   * （shell / process / 分组 / dependsOn / Unicode 标签 / 注释噪声），用真实
+   * fetchTasks + 真实扩展命令做端到端断言，测后恢复原文件。
+   *
+   * 不用 `updateWorkspaceFolders` 挂临时目录：单根 ↔ 多根切换会触发扩展宿主重启
+   * 且污染测试实例的会话恢复（实测），无法支撑进程内断言；多根树形（文件夹 →
+   * tasks.json → 任务）的层级逻辑由单测桩覆盖，本套件验证单根真实链路。
+   * 树结构经测试进程内新建的 provider 实例读取（测试进程与扩展 bundle 是两个
+   * 模块实例，无法直读扩展注册的 TreeView，但两者消费同一真实 API 与数据）。
+   */
+
+  const TASKS_JSON_PATH = nodePath.join(extensionDevelopmentRoot(), '.vscode', 'tasks.json')
+
+  /** 仓库根（launchArgs 第一项），用于定位 .vscode/tasks.json。 */
+  function extensionDevelopmentRoot(): string {
+    // 编译产物位于 <root>/out/test/ → 上溯两级即仓库根
+    return nodePath.resolve(__dirname, '../..')
+  }
+
+  let originalTasksJson = ''
+
+  const e2eEntries = async (): Promise<WorkspaceTaskEntry[]> =>
+    (await loadWorkspaceTasks()).filter((entry) => entry.label.startsWith('e2e-'))
+
+  /** 诊断转储：fetchTasks 概要（发现失败时给出可行动信息）。 */
+  const discoveryDump = async (): Promise<string> => {
+    const all = await vscode.tasks.fetchTasks()
+    const labels = all
+      .filter((t) => t.source === 'Workspace')
+      .map(
+        (t) =>
+          `${t.name} [${
+            typeof t.scope === 'object'
+              ? String((t.scope as { uri: { fsPath: string } }).uri.fsPath)
+              : String(t.scope)
+          }]`
+      )
+    return [
+      `workspace 任务 ${all.length} 条（Workspace 来源 ${labels.length} 条）：`,
+      ...labels.map((l) => `  ${l}`),
+    ].join('\n')
+  }
+
+  suiteSetup(async function (this: Mocha.Context): Promise<void> {
+    this.timeout(30000)
+    originalTasksJson = nodeFs.readFileSync(TASKS_JSON_PATH, 'utf8')
+    const original = JSON.parse(originalTasksJson) as {
+      version: string
+      tasks: Record<string, unknown>[]
+    }
+    // 合并 fixtures（保留原 npm 任务，M0 冒烟套件不受影响）；顶部注释验证 JSONC 容忍
+    const merged = JSON.stringify(
+      {
+        version: original.version,
+        tasks: [
+          ...original.tasks,
+          { label: 'e2e-shell-build', type: 'shell', command: 'echo build', group: 'build' },
+          { label: 'e2e-shell-test', type: 'shell', command: 'echo test', group: 'test' },
+          {
+            label: 'e2e-process',
+            type: 'process',
+            command: 'node',
+            args: ['-e', 'console.log(1)'],
+          },
+          { label: 'e2e-长名称 带空格（v2）', type: 'shell', command: 'echo unicode' },
+          {
+            label: 'e2e-run-stop',
+            type: 'process',
+            command: 'node',
+            args: ['-e', 'setTimeout(function () {}, 10000)'],
+          },
+          {
+            label: 'e2e-dep-main',
+            type: 'shell',
+            command: 'echo main',
+            dependsOn: ['e2e-dep-first'],
+          },
+          { label: 'e2e-dep-first', type: 'shell', command: 'echo dep' },
+          { label: 'e2e-locate', type: 'shell', command: 'echo locate' },
+        ],
+      },
+      null,
+      2
+    )
+    // 在 e2e-locate 的 label 行前插入注释噪声（label: "decoy"）——定位不得误命中
+    const withNoise = merged.replace(
+      '"label": "e2e-locate"',
+      '// 注释噪声：label: "decoy"\n    "label": "e2e-locate"'
+    )
+    nodeFs.writeFileSync(TASKS_JSON_PATH, withNoise, 'utf8')
+
+    if ((await e2eEntries()).length < 8) {
+      try {
+        await vi_waitFor(async () => (await e2eEntries()).length >= 8, 'e2e 任务被发现', 15000)
+      } catch (error) {
+        throw new Error(`${String(error)}\n诊断：\n${await discoveryDump()}`, {
+          cause: error,
+        })
+      }
+    }
+  })
+
+  suiteTeardown(async function (this: Mocha.Context): Promise<void> {
+    this.timeout(15000)
+    // 清场：终止残留的 e2e 执行 → 恢复原 tasks.json → 关编辑器
+    for (const execution of [...vscode.tasks.taskExecutions]) {
+      if (execution.task.name.startsWith('e2e-')) {
+        try {
+          execution.terminate()
+        } catch {
+          // 已结束的任务 terminate 可能 reject，忽略
+        }
+      }
+    }
+    if (originalTasksJson) {
+      nodeFs.writeFileSync(TASKS_JSON_PATH, originalTasksJson, 'utf8')
+    }
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors')
+  })
+
+  test('多种任务类型被真实发现：shell/process/分组/dependsOn/Unicode 标签', async () => {
+    const entries = await e2eEntries()
+    const labels = entries.map((entry) => entry.label)
+    for (const expected of [
+      'e2e-shell-build',
+      'e2e-shell-test',
+      'e2e-process',
+      'e2e-长名称 带空格（v2）',
+      'e2e-run-stop',
+      'e2e-dep-main',
+      'e2e-dep-first',
+      'e2e-locate',
+    ]) {
+      assert.ok(labels.includes(expected), `应发现任务 ${expected}（实际：${labels.join(', ')}）`)
+    }
+    // 全部为 Workspace 来源 + 文件夹 scope（用户级/扩展 provider 任务不混入）
+    assert.ok(
+      entries.every(
+        (entry) => entry.task.source === 'Workspace' && typeof entry.task.scope === 'object'
+      )
+    )
+
+    // 分组语义由引擎解析：build/test 分组任务带原生 TaskGroup
+    const build = entries.find((entry) => entry.label === 'e2e-shell-build')!
+    assert.strictEqual(build.task.group?.id, 'build')
+    const test = entries.find((entry) => entry.label === 'e2e-shell-test')!
+    assert.strictEqual(test.task.group?.id, 'test')
+
+    // process 任务：execution 为 ProcessExecution（真实解析结果）
+    const proc = entries.find((entry) => entry.label === 'e2e-process')!
+    assert.ok((proc.task.execution as { process?: string }).process?.includes('node'))
+
+    // 稳定 key 含 scopeUri（同一文件内不与仓库 npm 任务串扰）
+    assert.ok(taskKey(build.task).includes(build.folder.uri.toString()))
+  })
+
+  test('树形结构（单根）：三组根 → tasks.json → 全部任务；图标按类型/分组', async () => {
+    const host = makeHostTaskProvider()
+    try {
+      const groups = (await host.provider.getChildren()) as Extract<
+        TaskExplorerNode,
+        { kind: 'group' }
+      >[]
+      assert.deepStrictEqual(
+        groups.map((node) => node.group),
+        ['recent', 'favorites', 'tasks'],
+        '三组根节点顺序固定'
+      )
+      assert.ok(
+        groups.every(
+          (node) =>
+            host.provider.getTreeItem(node).collapsibleState ===
+            vscode.TreeItemCollapsibleState.Expanded
+        ),
+        '三组默认展开'
+      )
+
+      // 单根：工作区任务组直接是 tasks.json 文件节点
+      const fileNodes = (await host.provider.getChildren(groups[2]!)) as Extract<
+        TaskExplorerNode,
+        { kind: 'file' }
+      >[]
+      assert.strictEqual(fileNodes.length, 1, '单根工作区只有一个 tasks.json 节点')
+      const fileItem = host.provider.getTreeItem(fileNodes[0]!)
+      assert.strictEqual(fileItem.label, 'tasks.json')
+      assert.strictEqual(fileItem.contextValue, 'tasksFile')
+      assert.strictEqual(fileItem.collapsibleState, vscode.TreeItemCollapsibleState.Expanded)
+      assert.strictEqual(fileItem.command?.command, 'extStarter.openTasksJson')
+      assert.ok(
+        fileItem.resourceUri?.toString().endsWith('.vscode/tasks.json'),
+        `resourceUri 应指向 tasks.json（实际 ${String(fileItem.resourceUri)}）`
+      )
+
+      // 文件节点下 = 原 npm 任务 + 全部 e2e 任务
+      const taskNodes = (await host.provider.getChildren(fileNodes[0]!)) as Extract<
+        TaskExplorerNode,
+        { kind: 'task' }
+      >[]
+      const labels = taskNodes.map((node) => node.entry.label)
+      for (const expected of ['npm: compile', 'npm: watch', 'e2e-shell-build', 'e2e-locate']) {
+        assert.ok(labels.includes(expected), `文件节点下应有任务 ${expected}`)
+      }
+
+      const iconOf = (label: string): string => {
+        const node = taskNodes.find((item) => item.entry.label === label)!
+        return (host.provider.getTreeItem(node).iconPath as vscode.ThemeIcon).id
+      }
+      assert.strictEqual(iconOf('npm: compile'), 'tools') // 分组 build 优先
+      assert.strictEqual(iconOf('e2e-shell-build'), 'tools')
+      assert.strictEqual(iconOf('e2e-shell-test'), 'beaker')
+      assert.strictEqual(iconOf('e2e-process'), 'gear') // process 类型
+      assert.strictEqual(iconOf('e2e-长名称 带空格（v2）'), 'terminal') // shell 无分组
+      assert.strictEqual(iconOf('e2e-dep-first'), 'terminal')
+
+      // 单击任务 = 运行命令 + 原始 Task 参数（红线）
+      const buildNode = taskNodes.find((item) => item.entry.label === 'e2e-shell-build')!
+      const buildItem = host.provider.getTreeItem(buildNode)
+      assert.strictEqual(buildItem.command?.command, 'extStarter.runWorkspaceTask')
+      assert.ok(buildItem.command?.arguments?.[0] instanceof vscode.Task)
+      assert.strictEqual(buildItem.command?.arguments?.[0], buildNode.entry.task)
+      assert.strictEqual(buildItem.description, '构建')
+    } finally {
+      host.dispose()
+    }
+  })
+
+  test('收藏与最近运行分组：按名称排序 / 时间倒序 / 清空不影响收藏', async () => {
+    const host = makeHostTaskProvider()
+    try {
+      const entries = await e2eEntries()
+      const build = entries.find((entry) => entry.label === 'e2e-shell-build')!
+      const locate = entries.find((entry) => entry.label === 'e2e-locate')!
+      const proc = entries.find((entry) => entry.label === 'e2e-process')!
+
+      host.usage.addFavorite(locate.ref)
+      host.usage.addFavorite(build.ref)
+      const groups = (await host.provider.getChildren()) as Extract<
+        TaskExplorerNode,
+        { kind: 'group' }
+      >[]
+      const favorites = (await host.provider.getChildren(groups[1]!)) as Extract<
+        TaskExplorerNode,
+        { kind: 'task' }
+      >[]
+      assert.deepStrictEqual(
+        favorites.map((node) => node.entry.label),
+        ['e2e-locate', 'e2e-shell-build'], // 按任务名排序（localeCompare 升序）
+        '收藏组按任务名排序'
+      )
+
+      // 运行记录倒序 + 分组计数（真实 store 数据驱动）。
+      // 注意：usage 事件会整体重建 group 节点实例，必须重新拉取根节点再取 children
+      host.usage.recordRun(proc.ref, 100)
+      host.usage.recordRun(build.ref, 200)
+      const groupsAfterRun = (await host.provider.getChildren()) as Extract<
+        TaskExplorerNode,
+        { kind: 'group' }
+      >[]
+      const recent = (await host.provider.getChildren(groupsAfterRun[0]!)) as Extract<
+        TaskExplorerNode,
+        { kind: 'task' }
+      >[]
+      assert.deepStrictEqual(
+        recent.map((node) => node.entry.label),
+        ['e2e-shell-build', 'e2e-process'],
+        '最近运行最新在前'
+      )
+      const recentItem = host.provider.getTreeItem(groupsAfterRun[0]!)
+      assert.strictEqual(recentItem.description, '2 条')
+
+      // 清空最近运行不影响收藏
+      host.usage.clearRecent()
+      const groupsAfter = (await host.provider.getChildren()) as Extract<
+        TaskExplorerNode,
+        { kind: 'group' }
+      >[]
+      assert.strictEqual(
+        ((await host.provider.getChildren(groupsAfter[0]!)) as TaskExplorerNode[]).length,
+        1,
+        '最近运行清空后只剩「暂无」占位'
+      )
+      const favoritesAfter = (await host.provider.getChildren(groupsAfter[1]!)) as Extract<
+        TaskExplorerNode,
+        { kind: 'task' }
+      >[]
+      assert.strictEqual(favoritesAfter.length, 2, '收藏不受清空影响')
+    } finally {
+      host.dispose()
+    }
+  })
+
+  test('真实运行 → 三处运行态一致（转圈）→ 真实停止 → 状态恢复', async function (this: Mocha.Context): Promise<void> {
+    this.timeout(30000)
+    const host = makeHostTaskProvider()
+    try {
+      const runStop = (await e2eEntries()).find((entry) => entry.label === 'e2e-run-stop')!
+      assert.ok(runStop, '长驻任务应被发现')
+      host.usage.addFavorite(runStop.ref)
+
+      let startFired = false
+      const startSub = vscode.tasks.onDidStartTask((event) => {
+        if (event.execution.task.name === runStop.label) {
+          startFired = true
+        }
+      })
+      try {
+        // 经扩展真实命令运行（executeTask + recordRun 全链路）
+        await vscode.commands.executeCommand('extStarter.runWorkspaceTask', runStop.task)
+        await vi_waitFor(() => startFired, '任务开始事件')
+        await vi_waitFor(
+          () => vscode.tasks.taskExecutions.some((e) => e.task.name === runStop.label),
+          '任务出现在执行列表'
+        )
+
+        // 两处运行态一致：工作区任务 + 收藏组的同 key 节点都转圈、contextValue 运行中
+        const tasksNode = await findTaskNode(host.provider, runStop.label, 'tasks')
+        const favoriteNode = await findTaskNode(host.provider, runStop.label, 'favorites')
+        assert.ok(tasksNode && favoriteNode, '任务应同时出现在工作区任务与收藏组')
+        for (const node of [tasksNode!, favoriteNode!]) {
+          const item = host.provider.getTreeItem(node)
+          assert.strictEqual((item.iconPath as vscode.ThemeIcon).id, 'sync~spin')
+          assert.strictEqual(item.contextValue, 'workspaceTaskRunningFavorite')
+        }
+
+        // 经扩展真实命令停止
+        let endFired = false
+        const endSub = vscode.tasks.onDidEndTask((event) => {
+          if (event.execution.task.name === runStop.label) {
+            endFired = true
+          }
+        })
+        try {
+          await vscode.commands.executeCommand('extStarter.stopWorkspaceTask', runStop.task)
+          await vi_waitFor(() => endFired, '任务结束事件')
+          await vi_waitFor(
+            () => !vscode.tasks.taskExecutions.some((e) => e.task.name === runStop.label),
+            '执行列表清空'
+          )
+        } finally {
+          endSub.dispose()
+        }
+
+        // 状态恢复：非运行图标按类型回落（process → gear）
+        const restored = await findTaskNode(host.provider, runStop.label, 'favorites')
+        assert.ok(restored)
+        const restoredItem = host.provider.getTreeItem(restored!)
+        assert.strictEqual((restoredItem.iconPath as vscode.ThemeIcon).id, 'gear')
+        assert.strictEqual(restoredItem.contextValue, 'workspaceTaskFavorite')
+      } finally {
+        startSub.dispose()
+      }
+    } finally {
+      host.dispose()
+    }
+  })
+
+  test('定位到 tasks.json 行：注释噪声不误命中，选中 label 键所在行', async function (this: Mocha.Context): Promise<void> {
+    this.timeout(20000)
+    const locate = (await e2eEntries()).find((entry) => entry.label === 'e2e-locate')!
+    assert.ok(locate, '定位目标任务应被发现')
+
+    await vscode.commands.executeCommand('extStarter.locateTaskInTasksJson', locate.task)
+    const editor = vscode.window.activeTextEditor
+    assert.ok(editor, '定位应打开编辑器')
+    assert.strictEqual(editor.document.uri.fsPath.toLowerCase(), TASKS_JSON_PATH.toLowerCase())
+
+    // 选中行 = 真实 label 键所在行（插入的注释噪声行不应命中）
+    const content = nodeFs.readFileSync(TASKS_JSON_PATH, 'utf8').split('\n')
+    const expectedLine = content.findIndex((line) => line.includes('"label": "e2e-locate"'))
+    assert.ok(expectedLine >= 0)
+    assert.strictEqual(editor.selection.start.line, expectedLine)
+    assert.strictEqual(editor.selection.start.character, content[expectedLine].indexOf('"label"'))
+    assert.ok(!content[editor.selection.start.line].includes('decoy'), '不应定位到注释噪声行')
+  })
+})
 suite('全流程真实环境验证（真实编辑器 / 剪贴板 / 文件 / 草稿落盘）', () => {
   /** 打开一个真实文档并把选区定为 (0,0)-(0,len) —— 与用户「选中一段文本」等价。 */
   async function openWithSelection(content: string, end: number): Promise<void> {
@@ -316,10 +830,14 @@ ${fileB.fsPath}`
 
   test('分支编译弹框：命令打开面板；任务刷新命令可执行', async () => {
     await vscode.commands.executeCommand('extStarter.buildBranch')
-    const hasPanel = vscode.window.tabGroups.all
-      .flatMap((group) => group.tabs)
-      .some((tab) => (tab.label ?? '').includes('分支编译'))
-    assert.ok(hasPanel, '弹框面板应已打开')
+    // 面板创建是异步装配（createOrShow → open() 未被命令 await）：
+    // 若此前的面板已被关闭，这里是全新创建，必须轮询等待标签页出现
+    const hasPanel = (): boolean =>
+      vscode.window.tabGroups.all
+        .flatMap((group) => group.tabs)
+        .some((tab) => (tab.label ?? '').includes('分支编译'))
+    await vi_tabWait(hasPanel)
+    assert.ok(hasPanel(), '弹框面板应已打开')
     await assert.doesNotReject(async () => {
       await vscode.commands.executeCommand('extStarter.buildRefreshTasks')
     })

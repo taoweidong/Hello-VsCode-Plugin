@@ -27,6 +27,7 @@ export default defineConfig({
       // 09 方案阶段 2：src/models/** 与 src/domain/** 随条目领域删除，移出统计面。
       include: [
         'src/extension/services/**',
+        'src/extension/features/taskExplorer/**',
         'src/webview/protocol.ts',
         'src/webview/formSchema.ts',
         'src/webview/components/fieldAdapter.ts',
@@ -36,6 +37,7 @@ export default defineConfig({
       ],
       // 阈值为实测值减约 1pt 余量（2026-10 实测：整体 93.2L/88.85B/94.06F/93.36S；
       // services 92.5L、protocol 100）。09 方案阶段 2 后统计面缩小，以当轮实测复核为准。
+      // v2.3：新增 taskExplorer 统计面（10 方案 §11.2：新增模块行覆盖率 ≥ 90%）。
       thresholds: {
         lines: 92,
         functions: 93,
@@ -43,6 +45,12 @@ export default defineConfig({
         branches: 87,
         'src/extension/services/**': { lines: 90, functions: 90, statements: 90, branches: 85 },
         'src/webview/protocol.ts': { lines: 100, functions: 100, statements: 100, branches: 100 },
+        'src/extension/features/taskExplorer/**': {
+          lines: 90,
+          functions: 90,
+          statements: 90,
+          branches: 85,
+        },
       },
     },
   },

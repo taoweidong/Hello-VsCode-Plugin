@@ -22,6 +22,27 @@ export const VIEW = {
   serialServerContextValue: 'serialServer',
   /** 串口服务器树条目的 contextValue（已连接，图标/菜单可区分） */
   serialServerConnectedContextValue: 'serialServerConnected',
+
+  /** 任务管理器树视图 ID（v2.3：仅加载工作区 .vscode/tasks.json 任务） */
+  taskExplorerViewId: 'extStarter.taskExplorerView',
+  /** 工作区文件夹节点 */
+  taskExplorerFolderContextValue: 'taskExplorerFolder',
+  /** tasks.json 文件节点 */
+  taskExplorerFileContextValue: 'tasksFile',
+  /** 根分组：最近运行 */
+  taskExplorerGroupRecentContextValue: 'taskExplorerGroupRecent',
+  /** 根分组：收藏 */
+  taskExplorerGroupFavoritesContextValue: 'taskExplorerGroupFavorites',
+  /** 根分组：工作区任务 */
+  taskExplorerGroupTasksContextValue: 'taskExplorerGroupTasks',
+  /** 任务节点（未运行、未收藏） */
+  taskExplorerTaskContextValue: 'workspaceTask',
+  /** 任务节点（运行中、未收藏） */
+  taskExplorerTaskRunningContextValue: 'workspaceTaskRunning',
+  /** 任务节点（未运行、已收藏） */
+  taskExplorerTaskFavoriteContextValue: 'workspaceTaskFavorite',
+  /** 任务节点（运行中、已收藏） */
+  taskExplorerTaskRunningFavoriteContextValue: 'workspaceTaskRunningFavorite',
 } as const
 
 /**
@@ -82,6 +103,24 @@ export const COMMAND = {
   copyFileContent: 'extStarter.copyFileContent',
   /** 资源管理器右键：复制文件路径到剪贴板 */
   copyFilePath: 'extStarter.copyFilePath',
+
+  // 任务管理器（v2.3：工作区 .vscode/tasks.json 任务视图，10 方案）
+  /** 视图标题栏：刷新任务列表（清空去抖队列并立即重新 fetchTasks） */
+  refreshTaskExplorer: 'extStarter.refreshTaskExplorer',
+  /** 运行任务（单击任务条目 / 行内 ▶ / 右键；executeTask 交原生引擎） */
+  runWorkspaceTask: 'extStarter.runWorkspaceTask',
+  /** 停止任务（运行中条目；终止匹配的 TaskExecution） */
+  stopWorkspaceTask: 'extStarter.stopWorkspaceTask',
+  /** 打开 tasks.json（folder/file 节点单击；多根 QuickPick 选择文件夹） */
+  openTasksJson: 'extStarter.openTasksJson',
+  /** 定位到 tasks.json 对应 label 行（内置 JSONC 扫描，失败降级打开顶部） */
+  locateTaskInTasksJson: 'extStarter.locateTaskInTasksJson',
+  /** 收藏任务（星标；写 workspaceState，按工作区隔离） */
+  addTaskToFavorites: 'extStarter.addTaskToFavorites',
+  /** 取消收藏任务 */
+  removeTaskFromFavorites: 'extStarter.removeTaskFromFavorites',
+  /** 清空最近运行（模态确认；只清 recent，不影响收藏） */
+  clearRecentTasks: 'extStarter.clearRecentTasks',
 } as const
 
 /**
@@ -117,4 +156,6 @@ export const STORAGE = {
    * 已同步进 .gitignore（v2.0 起脏检查随 BuildService 删除，不再有自阻断风险）。
    */
   draftsFileName: '.vscode/ext-starter.drafts.json',
+  /** 任务管理器最近运行/收藏（workspaceState，按工作区隔离；v2.3） */
+  taskExplorerUsageKey: 'extStarter.taskExplorer.usage',
 } as const

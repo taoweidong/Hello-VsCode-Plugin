@@ -2,7 +2,7 @@
   "name": "vscode-starter-template",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "2.2.3",
+  "version": "2.3.0",
   "publisher": "your-publisher",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -60,6 +60,10 @@
         {
           "id": "extStarter.serialServersView",
           "name": "%view.serialServers.name%"
+        },
+        {
+          "id": "extStarter.taskExplorerView",
+          "name": "%view.taskExplorer.name%"
         }
       ]
     },
@@ -181,6 +185,54 @@
         "title": "%command.copyFilePath.title%",
         "category": "%command.category%",
         "icon": "$(link)"
+      },
+      {
+        "command": "extStarter.refreshTaskExplorer",
+        "title": "%command.refreshTaskExplorer.title%",
+        "category": "%command.category%",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "extStarter.runWorkspaceTask",
+        "title": "%command.runWorkspaceTask.title%",
+        "category": "%command.category%",
+        "icon": "$(play)"
+      },
+      {
+        "command": "extStarter.stopWorkspaceTask",
+        "title": "%command.stopWorkspaceTask.title%",
+        "category": "%command.category%",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "extStarter.openTasksJson",
+        "title": "%command.openTasksJson.title%",
+        "category": "%command.category%",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "extStarter.locateTaskInTasksJson",
+        "title": "%command.locateTaskInTasksJson.title%",
+        "category": "%command.category%",
+        "icon": "$(list-selection)"
+      },
+      {
+        "command": "extStarter.addTaskToFavorites",
+        "title": "%command.addTaskToFavorites.title%",
+        "category": "%command.category%",
+        "icon": "$(star)"
+      },
+      {
+        "command": "extStarter.removeTaskFromFavorites",
+        "title": "%command.removeTaskFromFavorites.title%",
+        "category": "%command.category%",
+        "icon": "$(star-filled)"
+      },
+      {
+        "command": "extStarter.clearRecentTasks",
+        "title": "%command.clearRecentTasks.title%",
+        "category": "%command.category%",
+        "icon": "$(clear-all)"
       }
     ],
     "menus": {
@@ -224,6 +276,16 @@
           "command": "extStarter.buildRefreshTasks",
           "when": "view == extStarter.buildView",
           "group": "navigation@3"
+        },
+        {
+          "command": "extStarter.refreshTaskExplorer",
+          "when": "view == extStarter.taskExplorerView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "extStarter.openTasksJson",
+          "when": "view == extStarter.taskExplorerView",
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [
@@ -261,6 +323,71 @@
           "command": "extStarter.deleteSerialServer",
           "when": "view == extStarter.serialServersView && viewItem == serialServerConnected",
           "group": "1_serial@3"
+        },
+        {
+          "command": "extStarter.runWorkspaceTask",
+          "when": "view == extStarter.taskExplorerView && viewItem =~ /^workspaceTask(Favorite)?$/",
+          "group": "inline@1"
+        },
+        {
+          "command": "extStarter.stopWorkspaceTask",
+          "when": "view == extStarter.taskExplorerView && viewItem =~ /^workspaceTaskRunning(Favorite)?$/",
+          "group": "inline@1"
+        },
+        {
+          "command": "extStarter.addTaskToFavorites",
+          "when": "view == extStarter.taskExplorerView && viewItem =~ /^workspaceTask(Running)?$/",
+          "group": "inline@2"
+        },
+        {
+          "command": "extStarter.removeTaskFromFavorites",
+          "when": "view == extStarter.taskExplorerView && viewItem =~ /^workspaceTask(Running)?Favorite$/",
+          "group": "inline@2"
+        },
+        {
+          "command": "extStarter.locateTaskInTasksJson",
+          "when": "view == extStarter.taskExplorerView && viewItem =~ /^workspaceTask(Running)?(Favorite)?$/",
+          "group": "inline@3"
+        },
+        {
+          "command": "extStarter.runWorkspaceTask",
+          "when": "view == extStarter.taskExplorerView && viewItem =~ /^workspaceTask(Favorite)?$/",
+          "group": "1_task@1"
+        },
+        {
+          "command": "extStarter.stopWorkspaceTask",
+          "when": "view == extStarter.taskExplorerView && viewItem =~ /^workspaceTaskRunning(Favorite)?$/",
+          "group": "1_task@1"
+        },
+        {
+          "command": "extStarter.addTaskToFavorites",
+          "when": "view == extStarter.taskExplorerView && viewItem =~ /^workspaceTask(Running)?$/",
+          "group": "2_favorite@1"
+        },
+        {
+          "command": "extStarter.removeTaskFromFavorites",
+          "when": "view == extStarter.taskExplorerView && viewItem =~ /^workspaceTask(Running)?Favorite$/",
+          "group": "2_favorite@1"
+        },
+        {
+          "command": "extStarter.locateTaskInTasksJson",
+          "when": "view == extStarter.taskExplorerView && viewItem =~ /^workspaceTask(Running)?(Favorite)?$/",
+          "group": "3_locate@1"
+        },
+        {
+          "command": "extStarter.openTasksJson",
+          "when": "view == extStarter.taskExplorerView && viewItem == tasksFile",
+          "group": "1_task@1"
+        },
+        {
+          "command": "extStarter.openTasksJson",
+          "when": "view == extStarter.taskExplorerView && viewItem == taskExplorerFolder",
+          "group": "1_task@1"
+        },
+        {
+          "command": "extStarter.clearRecentTasks",
+          "when": "view == extStarter.taskExplorerView && viewItem == taskExplorerGroupRecent",
+          "group": "4_manage@1"
         }
       ],
       "editor/context": [

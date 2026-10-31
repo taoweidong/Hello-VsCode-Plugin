@@ -6,6 +6,7 @@
   "view.init.name": "Environment Setup",
   "view.build.name": "Build Tasks",
   "view.serialServers.name": "Serial Servers",
+  "view.taskExplorer.name": "Tasks",
   "command.category": "Extension Starter",
   "command.refreshEnvironment.title": "Refresh Environment",
   "command.showEnvironmentOutput.title": "Show Environment Output",
@@ -30,5 +31,13 @@
   "command.buildRefreshTasks.title": "Refresh Build Tasks",
   "command.copySelection.title": "Copy Selection",
   "command.copyFileContent.title": "Copy File Content",
-  "command.copyFilePath.title": "Copy File Path"
+  "command.copyFilePath.title": "Copy File Path",
+  "command.refreshTaskExplorer.title": "Refresh Workspace Tasks",
+  "command.runWorkspaceTask.title": "Run Workspace Task",
+  "command.stopWorkspaceTask.title": "Stop Workspace Task",
+  "command.openTasksJson.title": "Open .vscode/tasks.json",
+  "command.locateTaskInTasksJson.title": "Locate in tasks.json",
+  "command.addTaskToFavorites.title": "Add to Favorites",
+  "command.removeTaskFromFavorites.title": "Remove from Favorites",
+  "command.clearRecentTasks.title": "Clear Recent Tasks"
 }

@@ -13,6 +13,7 @@ import { InitTreeProvider } from './features/init/initTreeProvider'
 import { createInitSteps } from './features/init/initSteps'
 import { SerialConsoleController } from './features/serialConsole/serialConsoleController'
 import { SerialConsolePanel } from './features/serialConsole/serialConsolePanel'
+import { TaskExplorerController } from './features/taskExplorer/taskExplorerController'
 import { EnvironmentTreeProvider } from './providers/environmentTreeProvider'
 import { migrateLegacyKeys } from './services/legacyMigration'
 import { recheckProbeByLabel } from './tasks/environmentTask'
@@ -119,6 +120,16 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(drafts)
   void drafts.load()
 
+  // ---------- 任务管理器（v2.3：仅工作区 .vscode/tasks.json 任务，10 方案） ----------
+  const taskExplorer = new TaskExplorerController(context.workspaceState, outputChannel)
+  context.subscriptions.push(taskExplorer)
+  context.subscriptions.push(
+    vscode.window.createTreeView(VIEW.taskExplorerViewId, {
+      treeDataProvider: taskExplorer.treeProvider,
+      showCollapseAll: true,
+    })
+  )
+
   // ---------- Webview 页面装配（M4）：面板上下文 + 序列化器（窗口重载恢复） ----------
   SerialConsolePanel.configure(context)
   WebviewController.registerSerializer(context, (pageId: WebviewPageId): WebviewControllerDeps => {
@@ -143,6 +154,7 @@ export function activate(context: vscode.ExtensionContext): void {
     serialConsole,
     drafts,
     recheckEnvironmentItem,
+    taskExplorer,
   })
 }
 

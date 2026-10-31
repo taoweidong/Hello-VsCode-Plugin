@@ -6,6 +6,50 @@
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-10-31
+
+### 新增（TaskExplorer 任务管理器，10 方案落地）
+
+- **侧边栏「任务管理器」视图**：只加载工作区 `.vscode/tasks.json` 定义的任务
+  （`fetchTasks()` + `source === 'Workspace'` + 文件夹 scope 过滤；用户级 /
+  `.code-workspace` / 扩展 provider 任务不出现）。树顶部固定「最近运行 → 收藏 →
+  工作区任务」三组（空组显示「暂无」占位）；单根为 `tasks.json → 任务`，
+  多根为「文件夹 → tasks.json → 任务」。
+- **任务操作**：单击/行内/右键运行（`executeTask` 原生对象，`dependsOn` /
+  `dependsOrder` 由 VS Code 任务引擎编排，依赖任务不污染最近运行）、运行中停止
+  （扫描 `taskExecutions` 实时判定，图标转圈 + 按钮切换）、收藏/取消收藏、
+  定位到 tasks.json 的 `label` 行（内置轻量 JSONC 扫描，注释/转义/重复 label
+  容错，未命中降级打开顶部）；视图标题栏刷新按钮 + 文件 watcher（300ms 去抖）+
+  工作区/信任变化自动刷新。
+- **最近运行 / 收藏持久化**：只存任务身份（文件夹 + 来源 + 名称）到
+  `workspaceState`，按工作区隔离、跨窗口恢复；最近运行展示 10 条（存 20）、
+  收藏不限量；读取校验失败重置并告警、写失败内存继续生效；失效条目隐藏但保留，
+  任务恢复后自动出现；「清空最近运行」模态确认且不影响收藏。
+- **受限模式**：空态文案「受限模式下不加载任务」，运行命令前置 `isTrusted` 拦截，
+  授予信任后自动加载。
+- 8 条新命令（`extStarter.refreshTaskExplorer` 等）；不新增运行时依赖。
+
+### 测试与工程化
+
+- 新增 7 个单测文件 88 例（过滤矩阵 / 持久化校验 / JSONC 扫描边界 / 事件去抖 /
+  三组树 / 图标三级判定 / 控制器编排 / 命令注册），`taskExplorer/**` 纳入覆盖率
+  统计（行 99% / 分支 93%，阈值 90/85）；测试桩补 `tasks` API、`Task` 执行类、
+  `Position/Range/Selection`、假文本文档与 watcher 句柄。
+- **宿主 E2E 全流程 suite（真实 fetchTasks + 真实扩展命令，19 passing）**：临时
+  改写仓库 `tasks.json` 注入 8 条多类型任务（shell/process/build/test 分组/
+  dependsOn/Unicode 标签/注释噪声），断言任务发现与排序、三组树结构、真实运行 →
+  运行态转圈 → 真实停止 → 状态恢复、定位命中 label 行（注释噪声不误命中）、
+  收藏与最近运行分组；测毕自动恢复原文件。实测发现并修正两处真实宿主语义差异：
+  分组比较须用 `group.id`（对象形式分组经 API 返回非单例）、全流程面板用例的
+  创建竞态补轮询等待。
+- 任务条目**图标优化**：按「运行态 > 分组 > 类型」三级判定——shell → `terminal`、
+  process → `gear`、npm 等包脚本 → `package`，build/test 分组仍为 `tools`/`beaker`，
+  运行中统一 `sync~spin`。
+- 宿主集成 Task Explorer suite：8 命令注册断言 + 仓库 `npm: compile` 任务的
+  `source/scope` 过滤假设实证（M0/R1）。
+- 文档：功能介绍 07（含图标速查表）、开发指南 09（含 E2E fixtures 方式与
+  `group.id` 坑）、docs 索引与根 README 功能表同步。
+
 ## [2.2.3] - 2026-10-25
 
 ### 修复（全量代码检视整改）
