@@ -18,6 +18,25 @@
       "isBackground": true,
       "group": "build",
       "problemMatcher": []
+    },
+     {
+      "label": "common-python_v",
+      "type": "shell",
+      "command": "python -V",
+      "dependsOn": [
+        "common-down_pwd_xml"
+      ],
+      "options": {
+        "cwd": "${workspaceRoot}"
+      }
+    },
+    {
+      "label": "common-down_pwd_xml",
+      "type": "shell",
+      "command": "python -V",
+      "options": {
+        "cwd": "${workspaceRoot}"
+      }
     }
   ]
 }

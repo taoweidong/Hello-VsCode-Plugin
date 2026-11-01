@@ -6,10 +6,12 @@ import type { TaskStatusTracker } from './taskStatusTracker'
 import type { TaskUsageStore } from './taskUsageStore'
 
 /**
- * 任务管理器树视图（v2.3，10 方案 §7）：三个根分组**固定显示、顺序固定**——
- * 「最近运行 → 收藏 → 工作区任务」，空组也显示「暂无」占位（可发现性）。
+ * 任务管理器树视图（v2.3，10 方案 §7；v2.4 任务树形分组）：三个根分组**固定显示、
+ * 顺序固定**——「最近运行 → 收藏 → 工作区任务」，空组也显示「暂无」占位（可发现性）。
  *
  * - 工作区任务组：单根为 `tasks.json → 任务`，多根为「文件夹 → tasks.json → 任务」；
+ *   v2.4 起任务 label 按 `-` 分段展示为**虚拟文件夹树**（如 `a-b-c` → a → b → 任务），
+ *   只有叶子是真实可运行任务；最近运行 / 收藏保持平铺（操作性列表不加层级）；
  * - 三个 group 节点持有固定实例（只替换 children），刷新后展开状态不丢；
  * - 运行态在 getTreeItem 时实时查询 status.isRunning（不缓存布尔值），最近运行/
  *   收藏/工作区任务三处同 key 节点显示天然一致；
@@ -24,6 +26,16 @@ export type TaskExplorerNode =
   | { kind: 'group'; group: TaskExplorerGroup; children: TaskExplorerNode[]; count: number }
   | { kind: 'folder'; folder: vscode.WorkspaceFolder; entries: WorkspaceTaskEntry[] }
   | { kind: 'file'; folder: vscode.WorkspaceFolder; entries: WorkspaceTaskEntry[] }
+  | {
+      kind: 'taskFolder'
+      /** 最后一段显示名（如 a-b-c 的 b 层显示 b） */
+      name: string
+      /** 完整前缀路径（a-b），用于稳定 id 保持展开状态 */
+      path: string
+      folder: vscode.WorkspaceFolder
+      children: TaskExplorerNode[]
+      count: number
+    }
   | { kind: 'task'; entry: WorkspaceTaskEntry }
   | { kind: 'info'; text: string; icon: string; tooltip?: string }
 
@@ -90,6 +102,81 @@ function taskContextValue(running: boolean, favorite: boolean): string {
       : VIEW.taskExplorerTaskRunningContextValue
   }
   return favorite ? VIEW.taskExplorerTaskFavoriteContextValue : VIEW.taskExplorerTaskContextValue
+}
+
+/* ---------------- 任务树形分组（v2.4：按 label 的 '-' 分段） ---------------- */
+
+/** 构建期的临时桶：文件夹桶 + 直接挂在该层的任务 */
+interface TaskBucket {
+  folders: Map<string, TaskBucket>
+  tasks: WorkspaceTaskEntry[]
+}
+
+const byLabel = (a: { label: string }, b: { label: string }): number =>
+  a.label.localeCompare(b.label, 'zh-Hans-CN')
+
+/** 统计子树内的任务总数（虚拟文件夹 description 用） */
+function countBucketTasks(bucket: TaskBucket): number {
+  let total = bucket.tasks.length
+  for (const child of bucket.folders.values()) {
+    total += countBucketTasks(child)
+  }
+  return total
+}
+
+/**
+ * 把平铺的任务列表按 label 的 `-` 分段构建虚拟文件夹树：
+ * `a-b-c` → 虚拟文件夹 a → 虚拟文件夹 b → 任务 a-b-c（叶子保留完整 label，
+ * 保证三组展示一致与可检索性）；无 `-` 的任务直接作为叶子。
+ * 边界：任务名与虚拟文件夹同名时，任务并入该文件夹（避免同层同名混淆）；
+ * 空段（`-x` / `x-`）忽略。
+ */
+function buildTaskTree(
+  entries: readonly WorkspaceTaskEntry[],
+  folder: vscode.WorkspaceFolder
+): TaskExplorerNode[] {
+  const root: TaskBucket = { folders: new Map(), tasks: [] }
+  for (const entry of entries) {
+    const segments = entry.label.split('-').filter((segment) => segment.length > 0)
+    let bucket = root
+    for (let i = 0; i < segments.length - 1; i += 1) {
+      let next = bucket.folders.get(segments[i]!)
+      if (!next) {
+        next = { folders: new Map(), tasks: [] }
+        bucket.folders.set(segments[i]!, next)
+      }
+      bucket = next
+    }
+    bucket.tasks.push(entry)
+  }
+  const build = (bucket: TaskBucket, prefix: string): TaskExplorerNode[] => {
+    const nodes: TaskExplorerNode[] = []
+    const claimed = new Set<string>()
+    for (const [name, child] of [...bucket.folders].sort((a, b) =>
+      byLabel({ label: a[0] }, { label: b[0] })
+    )) {
+      const path = prefix ? `${prefix}-${name}` : name
+      // 任务名与虚拟文件夹同名 → 并入该文件夹统一排序（任务名唯一，至多一条）
+      for (const entry of bucket.tasks.filter((entry) => entry.label === path)) {
+        child.tasks.push(entry)
+        claimed.add(path)
+      }
+      const childNodes = build(child, path)
+      nodes.push({
+        kind: 'taskFolder',
+        name,
+        path,
+        folder,
+        children: childNodes,
+        count: countBucketTasks(child),
+      })
+    }
+    for (const entry of bucket.tasks.filter((entry) => !claimed.has(entry.label)).sort(byLabel)) {
+      nodes.push({ kind: 'task', entry })
+    }
+    return nodes
+  }
+  return build(root, '')
 }
 
 /** tooltip 命令行展示：Shell / Process / 复合任务三种形态分别降级（10 方案 §7.4） */
@@ -355,7 +442,9 @@ export class TaskExplorerTreeProvider
       case 'folder':
         return [{ kind: 'file', folder: element.folder, entries: element.entries }]
       case 'file':
-        return element.entries.map((entry): TaskExplorerNode => ({ kind: 'task', entry }))
+        return buildTaskTree(element.entries, element.folder)
+      case 'taskFolder':
+        return element.children
       case 'task':
       case 'info':
         return []
@@ -403,6 +492,15 @@ export class TaskExplorerTreeProvider
           arguments: [node.folder],
         }
         item.id = `file:${String(tasksJson)}`
+        return item
+      }
+      case 'taskFolder': {
+        const item = new vscode.TreeItem(node.name, vscode.TreeItemCollapsibleState.Expanded)
+        item.iconPath = new vscode.ThemeIcon('folder')
+        item.description = `${node.count} 个任务`
+        item.contextValue = VIEW.taskExplorerTaskFolderContextValue
+        // 稳定 id：刷新后保持展开状态（path 为去重后的完整前缀）
+        item.id = `taskFolder:${String(vscode.Uri.joinPath(node.folder.uri, '.vscode', 'tasks.json'))}:${node.path}`
         return item
       }
       case 'task': {

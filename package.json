@@ -2,7 +2,7 @@
   "name": "vscode-starter-template",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "publisher": "your-publisher",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -46,24 +46,28 @@
     "views": {
       "extStarter": [
         {
+          "id": "extStarter.taskExplorerView",
+          "name": "%view.taskExplorer.name%"
+        },
+        {
           "id": "extStarter.envView",
-          "name": "%view.env.name%"
+          "name": "%view.env.name%",
+          "visibility": "collapsed"
         },
         {
           "id": "extStarter.initView",
-          "name": "%view.init.name%"
+          "name": "%view.init.name%",
+          "visibility": "collapsed"
         },
         {
           "id": "extStarter.buildView",
-          "name": "%view.build.name%"
+          "name": "%view.build.name%",
+          "visibility": "collapsed"
         },
         {
           "id": "extStarter.serialServersView",
-          "name": "%view.serialServers.name%"
-        },
-        {
-          "id": "extStarter.taskExplorerView",
-          "name": "%view.taskExplorer.name%"
+          "name": "%view.serialServers.name%",
+          "visibility": "collapsed"
         }
       ]
     },
@@ -226,7 +230,7 @@
         "command": "extStarter.removeTaskFromFavorites",
         "title": "%command.removeTaskFromFavorites.title%",
         "category": "%command.category%",
-        "icon": "$(star-filled)"
+        "icon": "$(star-full)"
       },
       {
         "command": "extStarter.clearRecentTasks",

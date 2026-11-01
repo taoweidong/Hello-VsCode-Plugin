@@ -43,6 +43,8 @@ export const VIEW = {
   taskExplorerTaskFavoriteContextValue: 'workspaceTaskFavorite',
   /** 任务节点（运行中、已收藏） */
   taskExplorerTaskRunningFavoriteContextValue: 'workspaceTaskRunningFavorite',
+  /** 任务 label 按 - 分段产生的虚拟文件夹节点（v2.4，仅展示分组，不可运行） */
+  taskExplorerTaskFolderContextValue: 'taskExplorerTaskFolder',
 } as const
 
 /**

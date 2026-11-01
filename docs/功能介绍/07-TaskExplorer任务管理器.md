@@ -5,19 +5,24 @@
 
 ## 视图结构
 
-树顶部**固定**显示三个分组（为空也显示「暂无」占位），顺序不变：
+「任务管理器」位于活动栏视图组**最顶端**，其余视图默认折叠；树顶部**固定**显示
+三个分组（为空也显示「暂无」占位），顺序不变：
 
 ```text
 最近运行 (1)
-└─ common-down_pack_code        ← 最近运行过的任务，最新在最上（最多 10 条）
+└─ common-down_pack_code        ← 最近运行过的任务，最新在最上（最多 10 条，平铺）
 收藏 (1)
-└─ common-down_pwd_xml          ← 星标收藏的任务，按名称排序
+└─ common-down_pwd_xml          ← 星标收藏的任务，按名称排序（平铺）
 工作区任务 (2)
 └─ tasks.json (2)               ← 单根工作区直接显示文件节点
-   ├─ common-down_pack_code     ← 多根工作区时为「文件夹 → tasks.json → 任务」
-   └─ common-down_pwd_xml
+   └─ common (2)                ← label 中的 `-` 作为层级：虚拟文件夹按段分组
+      ├─ common-down_pack_code  ← 叶子保留完整 label，单击即运行
+      └─ common-down_pwd_xml
 ```
 
+- **树形分组**：工作区任务组的任务 label 按 `-` 分段拆为虚拟文件夹
+  （如 `a-b-c` → a → b → 任务）；无 `-` 的任务直接挂文件节点下；
+  最近运行 / 收藏保持平铺不加层级；
 - 三个分组中的同名任务是**同一任务的引用**：运行态（转圈）、收藏态（星标）、
   定位行为在三处完全一致；
 - 只显示工作区 `.vscode/tasks.json` 的任务：用户级 tasks.json、`.code-workspace`
@@ -34,6 +39,7 @@
 | `$(tools)` / `$(beaker)`      | build 分组 / test 分组任务                |
 | `$(terminal)` / `$(gear)`     | shell 脚本 / process 独立进程             |
 | `$(package)`                  | npm 等包管理器脚本（contributed type）    |
+| `$(folder)`                   | 虚拟文件夹（label 分段产生的分组层）      |
 | `$(history)` / `$(star-full)` | 最近运行 / 收藏分组标题                   |
 | `$(info)` `$(warning)` 等     | 空态与异常提示（未发现任务 / 记录重置等） |
 

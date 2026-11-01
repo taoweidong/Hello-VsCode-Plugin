@@ -182,6 +182,99 @@ describe('TaskExplorerTreeProvider（三组根节点）', () => {
   })
 })
 
+describe('TaskExplorerTreeProvider（label 横线树形分组，v2.4）', () => {
+  /** 取 file 节点的直接 children（虚拟文件夹 + 无横线叶子任务） */
+  async function fileChildren(
+    provider: TaskExplorerTreeProvider,
+    groups: GroupNode[]
+  ): Promise<
+    { kind: string; name?: string; path?: string; count?: number; entry?: WorkspaceTaskEntry }[]
+  > {
+    const fileNode = (groups[2] as unknown as { children: { kind: string }[] }).children[0]
+    return (await provider.getChildren(fileNode as never)) as never
+  }
+
+  it('a-b-c → 虚拟文件夹 a → b → 叶子（叶子保留完整 label）', async () => {
+    const deep = makeTask({ name: 'a-b-c', folder: root })
+    const flat = makeTask({ name: 'plain', folder: root })
+    setWorkspace([root], [deep, flat])
+    const { provider } = makeHarness()
+    await provider.refresh()
+    const children = await fileChildren(provider, await roots(provider))
+
+    // 无横线任务直接是叶子；有横线的挂在虚拟文件夹下
+    const plainNode = children.find((node) => node.kind === 'task')
+    expect(plainNode?.entry?.label).toBe('plain')
+    const folderA = children.find((node) => node.kind === 'taskFolder' && node.name === 'a')
+    expect(folderA).toBeDefined()
+    expect(folderA?.path).toBe('a')
+    expect(folderA?.count).toBe(1)
+
+    const levelB = (await provider.getChildren(folderA as never)) as never as {
+      kind: string
+      name?: string
+    }[]
+    const folderB = levelB.find((node) => node.kind === 'taskFolder' && node.name === 'b')
+    expect(folderB).toBeDefined()
+    const leaves = (await provider.getChildren(folderB as never)) as never as {
+      kind: string
+      entry?: WorkspaceTaskEntry
+    }[]
+    expect(leaves).toHaveLength(1)
+    expect(leaves[0]?.entry?.label).toBe('a-b-c') // 叶子保留完整 label（三组一致 + 可检索）
+
+    const folderItem = provider.getTreeItem(folderA as never)
+    expect(folderItem.contextValue).toBe('taskExplorerTaskFolder')
+    expect(folderItem.description).toBe('1 个任务')
+    expect((folderItem.iconPath as vscode.ThemeIcon).id).toBe('folder')
+    expect(folderItem.collapsibleState).toBe(vscode.TreeItemCollapsibleState.Expanded)
+    expect(folderItem.id).toContain('taskFolder:')
+    provider.dispose()
+  })
+
+  it('任务名与虚拟文件夹同名 → 并入文件夹；文件夹先于叶子；各自按名排序', async () => {
+    const build = makeTask({ name: 'common-build', folder: root })
+    const common = makeTask({ name: 'common', folder: root })
+    const bSecond = makeTask({ name: 'common-second', folder: root })
+    const other = makeTask({ name: 'alpha', folder: root })
+    setWorkspace([root], [build, common, bSecond, other])
+    const { provider } = makeHarness()
+    await provider.refresh()
+    const children = await fileChildren(provider, await roots(provider))
+
+    // 文件夹在前，叶子在后；同名任务并入 common 文件夹
+    expect(children[0]?.kind).toBe('taskFolder')
+    expect(children[0]?.name).toBe('common')
+    expect(children[0]?.count).toBe(3) // common（并入）+ build + second
+    const inFolder = (await provider.getChildren(children[0] as never)) as never as {
+      kind: string
+      name?: string
+      entry?: WorkspaceTaskEntry
+    }[]
+    expect(inFolder.map((node) => node.entry?.label ?? node.name)).toEqual([
+      'common', // 同名任务并入文件夹首位（排序后）
+      'common-build',
+      'common-second',
+    ])
+    // 文件夹之后的叶子
+    const leaf = children.find((node) => node.kind === 'task')
+    expect(leaf?.entry?.label).toBe('alpha')
+    provider.dispose()
+  })
+
+  it('空段忽略：-x 与 x- 与 x 等价成叶子', async () => {
+    const leading = makeTask({ name: '-lead', folder: root })
+    const trailing = makeTask({ name: 'trail-', folder: root })
+    setWorkspace([root], [leading, trailing])
+    const { provider } = makeHarness()
+    await provider.refresh()
+    const children = await fileChildren(provider, await roots(provider))
+    expect(children.every((node) => node.kind === 'task')).toBe(true)
+    expect(children.map((node) => node.entry?.label)).toEqual(['-lead', 'trail-'])
+    provider.dispose()
+  })
+})
+
 describe('TaskExplorerTreeProvider（图标显示）', () => {
   it('图标优先级：运行转圈 > 任务分组 > 任务类型 > terminal 兜底', async () => {
     const build = makeTask({ name: 'b', folder: root, group: vscode.TaskGroup.Build })
