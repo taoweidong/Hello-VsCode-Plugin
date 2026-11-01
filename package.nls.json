@@ -39,5 +39,16 @@
   "command.locateTaskInTasksJson.title": "Locate in tasks.json",
   "command.addTaskToFavorites.title": "Add to Favorites",
   "command.removeTaskFromFavorites.title": "Remove from Favorites",
-  "command.clearRecentTasks.title": "Clear Recent Tasks"
+  "command.clearRecentTasks.title": "Clear Recent Tasks",
+  "configuration.taskGroupWithSeparator.description": "Group workspace tasks into virtual folders by splitting task labels on the separator.",
+  "configuration.taskGroupSeparator.description": "Separator used to split task labels into tree folders (e.g. a-b-c with \"-\" groups under a/b).",
+  "configuration.taskGroupMaxLevel.description": "Maximum number of grouping levels split from task labels (1 = only the first segment becomes a folder).",
+  "configuration.taskGroupMaxLevel.1": "1 level (default, e.g. a-b-c groups under folder a)",
+  "configuration.taskGroupMaxLevel.2": "2 levels",
+  "configuration.taskGroupMaxLevel.3": "3 levels",
+  "configuration.taskGroupMaxLevel.4": "4 levels",
+  "configuration.taskGroupMaxLevel.5": "5 levels",
+  "configuration.taskGroupStripTaskLabel.description": "Strip the group prefix from leaf task labels (full name stays in the tooltip).",
+  "configuration.taskNumLastTasks.description": "How many recently run tasks to display in the \"Recent\" group (storage keeps up to 20).",
+  "configuration.taskExpanded.description": "Default expanded state of the special groups (recent / favorites). Manual toggling is remembered by VS Code."
 }

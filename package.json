@@ -2,7 +2,7 @@
   "name": "vscode-starter-template",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "publisher": "your-publisher",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -473,6 +473,85 @@
           "type": "string",
           "default": "",
           "description": "%configuration.buildApiBaseUrl.description%"
+        },
+        "extStarter.taskGroupWithSeparator": {
+          "type": "boolean",
+          "default": true,
+          "description": "%configuration.taskGroupWithSeparator.description%"
+        },
+        "extStarter.taskGroupSeparator": {
+          "type": "string",
+          "default": "-",
+          "description": "%configuration.taskGroupSeparator.description%"
+        },
+        "extStarter.taskGroupMaxLevel": {
+          "type": "number",
+          "default": 1,
+          "enum": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "enumDescriptions": [
+            "%configuration.taskGroupMaxLevel.1%",
+            "%configuration.taskGroupMaxLevel.2%",
+            "%configuration.taskGroupMaxLevel.3%",
+            "%configuration.taskGroupMaxLevel.4%",
+            "%configuration.taskGroupMaxLevel.5%"
+          ],
+          "description": "%configuration.taskGroupMaxLevel.description%"
+        },
+        "extStarter.taskGroupStripTaskLabel": {
+          "type": "boolean",
+          "default": true,
+          "description": "%configuration.taskGroupStripTaskLabel.description%"
+        },
+        "extStarter.taskNumLastTasks": {
+          "type": "number",
+          "default": 10,
+          "enum": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20
+          ],
+          "description": "%configuration.taskNumLastTasks.description%"
+        },
+        "extStarter.taskExpanded": {
+          "type": "object",
+          "properties": {
+            "recent": {
+              "type": "boolean",
+              "default": true
+            },
+            "favorites": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "default": {
+            "recent": true,
+            "favorites": true
+          },
+          "description": "%configuration.taskExpanded.description%"
         }
       }
     }

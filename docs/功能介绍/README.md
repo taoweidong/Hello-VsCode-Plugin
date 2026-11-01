@@ -15,13 +15,19 @@
 | 拷贝示例（右键复制）   | 右键把选中文本 / 文件内容 / 文件路径复制到剪贴板                       | [06-拷贝示例](06-拷贝示例.md)                             | [开发指南 05](../开发指南/05-草稿箱与右键菜单.md)   |
 | 任务管理器             | 只加载工作区 `.vscode/tasks.json` 任务：三组树、运行/停止/收藏/定位    | [07-TaskExplorer任务管理器](07-TaskExplorer任务管理器.md) | [开发指南 09](../开发指南/09-任务管理器.md)         |
 
-## 全局设置（3 项）
+## 全局设置（9 项）
 
-| 设置项                            | 默认 | 说明                                            |
-| --------------------------------- | ---- | ----------------------------------------------- |
-| `extStarter.runStartupTasks`      | 开启 | 激活时自动执行启动任务（初始化脚本 + 环境检测） |
-| `extStarter.serialConsoleEnabled` | 开启 | 串口控制台功能开关（关闭时串口命令给出提示）    |
-| `extStarter.buildApiBaseUrl`      | 留空 | 构建任务 HTTP 接口基地址；留空 = 内置打桩模拟   |
+| 设置项                               | 默认   | 说明                                                 |
+| ------------------------------------ | ------ | ---------------------------------------------------- |
+| `extStarter.runStartupTasks`         | 开启   | 激活时自动执行启动任务（初始化脚本 + 环境检测）      |
+| `extStarter.serialConsoleEnabled`    | 开启   | 串口控制台功能开关（关闭时串口命令给出提示）         |
+| `extStarter.buildApiBaseUrl`         | 留空   | 构建任务 HTTP 接口基地址；留空 = 内置打桩模拟        |
+| `extStarter.taskGroupWithSeparator`  | 开启   | 任务 label 按分隔符拆入虚拟文件夹分组                |
+| `extStarter.taskGroupSeparator`      | `-`    | 任务分组分隔符                                       |
+| `extStarter.taskGroupMaxLevel`       | 1      | 分组拆层深度上限（1-5，1 = 只把第一段作为文件夹）    |
+| `extStarter.taskGroupStripTaskLabel` | 开启   | 叶子任务剥掉分组前缀只显示剩余段（完整名见 tooltip） |
+| `extStarter.taskNumLastTasks`        | 10     | 「最近运行」展示条数（1-20，存储上限恒 20）          |
+| `extStarter.taskExpanded`            | 全展开 | 最近运行 / 收藏分组的默认展开状态                    |
 
 ## 数据与文件落点
 

@@ -140,6 +140,20 @@ export const CONFIG = {
    * 留空（默认）= 打桩模拟；填写后切换真实接口（POST/GET /builds）。
    */
   buildApiBaseUrl: 'buildApiBaseUrl',
+
+  // 任务管理器树形展示（v2.5：继承 vscode-taskexplorer 的分组配置体系）
+  /** 是否按分隔符分组任务 label（默认 true） */
+  taskGroupWithSeparator: 'taskGroupWithSeparator',
+  /** 分组分隔符（默认 '-'） */
+  taskGroupSeparator: 'taskGroupSeparator',
+  /** 分组深度上限 1-5（默认 1：只按第一段分一层） */
+  taskGroupMaxLevel: 'taskGroupMaxLevel',
+  /** 叶子是否剥掉分组前缀只显示剩余段（默认 true，完整名见 tooltip） */
+  taskGroupStripTaskLabel: 'taskGroupStripTaskLabel',
+  /** 最近运行展示条数 1-20（存储上限恒 20） */
+  taskNumLastTasks: 'taskNumLastTasks',
+  /** 最近运行/收藏分组的默认展开状态 */
+  taskExpanded: 'taskExpanded',
 } as const
 
 /**

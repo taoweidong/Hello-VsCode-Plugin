@@ -39,5 +39,16 @@
   "command.locateTaskInTasksJson.title": "定位到 tasks.json 行",
   "command.addTaskToFavorites.title": "收藏任务",
   "command.removeTaskFromFavorites.title": "取消收藏",
-  "command.clearRecentTasks.title": "清空最近运行"
+  "command.clearRecentTasks.title": "清空最近运行",
+  "configuration.taskGroupWithSeparator.description": "按分隔符把任务 label 拆入虚拟文件夹分组展示。",
+  "configuration.taskGroupSeparator.description": "拆分任务 label 的分隔符（如 a-b-c 用 \"-\" 分组到 a/b 下）。",
+  "configuration.taskGroupMaxLevel.description": "任务 label 拆层的最大深度（1 = 只把第一段作为文件夹）。",
+  "configuration.taskGroupMaxLevel.1": "1 层（默认，如 a-b-c 收进文件夹 a）",
+  "configuration.taskGroupMaxLevel.2": "2 层",
+  "configuration.taskGroupMaxLevel.3": "3 层",
+  "configuration.taskGroupMaxLevel.4": "4 层",
+  "configuration.taskGroupMaxLevel.5": "5 层",
+  "configuration.taskGroupStripTaskLabel.description": "叶子任务剥掉分组前缀只显示剩余段（完整名见 tooltip）。",
+  "configuration.taskNumLastTasks.description": "「最近运行」分组展示的任务条数（存储上限恒为 20）。",
+  "configuration.taskExpanded.description": "特殊分组（最近运行 / 收藏）的默认展开状态。手动展开/折叠由 VS Code 记忆。"
 }

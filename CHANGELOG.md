@@ -6,6 +6,24 @@
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-11-01
+
+### 新增（任务树形展示配置化，继承 vscode-taskexplorer）
+
+- **6 个新设置**（`extStarter.task*`，与开源项目分组配置一一对应）：
+  `taskGroupWithSeparator`（分组开关，默认开）、`taskGroupSeparator`（分隔符，
+  默认 `-`）、`taskGroupMaxLevel`（拆层深度上限 1-5，默认 1）、
+  `taskGroupStripTaskLabel`（叶子短名，默认开）、`taskNumLastTasks`（最近运行
+  展示条数 1-20，默认 10）、`taskExpanded`（最近运行/收藏默认展开态）。
+- **叶子短名**：默认剥掉分组路径前缀只显示剩余段（`a-b-c` 在文件夹 a 下显示
+  `b-c`），tooltip 首行保留完整名；entry 身份恒用完整 label。
+- **运行中置顶**：最近运行组内正在执行的任务自动排到最前（对齐开源
+  pushToTopOfSpecialFolder；记录语义不变——仅本扩展运行成功才入列）。
+- 有意保留的设计差异：三组恒显空态占位、单击即运行、不加载用户级任务。
+- 测试：配置矩阵单测 8 例（开关/分隔符/深度/短名/同名并入/容量/置顶/展开态，
+  taskExplorer 共 96 例）；E2E 断言默认行为 + 配置改深度下钻（宿主 19 passing）；
+  设置变更触发全树重建（单飞 refresh）。文档设置表同步。
+
 ## [2.4.0] - 2026-11-01
 
 ### 变更（任务管理器体验优化）

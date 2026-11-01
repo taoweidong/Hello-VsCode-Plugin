@@ -5,7 +5,9 @@ import { type WorkspaceTaskEntry } from '../../../extension/features/taskExplore
 import { TaskStatusTracker } from '../../../extension/features/taskExplorer/taskStatusTracker'
 import { TaskUsageStore } from '../../../extension/features/taskExplorer/taskUsageStore'
 import {
+  __fireTaskStart,
   __resetStubs,
+  __setConfig,
   __setTaskExecutions,
   __stubs,
   createMementoStub,
@@ -182,19 +184,26 @@ describe('TaskExplorerTreeProvider（三组根节点）', () => {
   })
 })
 
-describe('TaskExplorerTreeProvider（label 横线树形分组，v2.4）', () => {
-  /** 取 file 节点的直接 children（虚拟文件夹 + 无横线叶子任务） */
+describe('TaskExplorerTreeProvider（label 树形分组，v2.5 配置化）', () => {
+  /** 取 file 节点的直接 children（虚拟文件夹 + 叶子任务） */
   async function fileChildren(
     provider: TaskExplorerTreeProvider,
     groups: GroupNode[]
   ): Promise<
-    { kind: string; name?: string; path?: string; count?: number; entry?: WorkspaceTaskEntry }[]
+    {
+      kind: string
+      name?: string
+      path?: string
+      count?: number
+      entry?: WorkspaceTaskEntry
+      displayLabel?: string
+    }[]
   > {
     const fileNode = (groups[2] as unknown as { children: { kind: string }[] }).children[0]
     return (await provider.getChildren(fileNode as never)) as never
   }
 
-  it('a-b-c → 虚拟文件夹 a → b → 叶子（叶子保留完整 label）', async () => {
+  it('默认配置（maxLevel=1 + 短名）：a-b-c → 文件夹 a → 叶子显示 b-c（entry.label 完整）', async () => {
     const deep = makeTask({ name: 'a-b-c', folder: root })
     const flat = makeTask({ name: 'plain', folder: root })
     setWorkspace([root], [deep, flat])
@@ -202,37 +211,86 @@ describe('TaskExplorerTreeProvider（label 横线树形分组，v2.4）', () => 
     await provider.refresh()
     const children = await fileChildren(provider, await roots(provider))
 
-    // 无横线任务直接是叶子；有横线的挂在虚拟文件夹下
-    const plainNode = children.find((node) => node.kind === 'task')
-    expect(plainNode?.entry?.label).toBe('plain')
     const folderA = children.find((node) => node.kind === 'taskFolder' && node.name === 'a')
     expect(folderA).toBeDefined()
-    expect(folderA?.path).toBe('a')
     expect(folderA?.count).toBe(1)
-
-    const levelB = (await provider.getChildren(folderA as never)) as never as {
-      kind: string
-      name?: string
-    }[]
-    const folderB = levelB.find((node) => node.kind === 'taskFolder' && node.name === 'b')
-    expect(folderB).toBeDefined()
-    const leaves = (await provider.getChildren(folderB as never)) as never as {
-      kind: string
-      entry?: WorkspaceTaskEntry
-    }[]
-    expect(leaves).toHaveLength(1)
-    expect(leaves[0]?.entry?.label).toBe('a-b-c') // 叶子保留完整 label（三组一致 + 可检索）
-
     const folderItem = provider.getTreeItem(folderA as never)
     expect(folderItem.contextValue).toBe('taskExplorerTaskFolder')
     expect(folderItem.description).toBe('1 个任务')
     expect((folderItem.iconPath as vscode.ThemeIcon).id).toBe('folder')
-    expect(folderItem.collapsibleState).toBe(vscode.TreeItemCollapsibleState.Expanded)
     expect(folderItem.id).toContain('taskFolder:')
+
+    const leaves = (await provider.getChildren(folderA as never)) as never as {
+      kind: string
+      entry?: WorkspaceTaskEntry
+      displayLabel?: string
+    }[]
+    expect(leaves).toHaveLength(1)
+    expect(leaves[0]?.entry?.label).toBe('a-b-c') // entry 完整名不变（身份/匹配仍用全名）
+    expect(leaves[0]?.displayLabel).toBe('b-c') // 剥掉分组前缀
+
+    const leafItem = provider.getTreeItem(leaves[0] as never)
+    expect(leafItem.label).toBe('b-c') // 树内显示短名
+    expect(String((leafItem.tooltip as vscode.MarkdownString).value)).toContain('**a-b-c**') // tooltip 保留完整名
     provider.dispose()
   })
 
-  it('任务名与虚拟文件夹同名 → 并入文件夹；文件夹先于叶子；各自按名排序', async () => {
+  it('maxLevel=3 + stripLabel=false：a-b-c → a → b → 叶子完整显示（继承 groupMaxLevel/groupStripTaskLabel）', async () => {
+    __setConfig('extStarter', 'taskGroupMaxLevel', 3)
+    __setConfig('extStarter', 'taskGroupStripTaskLabel', false)
+    const deep = makeTask({ name: 'a-b-c', folder: root })
+    setWorkspace([root], [deep])
+    const { provider } = makeHarness()
+    await provider.refresh()
+    const children = await fileChildren(provider, await roots(provider))
+    const folderA = children.find((node) => node.kind === 'taskFolder' && node.name === 'a')!
+    const levelB = (await provider.getChildren(folderA as never)) as never as {
+      kind: string
+      name?: string
+    }[]
+    const folderB = levelB.find((node) => node.kind === 'taskFolder' && node.name === 'b')!
+    const leaves = (await provider.getChildren(folderB as never)) as never as {
+      kind: string
+      entry?: WorkspaceTaskEntry
+      displayLabel?: string
+    }[]
+    expect(leaves[0]?.entry?.label).toBe('a-b-c')
+    expect(leaves[0]?.displayLabel).toBeUndefined() // 不剥前缀
+    const leafItem = provider.getTreeItem(leaves[0] as never)
+    expect(leafItem.label).toBe('a-b-c')
+    provider.dispose()
+  })
+
+  it('groupWithSeparator=false → 全部平铺叶子（继承分组开关）', async () => {
+    __setConfig('extStarter', 'taskGroupWithSeparator', false)
+    const build = makeTask({ name: 'common-build', folder: root })
+    setWorkspace([root], [build])
+    const { provider } = makeHarness()
+    await provider.refresh()
+    const children = await fileChildren(provider, await roots(provider))
+    expect(children).toHaveLength(1)
+    expect(children[0]?.kind).toBe('task')
+    expect(children[0]?.entry?.label).toBe('common-build')
+    provider.dispose()
+  })
+
+  it('自定义分隔符（/）：a/b/c → 文件夹 a → 叶子 b/c（继承 groupSeparator）', async () => {
+    __setConfig('extStarter', 'taskGroupSeparator', '/')
+    const task = makeTask({ name: 'a/b/c', folder: root })
+    setWorkspace([root], [task])
+    const { provider } = makeHarness()
+    await provider.refresh()
+    const children = await fileChildren(provider, await roots(provider))
+    const folderA = children.find((node) => node.kind === 'taskFolder' && node.name === 'a')!
+    const leaves = (await provider.getChildren(folderA as never)) as never as {
+      kind: string
+      displayLabel?: string
+    }[]
+    expect(leaves[0]?.displayLabel).toBe('b/c')
+    provider.dispose()
+  })
+
+  it('任务名与虚拟文件夹同名 → 并入文件夹（同名任务显示全名）；文件夹先于叶子', async () => {
     const build = makeTask({ name: 'common-build', folder: root })
     const common = makeTask({ name: 'common', folder: root })
     const bSecond = makeTask({ name: 'common-second', folder: root })
@@ -242,27 +300,28 @@ describe('TaskExplorerTreeProvider（label 横线树形分组，v2.4）', () => 
     await provider.refresh()
     const children = await fileChildren(provider, await roots(provider))
 
-    // 文件夹在前，叶子在后；同名任务并入 common 文件夹
     expect(children[0]?.kind).toBe('taskFolder')
     expect(children[0]?.name).toBe('common')
     expect(children[0]?.count).toBe(3) // common（并入）+ build + second
     const inFolder = (await provider.getChildren(children[0] as never)) as never as {
       kind: string
-      name?: string
       entry?: WorkspaceTaskEntry
+      displayLabel?: string
     }[]
-    expect(inFolder.map((node) => node.entry?.label ?? node.name)).toEqual([
-      'common', // 同名任务并入文件夹首位（排序后）
+    expect(inFolder.map((node) => node.entry?.label)).toEqual([
+      'common', // 同名任务并入（剥前缀无剩余 → 保完整名）
       'common-build',
       'common-second',
     ])
+    expect(inFolder[0]?.displayLabel).toBeUndefined() // 剥前缀无剩余 → 回退完整名（显示即 common）
+    expect(inFolder[1]?.displayLabel).toBe('build') // 短名
     // 文件夹之后的叶子
     const leaf = children.find((node) => node.kind === 'task')
     expect(leaf?.entry?.label).toBe('alpha')
     provider.dispose()
   })
 
-  it('空段忽略：-x 与 x- 与 x 等价成叶子', async () => {
+  it('空段忽略：-x 与 x- 等价成叶子', async () => {
     const leading = makeTask({ name: '-lead', folder: root })
     const trailing = makeTask({ name: 'trail-', folder: root })
     setWorkspace([root], [leading, trailing])
@@ -271,6 +330,50 @@ describe('TaskExplorerTreeProvider（label 横线树形分组，v2.4）', () => 
     const children = await fileChildren(provider, await roots(provider))
     expect(children.every((node) => node.kind === 'task')).toBe(true)
     expect(children.map((node) => node.entry?.label)).toEqual(['-lead', 'trail-'])
+    provider.dispose()
+  })
+
+  it('最近运行：展示条数可配（taskNumLastTasks）+ 运行中置顶', async () => {
+    __setConfig('extStarter', 'taskNumLastTasks', 2)
+    const a = makeTask({ name: 'rec-a', folder: root })
+    const b = makeTask({ name: 'rec-b', folder: root })
+    const c = makeTask({ name: 'rec-c', folder: root })
+    setWorkspace([root], [a, b, c])
+    const { provider, usage } = makeHarness()
+    await provider.refresh()
+    usage.recordRun({ scopeUri: String(root.uri), source: 'Workspace', name: 'rec-a' }, 100)
+    usage.recordRun({ scopeUri: String(root.uri), source: 'Workspace', name: 'rec-b' }, 200)
+    usage.recordRun({ scopeUri: String(root.uri), source: 'Workspace', name: 'rec-c' }, 300)
+
+    // 运行中：rec-b 开始执行（真实事件流：start 事件 + 100ms 去抖）→ 置顶
+    const execution = new FakeTaskExecution(b as unknown as Task)
+    __setTaskExecutions([execution])
+    __fireTaskStart(execution)
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    const groups = await roots(provider)
+    const recent = (
+      groups[0] as unknown as { children: { kind: string; entry?: WorkspaceTaskEntry }[] }
+    ).children
+    expect(recent).toHaveLength(2) // taskNumLastTasks=2
+    expect(recent[0]?.entry?.label).toBe('rec-b') // 运行中置顶（覆盖时间序）
+    expect(recent[1]?.entry?.label).toBe('rec-c') // 其余按 lastRunAt 倒序
+    provider.dispose()
+  })
+
+  it('taskExpanded 设置：favorites=false → 收藏组默认折叠', async () => {
+    __setConfig('extStarter', 'taskExpanded', { recent: true, favorites: false })
+    setWorkspace([root], [])
+    const { provider } = makeHarness()
+    const groups = await roots(provider)
+    expect(provider.getTreeItem(groups[0] as never).collapsibleState).toBe(
+      vscode.TreeItemCollapsibleState.Expanded
+    )
+    expect(provider.getTreeItem(groups[1] as never).collapsibleState).toBe(
+      vscode.TreeItemCollapsibleState.Collapsed
+    )
+    expect(provider.getTreeItem(groups[2] as never).collapsibleState).toBe(
+      vscode.TreeItemCollapsibleState.Expanded
+    )
     provider.dispose()
   })
 })

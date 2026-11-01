@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import { COMMAND, VIEW } from '../../constants'
+import { COMMAND, CONFIG, VIEW } from '../../constants'
 import type { WorkspaceTaskEntry } from './taskSource'
 import { groupByFolder, loadWorkspaceTasks, taskKeyFromRef } from './taskSource'
 import type { TaskStatusTracker } from './taskStatusTracker'
@@ -36,11 +36,12 @@ export type TaskExplorerNode =
       children: TaskExplorerNode[]
       count: number
     }
-  | { kind: 'task'; entry: WorkspaceTaskEntry }
+  | {
+      kind: 'task'
+      entry: WorkspaceTaskEntry
+      /** 树内显示名（剥前缀后的短名）；完整名恒为 entry.label */ displayLabel?: string
+    }
   | { kind: 'info'; text: string; icon: string; tooltip?: string }
-
-/** 最近运行展示上限（存储上限 20 在 TaskUsageStore） */
-const RECENT_DISPLAY_LIMIT = 10
 
 const GROUP_LABEL: Record<TaskExplorerGroup, string> = {
   recent: '最近运行',
@@ -124,22 +125,52 @@ function countBucketTasks(bucket: TaskBucket): number {
   return total
 }
 
+/** 分组配置（每次建树时读取，随设置即时生效） */
+interface GroupingConfig {
+  enabled: boolean
+  separator: string
+  maxLevel: number
+  stripLabel: boolean
+}
+
+function readGroupingConfig(): GroupingConfig {
+  const cfg = vscode.workspace.getConfiguration(CONFIG.section)
+  const separator = cfg.get<string>(CONFIG.taskGroupSeparator, '-') || '-'
+  const rawLevel = cfg.get<number>(CONFIG.taskGroupMaxLevel, 1)
+  const maxLevel = Math.min(5, Math.max(1, Math.floor(Number(rawLevel) || 1)))
+  return {
+    enabled: cfg.get<boolean>(CONFIG.taskGroupWithSeparator, true),
+    separator,
+    maxLevel,
+    stripLabel: cfg.get<boolean>(CONFIG.taskGroupStripTaskLabel, true),
+  }
+}
+
 /**
- * 把平铺的任务列表按 label 的 `-` 分段构建虚拟文件夹树：
- * `a-b-c` → 虚拟文件夹 a → 虚拟文件夹 b → 任务 a-b-c（叶子保留完整 label，
- * 保证三组展示一致与可检索性）；无 `-` 的任务直接作为叶子。
- * 边界：任务名与虚拟文件夹同名时，任务并入该文件夹（避免同层同名混淆）；
- * 空段（`-x` / `x-`）忽略。
+ * 把平铺的任务列表按 label 分段构建虚拟文件夹树（v2.5 配置化，对齐
+ * vscode-taskexplorer 的 groupWithSeparator / groupSeparator / groupMaxLevel /
+ * groupStripTaskLabel）：
+ *
+ * - `groupWithSeparator=false` → 全部平铺叶子；
+ * - 分段数超过 `maxLevel` 时，超出部分保留在叶子中（叶子 displayLabel =
+ *   剩余段用分隔符拼回；`stripLabel=false` 则叶子始终显示完整 label）；
+ * - 任务名与虚拟文件夹同名时，任务并入该文件夹（避免同层同名混淆）；
+ *   空段（`-x` / `x-`）忽略；
+ * - 叶子节点保留 `entry`（完整任务身份），显示名见 `displayLabel`。
  */
 function buildTaskTree(
   entries: readonly WorkspaceTaskEntry[],
   folder: vscode.WorkspaceFolder
 ): TaskExplorerNode[] {
+  const config = readGroupingConfig()
   const root: TaskBucket = { folders: new Map(), tasks: [] }
   for (const entry of entries) {
-    const segments = entry.label.split('-').filter((segment) => segment.length > 0)
+    const segments = config.enabled
+      ? entry.label.split(config.separator).filter((segment) => segment.length > 0)
+      : [entry.label]
+    const folderCount = Math.min(config.maxLevel, segments.length - 1)
     let bucket = root
-    for (let i = 0; i < segments.length - 1; i += 1) {
+    for (let i = 0; i < folderCount; i += 1) {
       let next = bucket.folders.get(segments[i]!)
       if (!next) {
         next = { folders: new Map(), tasks: [] }
@@ -155,7 +186,7 @@ function buildTaskTree(
     for (const [name, child] of [...bucket.folders].sort((a, b) =>
       byLabel({ label: a[0] }, { label: b[0] })
     )) {
-      const path = prefix ? `${prefix}-${name}` : name
+      const path = prefix ? `${prefix}${config.separator}${name}` : name
       // 任务名与虚拟文件夹同名 → 并入该文件夹统一排序（任务名唯一，至多一条）
       for (const entry of bucket.tasks.filter((entry) => entry.label === path)) {
         child.tasks.push(entry)
@@ -172,7 +203,16 @@ function buildTaskTree(
       })
     }
     for (const entry of bucket.tasks.filter((entry) => !claimed.has(entry.label)).sort(byLabel)) {
-      nodes.push({ kind: 'task', entry })
+      // 剥前缀：去掉该叶子在树中的完整分组路径（剩余段为显示名；
+      // 不剥/无剩余时不设 displayLabel——树内回退完整名）
+      let displayLabel: string | undefined
+      if (config.stripLabel && prefix && entry.label.startsWith(prefix + config.separator)) {
+        const rest = entry.label.slice(prefix.length + config.separator.length)
+        if (rest.length > 0) {
+          displayLabel = rest
+        }
+      }
+      nodes.push({ kind: 'task', entry, displayLabel })
     }
     return nodes
   }
@@ -274,7 +314,15 @@ export class TaskExplorerTreeProvider
     // 二者都不重新 fetchTasks（10 方案 §9「运行态与数据刷新解耦」）
     this.subscriptions = [
       usage.onDidChange(() => this.rebuildGroups()),
-      status.onDidChange(() => this._onDidChangeTreeData.fire()),
+      // status 变化除刷新图标外还影响最近运行组的「运行中置顶」排序 → 重建分组
+      status.onDidChange(() => this.rebuildGroups()),
+      // 树形分组/展示设置即时生效：虚拟文件夹 children 建树时缓存，必须整体
+      // 重建（与 watcher 同路径走单飞 refresh；配置变更是低频操作）
+      vscode.workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration(`${CONFIG.section}.task`)) {
+          void this.refresh()
+        }
+      }),
     ]
   }
 
@@ -329,7 +377,9 @@ export class TaskExplorerTreeProvider
     this._onDidChangeTreeData.fire()
   }
 
-  /** 匹配不到的 ref 直接隐藏；重置提示 + 空态占位见 10 方案 §7.5 */
+  /** 匹配不到的 ref 直接隐藏；重置提示 + 空态占位见 10 方案 §7.5。
+   * v2.5：展示条数可配（taskNumLastTasks，存 20 展 N）；运行中的任务置顶
+   * （对齐 vscode-taskexplorer 的 pushToTopOfSpecialFolder 行为）。 */
   private buildRecentChildren(): TaskExplorerNode[] {
     const nodes: TaskExplorerNode[] = []
     if (this.usage.wasReset) {
@@ -345,9 +395,6 @@ export class TaskExplorerTreeProvider
       const entry = this.entryByKey.get(taskKeyFromRef(ref))
       if (entry && !matched.some((item) => item.key === entry.key)) {
         matched.push(entry)
-        if (matched.length >= RECENT_DISPLAY_LIMIT) {
-          break
-        }
       }
     }
     if (matched.length === 0) {
@@ -359,7 +406,26 @@ export class TaskExplorerTreeProvider
       })
       return nodes
     }
-    return [...nodes, ...matched.map((entry): TaskExplorerNode => ({ kind: 'task', entry }))]
+    // 运行中的置顶（组内保持 lastRunAt 倒序），其余随后；再按展示上限截断
+    const running = matched.filter((entry) => this.status.isRunning(entry.key))
+    const idle = matched.filter((entry) => !this.status.isRunning(entry.key))
+    const limit = Math.max(
+      1,
+      Math.min(
+        20,
+        Math.floor(
+          Number(
+            vscode.workspace.getConfiguration(CONFIG.section).get(CONFIG.taskNumLastTasks, 10)
+          ) || 10
+        )
+      )
+    )
+    return [
+      ...nodes,
+      ...[...running, ...idle]
+        .slice(0, limit)
+        .map((entry): TaskExplorerNode => ({ kind: 'task', entry })),
+    ]
   }
 
   private buildFavoritesChildren(): TaskExplorerNode[] {
@@ -454,9 +520,24 @@ export class TaskExplorerTreeProvider
   getTreeItem(node: TaskExplorerNode): vscode.TreeItem {
     switch (node.kind) {
       case 'group': {
+        // 特殊分组默认展开态可配（taskExpanded.recent / .favorites）；工作区任务组恒展开
+        const expandedSetting = vscode.workspace
+          .getConfiguration(CONFIG.section)
+          .get<{ recent?: boolean; favorites?: boolean } | undefined>(
+            CONFIG.taskExpanded,
+            undefined
+          )
+        const expandedByDefault =
+          node.group === 'recent'
+            ? expandedSetting?.recent !== false
+            : node.group === 'favorites'
+              ? expandedSetting?.favorites !== false
+              : true
         const item = new vscode.TreeItem(
           GROUP_LABEL[node.group],
-          vscode.TreeItemCollapsibleState.Expanded
+          expandedByDefault
+            ? vscode.TreeItemCollapsibleState.Expanded
+            : vscode.TreeItemCollapsibleState.Collapsed
         )
         item.iconPath = new vscode.ThemeIcon(GROUP_ICON[node.group])
         item.description = node.group === 'tasks' ? `${node.count} 个` : `${node.count} 条`
@@ -507,7 +588,10 @@ export class TaskExplorerTreeProvider
         const { entry } = node
         const running = this.status.isRunning(entry.key)
         const favorite = this.usage.isFavorite(entry.key)
-        const item = new vscode.TreeItem(entry.label, vscode.TreeItemCollapsibleState.None)
+        const item = new vscode.TreeItem(
+          node.displayLabel ?? entry.label,
+          vscode.TreeItemCollapsibleState.None
+        )
         item.iconPath = new vscode.ThemeIcon(running ? 'sync~spin' : taskIcon(entry.task))
         item.description = entry.task.group ? TASK_GROUP_LABEL[entry.task.group.id] : undefined
         item.contextValue = taskContextValue(running, favorite)
