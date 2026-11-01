@@ -15,6 +15,21 @@
 | 拷贝示例（右键复制）   | 右键把选中文本 / 文件内容 / 文件路径复制到剪贴板                       | [06-拷贝示例](06-拷贝示例.md)                             | [开发指南 05](../开发指南/05-草稿箱与右键菜单.md)   |
 | 任务管理器             | 只加载工作区 `.vscode/tasks.json` 任务：三组树、运行/停止/收藏/定位    | [07-TaskExplorer任务管理器](07-TaskExplorer任务管理器.md) | [开发指南 09](../开发指南/09-任务管理器.md)         |
 
+## 菜单与右键入口速查（28 条命令的分布）
+
+| 菜单位置           | 入口 / 触发方式                                            | 典型场景                                                                    | 对应命令                                                                                                                                                             |
+| ------------------ | ---------------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 视图标题栏         | 各面板右上角（刷新 / 输出 / 全部初始化 / 串口等）          | 手动触发与刷新                                                              | `refreshEnvironment` `showEnvironmentOutput` `runAllInit` `openSerialConsole` `addSerialServer` `refreshSerialServers` `refreshTaskExplorer` `openTasksJson`         |
+| 树条目 inline 按钮 | 单击树条目或条目内联按钮                                   | 执行单个初始化步骤 / 连接串口服务器 / 运行·停止·收藏·定位任务               | `runInitStep` `connectSerialServer` `runWorkspaceTask` `stopWorkspaceTask` `addTaskToFavorites` `removeTaskFromFavorites` `locateTaskInTasksJson`                    |
+| 树条目右键菜单     | 右键任务 / 串口服务器条目（连接态菜单不同）                | 运行 / 停止 / 收藏 / 定位 / 打开 tasks.json；连接 / 编辑 / 删除（模态确认） | `runWorkspaceTask` `stopWorkspaceTask` `addTaskToFavorites` `locateTaskInTasksJson` `clearRecentTasks` `connectSerialServer` `editSerialServer` `deleteSerialServer` |
+| 编辑器右键菜单     | 选中文本右键（登记 / 追加 / 复制）；无选区右键（登记文件） | 选中文本一键入草稿箱；补充最近草稿；登记 / 复制当前文件                     | `draftSelection` `appendDraftSelection` `draftFile` `copySelection`                                                                                                  |
+| 资源管理器右键菜单 | 右键文件（单选 / 多选批量）或文件夹                        | 登记文件到草稿箱；整个目录内容登记为一条汇总草稿；复制文件内容 / 路径       | `draftFile` `draftFolder` `copyFileContent` `copyFilePath`                                                                                                           |
+| 编辑器标题栏       | 文件页签右上角图标按钮                                     | 对当前打开的文件做同样登记                                                  | `draftFile`                                                                                                                                                          |
+| 命令面板           | `Ctrl+Shift+P` 输入 "Hello VSCode Plugin"                  | 无鼠标操作路径；「打开分支编译控制台」弹框提交构建任务                      | 全部命令                                                                                                                                                             |
+
+> 传参约定 / `when` 子句 / i18n 等开发要点见 [开发指南 07](../开发指南/07-命令视图与i18n.md)
+> 与 [开发指南 05](../开发指南/05-草稿箱与右键菜单.md)。
+
 ## 全局设置（9 项）
 
 | 设置项                               | 默认   | 说明                                                 |

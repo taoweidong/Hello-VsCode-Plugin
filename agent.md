@@ -13,7 +13,8 @@
   Vite（Webview 构建）+ Vitest（单测）+ mocha/@vscode/test-electron（集成）+ Playwright（e2e）。
 - **仓库**：https://github.com/taoweidong/Hello-VsCode-Plugin
 - **扩展内品牌**：Hello VSCode Plugin / Hello VSCode 插件（ID 前缀 `extStarter`，manifest 文案走
-  `package.nls*.json` 的 `%key%` 占位符）。总览事实源是根目录 `README.md`；**文档总入口**是 `docs/README.md`（四层：操作指导 /
+  `package.nls*.json` 的 `%key%` 占位符）。总览事实源是根目录 `README.md`（精简版，
+  详情在四层文档）；**文档总入口**是 `docs/README.md`（四层：操作指导 /
   功能介绍 / 开发指南 / 设计与决策），按功能的二次开发文档在 `docs/开发指南/`。
 
 ## 一键式质量门禁（强制）
@@ -97,7 +98,8 @@ src/test/（unit: Vitest + vscode 测试桩；集成: mocha + @vscode/test-elect
 3. **图标语言**：webview 侧 codicon 语义名单一来源为 `src/webview/ui/iconNames.ts`；
    宿主树视图直接用 `ThemeIcon`。同一概念全插件同图标。
 4. **UI 规约**：颜色只用 `--vscode-*` 主题令牌；尺寸走 `--ui-*` 令牌（样式门禁强制）；
-   主按钮在右；动效仅 0.1s hover/focus；成功反馈以「已…」开头（详见 README「UI 风格约定」）。
+   主按钮在右；动效仅 0.1s hover/focus；成功反馈以「已…」开头
+   （详见 [docs/开发指南/00-架构与目录.md](docs/开发指南/00-架构与目录.md)「UI 风格约定」）。
 5. **右键菜单传参**：`view/item/context` 命令第一个参数是树节点元素（需 `toItem()` 归一化），
    第二个参数是多选集合；`TreeItem.command` 传的才是原始对象。
 6. **shell 拼接外部输入前必须白名单校验**（先例：分支名 `BRANCH_NAME_PATTERN`）。
