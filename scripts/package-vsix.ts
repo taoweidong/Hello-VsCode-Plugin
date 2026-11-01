@@ -8,11 +8,13 @@
  * 1. release/ 归档目录就绪（--clean 时先清空）；
  * 2. 完整构建（check-types + 宿主 + Webview，等价 npm run package，失败即中止）；
  * 3. vsce 打包（-o 直接产出到 release/，vsce 来自 devDependencies 免全局安装）；
- * 4. 校验产物存在并输出归档摘要（根目录不再出现 .vsix，保持整洁）。
+ * 4. 产物校验：存在性 + **逐条目解压 CRC**（零依赖，见 checks/vsixIntegrity；
+ *    v2.3.0 实测产物曾静默损坏且清单类检查全通过，只有解压比对能拦截）+ 归档摘要。
  */
 import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import * as path from 'node:path'
+import { verifyZipEntries } from './checks/vsixIntegrity'
 
 const root = path.resolve(__dirname, '..')
 process.chdir(root)
@@ -42,14 +44,25 @@ function main(): void {
   const outPath = `${RELEASE_DIR}/${outName}`
   execSync(`npx vsce package -o ${outPath}`, { cwd: root, stdio: 'inherit' })
 
-  // ---- 4) 产物校验 + 归档摘要 ----
+  // ---- 4) 产物校验：存在 + 逐条目 CRC ----
   if (!existsSync(path.join(root, outPath))) {
     throw new Error(`打包完成但未找到产物：${outPath}（检查 vsce 输出）`)
+  }
+  const verify = verifyZipEntries(path.join(root, outPath))
+  if (verify.failed.length > 0) {
+    throw new Error(
+      `产物损坏（${verify.failed.length}/${verify.total} 条目校验失败，疑似写入被干扰）：\n` +
+        verify.failed
+          .slice(0, 5)
+          .map((name) => `  ${name}`)
+          .join('\n') +
+        `\n请删除 ${outPath} 后重新打包，并排查磁盘/杀毒软件对 release 目录的写入干扰。`
+    )
   }
   const sizeMb = statSync(path.join(root, outPath)).size / 1024 / 1024
   const archives = readdirSync(RELEASE_DIR).filter((name) => name.endsWith('.vsix'))
   process.stdout.write(
-    `\n✅ 打包完成：${outPath}（${sizeMb.toFixed(1)} MB）\n` +
+    `\n✅ 打包完成：${outPath}（${sizeMb.toFixed(1)} MB，${verify.total} 条目逐条 CRC 校验通过）\n` +
       `   release/ 归档现有 ${archives.length} 个 .vsix：\n` +
       archives.map((name) => `   - ${name}`).join('\n') +
       '\n'
