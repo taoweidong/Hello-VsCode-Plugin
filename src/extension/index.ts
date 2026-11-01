@@ -36,7 +36,7 @@ import type { WebviewPageId } from '../webview/pages'
  * ItemFormPanel / ConfigFormPanel / ImportWizardPanel 接线一并清理）。
  */
 export function activate(context: vscode.ExtensionContext): void {
-  const outputChannel = vscode.window.createOutputChannel('Extension Starter')
+  const outputChannel = vscode.window.createOutputChannel('Hello VSCode Plugin')
   context.subscriptions.push(outputChannel)
 
   // 阶段 5.4（09 §5.2）：v0.x 旧命名数据一次性迁移（配置 / Memento；Secret 惰性搬迁）

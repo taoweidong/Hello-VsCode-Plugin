@@ -1,4 +1,4 @@
-# VSCode Extension Starter（VSCode 扩展初始化模板）
+# Hello VSCode Plugin（VSCode 扩展开发模板）
 
 一个 **VSCode 插件初始化项目（模板）**：收敛为「4 个可抄的示例 + 1 套自洽基座」——
 可插拔环境探针、任务编排、HTTP 弹框对接（分支编译）、真实业务（串口控制台）四种典型模式，
@@ -15,7 +15,7 @@
 > | 四 · 设计与决策 | [`docs/需求与优化方案/`](docs/需求与优化方案/README.md) | 想了解来龙去脉的人 | 评审设计、理解历史方案 01~09                 |
 >
 > 🎯 **需求与优化方案**（需求细化 / 缺陷分析 / 技术选型 / 设计系统 / 路线图）：
-> 见 [`docs/需求与优化方案/`](https://github.com/taoweidong/vscode-starter-template/blob/main/docs/需求与优化方案/README.md)。
+> 见 [`docs/需求与优化方案/`](https://github.com/taoweidong/Hello-VsCode-Plugin/blob/main/docs/需求与优化方案/README.md)。
 > v1.0.0 起项目由「CRUD 演示集合」重构为扩展初始化模板（09 方案），ID 前缀
 > `crudStarter.*` → `extStarter.*`，旧版设置 / 数据在激活时自动迁移。
 
@@ -60,7 +60,7 @@
 
 表单基座：**Vue 3 + SchemaForm**（由领域字段表 `SchemaFieldDef[]` 经 `deriveFormSchema` 派生，
 字段渲染 / 校验 / 回填零特例），视觉走自研 VSCode 原生设计系统（语义令牌 + 基础组件，
-详见 [`docs/需求与优化方案/04-VSCode原生设计系统.md`](https://github.com/taoweidong/vscode-starter-template/blob/main/docs/需求与优化方案/04-VSCode原生设计系统.md)），
+详见 [`docs/需求与优化方案/04-VSCode原生设计系统.md`](https://github.com/taoweidong/Hello-VsCode-Plugin/blob/main/docs/需求与优化方案/04-VSCode原生设计系统.md)），
 自动适配深浅色与高对比度主题、严格 CSP、`Esc` 取消 / `Ctrl+Enter` 保存、草稿自动恢复。
 
 ## 菜单与右键菜单示例（典型场景）
@@ -73,7 +73,7 @@
 | 编辑器右键菜单     | 选中文本右键（登记 / 追加）；无选区右键（登记文件） | 选中文本一键入草稿箱；给最近一条草稿补充内容；登记当前文件    | `draftSelection` `appendDraftSelection` `draftFile`                                                                     |
 | 资源管理器右键菜单 | 右键文件（单选 / 多选批量）或文件夹                 | 登记文件到草稿箱；整个目录内容登记为一条汇总草稿              | `draftFile` `draftFolder`                                                                                               |
 | 编辑器标题栏       | 文件页签右上角图标按钮                              | 对当前打开的文件做同样登记                                    | `draftFile`                                                                                                             |
-| 命令面板           | `Ctrl+Shift+P` 输入 "Extension Starter"             | 无鼠标操作路径；「打开分支编译控制台」弹框提交构建任务        | 全部命令                                                                                                                |
+| 命令面板           | `Ctrl+Shift+P` 输入 "Hello VSCode Plugin"           | 无鼠标操作路径；「打开分支编译控制台」弹框提交构建任务        | 全部命令                                                                                                                |
 
 ### 菜单开发要点（示例中的关键模式）
 
@@ -95,18 +95,18 @@
 
 扩展的 UI 目标是「像 VSCode 团队自己出品的一样」，后续增改界面时请遵守以下约定：
 
-| 约定           | 做法                                                                                                                                                                                       |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 颜色零硬编码   | 只使用 `--vscode-*` 主题令牌（输入框、按钮、错误、焦点色等），自动适配深浅色与高对比度主题                                                                                                 |
-| 单一字体与字阶 | 只用 `--vscode-font-family`；标题 1.3em/600，正文 13px，提示 0.9em                                                                                                                         |
-| 图标语言统一   | codicon 语义名单一来源 `src/webview/ui/iconNames.ts`（webview 侧）；宿主树视图直接用 `ThemeIcon`。新增图标先加进映射表                                                                     |
-| 布局刻度       | 全部尺寸走 `--ui-*` 令牌（门禁强制：padding/margin/gap/圆角/高宽/字号不允许 px 字面量）                                                                                                    |
-| 主按钮在右     | 确认键（保存/删除）在右侧、次要在左侧，与 VSCode 模态对话框一致                                                                                                                            |
-| 动效克制       | 仅 0.1s 的 hover/focus 过渡，无阴影、无渐变、无入场动画                                                                                                                                    |
-| 反馈闭环       | 成功用「已…」toast，失败给可修正的行内提示；确认弹窗按钮动词与操作同名                                                                                                                     |
-| 键盘可达       | 表单 `Esc` 取消、`Ctrl+Enter` 保存、打开即聚焦首字段；QuickPick/输入框均有 `Esc` 退出约定                                                                                                  |
-| 设计系统基线   | 全部令牌 / 组件规格与状态矩阵见 [04 · VSCode 原生设计系统](https://github.com/taoweidong/vscode-starter-template/blob/main/docs/需求与优化方案/04-VSCode原生设计系统.md)，画廊页可实时巡检 |
-| 资源相对引用   | webview 构建设置 `base: './'`（CSS 内 `url()` 相对解析），门禁红线禁止产物 CSS 出现站点根绝对引用——违反即字体 404、图标全灭（v0.7.0 的真实事故）                                           |
+| 约定           | 做法                                                                                                                                                                                   |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 颜色零硬编码   | 只使用 `--vscode-*` 主题令牌（输入框、按钮、错误、焦点色等），自动适配深浅色与高对比度主题                                                                                             |
+| 单一字体与字阶 | 只用 `--vscode-font-family`；标题 1.3em/600，正文 13px，提示 0.9em                                                                                                                     |
+| 图标语言统一   | codicon 语义名单一来源 `src/webview/ui/iconNames.ts`（webview 侧）；宿主树视图直接用 `ThemeIcon`。新增图标先加进映射表                                                                 |
+| 布局刻度       | 全部尺寸走 `--ui-*` 令牌（门禁强制：padding/margin/gap/圆角/高宽/字号不允许 px 字面量）                                                                                                |
+| 主按钮在右     | 确认键（保存/删除）在右侧、次要在左侧，与 VSCode 模态对话框一致                                                                                                                        |
+| 动效克制       | 仅 0.1s 的 hover/focus 过渡，无阴影、无渐变、无入场动画                                                                                                                                |
+| 反馈闭环       | 成功用「已…」toast，失败给可修正的行内提示；确认弹窗按钮动词与操作同名                                                                                                                 |
+| 键盘可达       | 表单 `Esc` 取消、`Ctrl+Enter` 保存、打开即聚焦首字段；QuickPick/输入框均有 `Esc` 退出约定                                                                                              |
+| 设计系统基线   | 全部令牌 / 组件规格与状态矩阵见 [04 · VSCode 原生设计系统](https://github.com/taoweidong/Hello-VsCode-Plugin/blob/main/docs/需求与优化方案/04-VSCode原生设计系统.md)，画廊页可实时巡检 |
+| 资源相对引用   | webview 构建设置 `base: './'`（CSS 内 `url()` 相对解析），门禁红线禁止产物 CSS 出现站点根绝对引用——违反即字体 404、图标全灭（v0.7.0 的真实事故）                                       |
 
 ## 快速开始
 
@@ -123,7 +123,7 @@ npm run gate      # 一键式质量门禁：lint/格式→类型→双构建→�
 
 调试窗口中的体验路径：
 
-1. 活动栏出现「扩展模板」图标，点击进入侧边栏（4 个视图）；「构建任务」视图标题栏可打开分支编译弹框，任务列表实时轮询；
+1. 活动栏出现「Hello VSCode 插件」图标，点击进入侧边栏（4 个视图）；「构建任务」视图标题栏可打开分支编译弹框，任务列表实时轮询；
 2. 窗口加载完成即自动执行启动任务（无需打开文件夹或点击插件；初始化脚本 Hello World + 环境检测，含 Python 版本检查），过程打印在输出通道（`extStarter.runStartupTasks` 可关闭）；之后点标题栏 ↻ 或单击任一探针条目按需重检；
 3. `npm run gate -- --with-e2e` 可追加 Webview E2E（Playwright + Edge）。
 
@@ -144,7 +144,7 @@ npm run package:vsix  # 一键打包离线 .vsix（内置 vsce，免全局安装
 ## 目录结构与架构
 
 ```
-vscode-starter-template/
+Hello-VsCode-Plugin/
 ├── package.json                  # 插件清单：命令、视图、菜单、配置（文案走 %key% 占位符）
 ├── package.nls.json              # manifest 文案（英文默认）
 ├── package.nls.zh-cn.json        # manifest 文案（简体中文）

@@ -5,7 +5,7 @@ import type { StartupTask, TaskContext, TaskResult } from './types'
  *
  * VSCode 打开（扩展激活）时随启动任务自动执行（受 extStarter.runStartupTasks 控制，
  * 默认开启），执行过程经 TaskRunner 逐行打印到输出通道（控制台：命令面板
- * 「Extension Starter: 打开环境信息输出」即可查看）。
+ * 「Hello VSCode Plugin: 打开环境信息输出」即可查看）。
  *
  * ★ 预留的扩展接口（与任务框架同一条路）：新增初始化脚本 = 实现 StartupTask
  *   接口并在 taskRegistry.ts 的 TASKS 数组加一项——调度、超时裁决、异常降级、
@@ -19,7 +19,7 @@ export const helloTask: StartupTask = {
 
   async run(ctx: TaskContext): Promise<TaskResult> {
     const startedAt = Date.now()
-    const message = 'Hello, World!（VSCode Extension Starter 初始化脚本）'
+    const message = 'Hello, World!（Hello VSCode Plugin 初始化脚本）'
     // 执行过程实时打印到控制台（输出通道）；结果同时进「环境信息」视图分组
     ctx.output.appendLine(`[初始化脚本] ${message}`)
     return {

@@ -1,18 +1,18 @@
 # agent.md — AI 编码代理工作约定
 
-> 本文件是 AI 编码代理在本仓库（vscode-starter-template）工作时的**强制约定**。
+> 本文件是 AI 编码代理在本仓库（Hello-VsCode-Plugin）工作时的**强制约定**。
 > 任何会话中修改代码 / 配置 / 文档之前，先读完本文件再动手。
 
 ## 项目概述
 
-- **是什么**：VSCode 扩展初始化模板（v1.0.0 起由「CRUD 演示集合」按 09 方案收敛重构）：
+- **是什么**：Hello VSCode 插件（v1.0.0 起由「CRUD 演示集合」按 09 方案收敛重构）：
   4 视图（环境信息 / 环境初始化 / 构建任务 / 串口服务器）+ 3 Webview 页面
   （gallery 组件画廊 / serialConsole 串口控制台 / buildConsole 分支编译弹框）+ 草稿箱右键示例（8 条入口）+
   启动任务框架（窗口加载完成自动执行：初始化脚本 + 环境探针）。
 - **技术栈**：TypeScript（strict，tsconfig node / webview 双工程）+ esbuild（宿主构建）+
   Vite（Webview 构建）+ Vitest（单测）+ mocha/@vscode/test-electron（集成）+ Playwright（e2e）。
-- **仓库**：https://github.com/taoweidong/vscode-starter-template
-- **扩展内品牌**：Extension Starter / 扩展模板（ID 前缀 `extStarter`，manifest 文案走
+- **仓库**：https://github.com/taoweidong/Hello-VsCode-Plugin
+- **扩展内品牌**：Hello VSCode Plugin / Hello VSCode 插件（ID 前缀 `extStarter`，manifest 文案走
   `package.nls*.json` 的 `%key%` 占位符）。总览事实源是根目录 `README.md`；**文档总入口**是 `docs/README.md`（四层：操作指导 /
   功能介绍 / 开发指南 / 设计与决策），按功能的二次开发文档在 `docs/开发指南/`。
 

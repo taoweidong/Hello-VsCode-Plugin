@@ -14,7 +14,7 @@ import type { TaskContext, TaskResult } from '../../extension/tasks/types'
 
 function makeContext(): TaskContext {
   return {
-    output: vscode.window.createOutputChannel('Extension Starter Test'),
+    output: vscode.window.createOutputChannel('Hello VSCode Plugin Test'),
     signal: {
       isCancellationRequested: false,
       onCancellationRequested: () => ({ dispose: () => {} }),
@@ -65,7 +65,7 @@ describe('TASKS 启动任务注册表（预留的扩展接口）', () => {
     }
     const runner = new TaskRunner(
       [TASKS[0], fakeEnv],
-      vscode.window.createOutputChannel('Extension Starter Test')
+      vscode.window.createOutputChannel('Hello VSCode Plugin Test')
     )
     await runner.runAll()
     const scriptLine = __stubs.outputLines.findIndex((line) => line.includes('[初始化脚本]'))

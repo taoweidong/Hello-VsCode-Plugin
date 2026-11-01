@@ -3,7 +3,7 @@
   <rect width="900" height="34" rx="8" fill="#2d2d2d"/>
   <text x="450" y="22" fill="#cccccc" font-size="13" text-anchor="middle" font-family="Segoe UI, sans-serif">终端 — npm run gate（一键式质量门禁）</text>
 
-  <text x="24" y="66" fill="#ffff00" font-size="14">PS D:\dev\vscode-starter-template&gt;</text>
+  <text x="24" y="66" fill="#ffff00" font-size="14">PS D:\dev\Hello-VsCode-Plugin&gt;</text>
   <text x="330" y="66" fill="#e6e6e6" font-size="14">npm run gate</text>
 
   <text x="24" y="96" fill="#e6e6e6" font-size="13">▶ 1/5 类型检查（tsc --noEmit，strict）</text>

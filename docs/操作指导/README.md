@@ -2,7 +2,7 @@
 
 > 文档分层：**第一层**——克隆到 F5 全流程跑通。返回导航中心见 [../README.md](../README.md)。
 
-本目录存放 **vscode-starter-template** 的详细操作指导，面向第一次接触本项目的开发者（含 AI 编码代理）。
+本目录存放 **Hello-VsCode-Plugin** 的详细操作指导，面向第一次接触本项目的开发者（含 AI 编码代理）。
 
 ## 文档清单
 
@@ -27,7 +27,7 @@
 ## 全局导航
 
 ```text
-vscode-starter-template/
+Hello-VsCode-Plugin/
 ├── agent.md               # AI 代理强制约定（门禁 + 单元测试协议）
 ├── README.md              # 项目主文档（功能/架构/扩展）
 ├── CHANGELOG.md           # 变更日志

@@ -34,7 +34,7 @@ function makeApi(overrides: Partial<BuildApiClient> = {}): BuildApiClient {
 }
 
 function makeServices(api: BuildApiClient, onAfterSubmit?: () => void) {
-  const output = vscode.window.createOutputChannel('Extension Starter Test')
+  const output = vscode.window.createOutputChannel('Hello VSCode Plugin Test')
   return { api, output, onAfterSubmit }
 }
 

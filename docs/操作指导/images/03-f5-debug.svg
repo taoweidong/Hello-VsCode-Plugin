@@ -1,7 +1,7 @@
 <svg width="900" height="560" viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif">
   <rect width="900" height="560" rx="8" fill="#3c3c3c"/>
   <rect width="900" height="34" rx="8" fill="#3c3c3c"/>
-  <text x="450" y="22" fill="#cccccc" font-size="13" text-anchor="middle">vscode-starter-template — 调试（扩展开发宿主）</text>
+  <text x="450" y="22" fill="#cccccc" font-size="13" text-anchor="middle">Hello-VsCode-Plugin — 调试（扩展开发宿主）</text>
 
   <rect y="34" width="900" height="490" fill="#1e1e1e"/>
 
@@ -40,7 +40,7 @@
   <rect x="60" y="420" width="780" height="86" rx="6" fill="#252526" stroke="#414141"/>
   <text x="80" y="446" fill="#dcdcaa" font-size="13" font-weight="bold">调试控制台 / 终端面板</text>
   <text x="80" y="468" fill="#858585" font-size="12">Terminal ｜ Debug Console ｜ 输出（选择「CRUD Starter」可看启动任务与编译日志）</text>
-  <text x="80" y="490" fill="#23d18b" font-size="12">[扩展宿主] 扩展已激活：vscode-starter-template@0.6.1</text>
+  <text x="80" y="490" fill="#23d18b" font-size="12">[扩展宿主] 扩展已激活：Hello-VsCode-Plugin@0.6.1</text>
 
   <rect y="526" width="900" height="34" fill="#007acc"/>
   <text x="16" y="548" fill="#ffffff" font-size="12">⎇ main</text>

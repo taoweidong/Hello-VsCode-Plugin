@@ -7,20 +7,20 @@
   <text x="450" y="22" fill="#cccccc" font-size="13" text-anchor="middle" font-family="Segoe UI, sans-serif">Windows PowerShell — 开发终端</text>
 
   <text x="24" y="70" fill="#ffff00" font-size="14">PS D:\dev&gt;</text>
-  <text x="110" y="70" fill="#e6e6e6" font-size="14">git clone https://github.com/taoweidong/vscode-starter-template.git</text>
-  <text x="24" y="96" fill="#23d18b" font-size="14">Cloning into 'vscode-starter-template'...</text>
+  <text x="110" y="70" fill="#e6e6e6" font-size="14">git clone https://github.com/taoweidong/Hello-VsCode-Plugin.git</text>
+  <text x="24" y="96" fill="#23d18b" font-size="14">Cloning into 'Hello-VsCode-Plugin'...</text>
   <text x="24" y="116" fill="#23d18b" font-size="14">remote: Enumerating objects: 156, done.</text>
   <text x="24" y="136" fill="#23d18b" font-size="14">Receiving objects: 100% (156/156), done.</text>
 
   <text x="24" y="172" fill="#ffff00" font-size="14">PS D:\dev&gt;</text>
-  <text x="110" y="172" fill="#e6e6e6" font-size="14">cd vscode-starter-template</text>
+  <text x="110" y="172" fill="#e6e6e6" font-size="14">cd Hello-VsCode-Plugin</text>
 
-  <text x="24" y="208" fill="#ffff00" font-size="14">PS D:\dev\vscode-starter-template&gt;</text>
+  <text x="24" y="208" fill="#ffff00" font-size="14">PS D:\dev\Hello-VsCode-Plugin&gt;</text>
   <text x="300" y="208" fill="#e6e6e6" font-size="14">npm install</text>
   <text x="24" y="234" fill="#23d18b" font-size="14">added 120 packages in 9s</text>
   <text x="24" y="254" fill="#858585" font-size="14">37 packages are looking for funding</text>
 
-  <text x="24" y="290" fill="#ffff00" font-size="14">PS D:\dev\vscode-starter-template&gt;</text>
+  <text x="24" y="290" fill="#ffff00" font-size="14">PS D:\dev\Hello-VsCode-Plugin&gt;</text>
   <text x="318" y="290" fill="#e6e6e6" font-size="14">node -v ; npm -v</text>
   <text x="24" y="316" fill="#569cd6" font-size="14">v24.4.0</text>
   <text x="24" y="336" fill="#569cd6" font-size="14">11.11.0</text>

@@ -6,6 +6,21 @@
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-11-01
+
+### 变更（破坏性 · 项目与扩展改名）
+
+- **项目与扩展更名**：GitHub 仓库 `vscode-starter-template` → `Hello-VsCode-Plugin`；
+  扩展 ID `your-publisher.vscode-starter-template` → `your-publisher.hello-vscode-plugin`；
+  品牌名统一为 **Hello VSCode Plugin** / **Hello VSCode 插件**（活动栏容器、命令
+  分类、配置标题、输出通道、README 与全部文档及操作配图）。
+- **升级注意**：扩展 ID 变更无法原地升级——旧版本（2.x）需先卸载再安装本版本。
+  内部 ID 前缀 `extStarter.*` **保持不变**（命令 / 视图 / 配置 / 存储键全部兼容），
+  用户设置与数据无缝沿用。
+- package.json 的 name / repository / homepage / bugs / keywords 同步更新，
+  package-lock 同步；README、agent.md、操作指导（含 4 张配图）、功能介绍、
+  开发指南、历史方案报告全部改名。
+
 ## [2.5.0] - 2026-11-01
 
 ### 新增（任务树形展示配置化，继承 vscode-taskexplorer）
@@ -243,7 +258,7 @@
 
 ### 变更（破坏性）
 
-- **项目定位收敛**：按 09 方案从「CRUD 演示集合」重构为「VSCode 扩展初始化模板」——
+- **项目定位收敛**：按 09 方案从「CRUD 演示集合」重构为「Hello VSCode 插件」——
   删除条目 / 特性配置 / 静态配置三视图及全部相关代码（7→4 视图、37→16 命令、
   42→23 菜单条目、2 子菜单与 2 快捷键清零、8→2 配置项），源码 −33% / 测试 −40%。
 - **ID 前缀迁移**：`crudStarter.*` → `extStarter.*`（命令 / 视图 / 配置 / 存储 / Secret 键），
@@ -489,7 +504,7 @@ cloneDraft / applyPatch`；未知字段透传——「加字段」在表单渲�
 
 ### 变更
 
-- 项目更名为 **vscode-starter-template**：GitHub 仓库、`package.json` 的 name/repository、
+- 项目更名为 **Hello-VsCode-Plugin**：GitHub 仓库、`package.json` 的 name/repository、
   文档中的项目路径同步更新；扩展内品牌（CRUD Starter 视图名 / 命令分类 / 输出通道）保持不变，
   继续描述插件自身功能。
 

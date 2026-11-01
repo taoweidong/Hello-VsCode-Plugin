@@ -1,8 +1,8 @@
 {
-  "name": "vscode-starter-template",
+  "name": "hello-vscode-plugin",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "2.5.0",
+  "version": "3.0.0",
   "publisher": "your-publisher",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -11,19 +11,19 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/taoweidong/vscode-starter-template.git"
+    "url": "https://github.com/taoweidong/Hello-VsCode-Plugin.git"
   },
-  "homepage": "https://github.com/taoweidong/vscode-starter-template#readme",
+  "homepage": "https://github.com/taoweidong/Hello-VsCode-Plugin#readme",
   "bugs": {
-    "url": "https://github.com/taoweidong/vscode-starter-template/issues"
+    "url": "https://github.com/taoweidong/Hello-VsCode-Plugin/issues"
   },
   "keywords": [
-    "crud",
+    "vscode-extension",
     "starter",
     "template",
     "webview",
-    "tree view",
-    "context menu"
+    "tree-view",
+    "task-explorer"
   ],
   "engines": {
     "vscode": "^1.85.0",

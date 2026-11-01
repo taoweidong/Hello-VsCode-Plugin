@@ -1,7 +1,7 @@
 <svg width="900" height="560" viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif">
   <rect width="900" height="560" rx="8" fill="#3c3c3c"/>
   <rect width="900" height="34" rx="8" fill="#3c3c3c"/>
-  <text x="450" y="22" fill="#cccccc" font-size="13" text-anchor="middle">vscode-starter-template — Visual Studio Code</text>
+  <text x="450" y="22" fill="#cccccc" font-size="13" text-anchor="middle">Hello-VsCode-Plugin — Visual Studio Code</text>
 
   <rect y="34" width="52" height="526" fill="#333333"/>
   <g fill="#858585">
@@ -43,7 +43,7 @@
   <rect x="292" y="34" width="608" height="492" fill="#1e1e1e"/>
   <g font-family="Consolas, monospace" font-size="13">
     <text x="316" y="70" fill="#569cd6">{</text>
-    <text x="330" y="94" fill="#9cdcfe">"name"</text><text x="400" y="94" fill="#d4d4d4">: </text><text x="410" y="94" fill="#ce9178">"vscode-starter-template"</text><text x="600" y="94" fill="#d4d4d4">,</text>
+    <text x="330" y="94" fill="#9cdcfe">"name"</text><text x="400" y="94" fill="#d4d4d4">: </text><text x="410" y="94" fill="#ce9178">"Hello-VsCode-Plugin"</text><text x="600" y="94" fill="#d4d4d4">,</text>
     <text x="330" y="118" fill="#9cdcfe">"displayName"</text><text x="425" y="118" fill="#d4d4d4">: </text><text x="435" y="118" fill="#ce9178">"CRUD Starter（界面化增删改查模板）"</text><text x="700" y="118" fill="#d4d4d4">,</text>
     <text x="330" y="142" fill="#9cdcfe">"version"</text><text x="400" y="142" fill="#d4d4d4">: </text><text x="410" y="142" fill="#ce9178">"0.6.1"</text><text x="460" y="142" fill="#d4d4d4">,</text>
     <text x="330" y="166" fill="#9cdcfe">"main"</text><text x="382" y="166" fill="#d4d4d4">: </text><text x="392" y="166" fill="#ce9178">"./dist/extension.js"</text><text x="510" y="166" fill="#d4d4d4">,</text>
