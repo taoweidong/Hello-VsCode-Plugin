@@ -2,7 +2,7 @@
   "name": "hello-vscode-plugin",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "publisher": "your-publisher",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -486,20 +486,40 @@
         },
         "extStarter.taskGroupMaxLevel": {
           "type": "number",
-          "default": 1,
+          "default": 5,
           "enum": [
             1,
             2,
             3,
             4,
-            5
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
           ],
           "enumDescriptions": [
             "%configuration.taskGroupMaxLevel.1%",
             "%configuration.taskGroupMaxLevel.2%",
             "%configuration.taskGroupMaxLevel.3%",
             "%configuration.taskGroupMaxLevel.4%",
-            "%configuration.taskGroupMaxLevel.5%"
+            "%configuration.taskGroupMaxLevel.5%",
+            "%configuration.taskGroupMaxLevel.6%",
+            "%configuration.taskGroupMaxLevel.7%",
+            "%configuration.taskGroupMaxLevel.8%",
+            "%configuration.taskGroupMaxLevel.9%",
+            "%configuration.taskGroupMaxLevel.10%",
+            "%configuration.taskGroupMaxLevel.11%",
+            "%configuration.taskGroupMaxLevel.12%",
+            "%configuration.taskGroupMaxLevel.13%",
+            "%configuration.taskGroupMaxLevel.14%",
+            "%configuration.taskGroupMaxLevel.15%"
           ],
           "description": "%configuration.taskGroupMaxLevel.description%"
         },

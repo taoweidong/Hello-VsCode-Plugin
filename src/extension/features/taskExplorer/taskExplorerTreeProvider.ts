@@ -105,12 +105,18 @@ function taskContextValue(running: boolean, favorite: boolean): string {
   return favorite ? VIEW.taskExplorerTaskFavoriteContextValue : VIEW.taskExplorerTaskContextValue
 }
 
-/* ---------------- 任务树形分组（v2.4：按 label 的 '-' 分段） ---------------- */
+/* ---------------- 任务树形分组（v2.4 起按 label 分隔符分段；v3.1 默认 5 层、上限 15 层） ---------------- */
 
 /** 构建期的临时桶：文件夹桶 + 直接挂在该层的任务 */
 interface TaskBucket {
   folders: Map<string, TaskBucket>
-  tasks: WorkspaceTaskEntry[]
+  tasks: BucketedTask[]
+}
+
+/** 桶内叶子：entry 保留完整任务身份，displayLabel 仅在剥名时设置 */
+interface BucketedTask {
+  entry: WorkspaceTaskEntry
+  displayLabel?: string
 }
 
 const byLabel = (a: { label: string }, b: { label: string }): number =>
@@ -133,11 +139,19 @@ interface GroupingConfig {
   stripLabel: boolean
 }
 
+/** 开源项目 groupMaxLevel 的允许范围（v3.1 默认 5 层，上限 15 层） */
+const DEFAULT_GROUP_MAX_LEVEL = 5
+const MAX_GROUP_MAX_LEVEL = 15
+
 function readGroupingConfig(): GroupingConfig {
   const cfg = vscode.workspace.getConfiguration(CONFIG.section)
   const separator = cfg.get<string>(CONFIG.taskGroupSeparator, '-') || '-'
-  const rawLevel = cfg.get<number>(CONFIG.taskGroupMaxLevel, 1)
-  const maxLevel = Math.min(5, Math.max(1, Math.floor(Number(rawLevel) || 1)))
+  const rawLevel = cfg.get<number>(CONFIG.taskGroupMaxLevel, DEFAULT_GROUP_MAX_LEVEL)
+  const numericLevel = Number(rawLevel)
+  const maxLevel = Math.min(
+    MAX_GROUP_MAX_LEVEL,
+    Math.max(1, Math.floor(Number.isFinite(numericLevel) ? numericLevel : DEFAULT_GROUP_MAX_LEVEL))
+  )
   return {
     enabled: cfg.get<boolean>(CONFIG.taskGroupWithSeparator, true),
     separator,
@@ -152,10 +166,13 @@ function readGroupingConfig(): GroupingConfig {
  * groupStripTaskLabel）：
  *
  * - `groupWithSeparator=false` → 全部平铺叶子；
- * - 分段数超过 `maxLevel` 时，超出部分保留在叶子中（叶子 displayLabel =
- *   剩余段用分隔符拼回；`stripLabel=false` 则叶子始终显示完整 label）；
+ * - 每层分隔符拆一段，默认拆 5 层（与开源项目一致），可配 1-15 层；`a-b-c-d`
+ *   默认展示为 a → b → c → d；超过 `maxLevel` 的剩余段保留在叶子里；
+ * - `stripLabel=true` 时叶子显示「剩余段用分隔符拼回」的短名（按分段而非字符
+ *   切片，连续分隔符 `a--b` 也只会得到 `b`）；`stripLabel=false` 则叶子始终
+ *   显示完整 label；
  * - 任务名与虚拟文件夹同名时，任务并入该文件夹（避免同层同名混淆）；
- *   空段（`-x` / `x-`）忽略；
+ *   空段（`-x` / `x-` / `a--b`）忽略；
  * - 叶子节点保留 `entry`（完整任务身份），显示名见 `displayLabel`。
  */
 function buildTaskTree(
@@ -168,7 +185,7 @@ function buildTaskTree(
     const segments = config.enabled
       ? entry.label.split(config.separator).filter((segment) => segment.length > 0)
       : [entry.label]
-    const folderCount = Math.min(config.maxLevel, segments.length - 1)
+    const folderCount = Math.max(0, Math.min(config.maxLevel, segments.length - 1))
     let bucket = root
     for (let i = 0; i < folderCount; i += 1) {
       let next = bucket.folders.get(segments[i]!)
@@ -178,7 +195,15 @@ function buildTaskTree(
       }
       bucket = next
     }
-    bucket.tasks.push(entry)
+    // 短名按分段重拼，而不是按字符切片：连续/首尾分隔符不会把 `-` 带进显示名
+    let displayLabel: string | undefined
+    if (config.stripLabel && folderCount > 0) {
+      const rest = segments.slice(folderCount).join(config.separator)
+      if (rest.length > 0) {
+        displayLabel = rest
+      }
+    }
+    bucket.tasks.push({ entry, displayLabel })
   }
   const build = (bucket: TaskBucket, prefix: string): TaskExplorerNode[] => {
     const nodes: TaskExplorerNode[] = []
@@ -188,8 +213,8 @@ function buildTaskTree(
     )) {
       const path = prefix ? `${prefix}${config.separator}${name}` : name
       // 任务名与虚拟文件夹同名 → 并入该文件夹统一排序（任务名唯一，至多一条）
-      for (const entry of bucket.tasks.filter((entry) => entry.label === path)) {
-        child.tasks.push(entry)
+      for (const task of bucket.tasks.filter((task) => task.entry.label === path)) {
+        child.tasks.push({ entry: task.entry })
         claimed.add(path)
       }
       const childNodes = build(child, path)
@@ -202,17 +227,10 @@ function buildTaskTree(
         count: countBucketTasks(child),
       })
     }
-    for (const entry of bucket.tasks.filter((entry) => !claimed.has(entry.label)).sort(byLabel)) {
-      // 剥前缀：去掉该叶子在树中的完整分组路径（剩余段为显示名；
-      // 不剥/无剩余时不设 displayLabel——树内回退完整名）
-      let displayLabel: string | undefined
-      if (config.stripLabel && prefix && entry.label.startsWith(prefix + config.separator)) {
-        const rest = entry.label.slice(prefix.length + config.separator.length)
-        if (rest.length > 0) {
-          displayLabel = rest
-        }
-      }
-      nodes.push({ kind: 'task', entry, displayLabel })
+    for (const task of bucket.tasks
+      .filter((task) => !claimed.has(task.entry.label))
+      .sort((a, b) => byLabel(a.entry, b.entry))) {
+      nodes.push({ kind: 'task', entry: task.entry, displayLabel: task.displayLabel })
     }
     return nodes
   }

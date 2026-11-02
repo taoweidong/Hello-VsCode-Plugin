@@ -39,7 +39,7 @@
 | `extStarter.buildApiBaseUrl`         | 留空   | 构建任务 HTTP 接口基地址；留空 = 内置打桩模拟        |
 | `extStarter.taskGroupWithSeparator`  | 开启   | 任务 label 按分隔符拆入虚拟文件夹分组                |
 | `extStarter.taskGroupSeparator`      | `-`    | 任务分组分隔符                                       |
-| `extStarter.taskGroupMaxLevel`       | 1      | 分组拆层深度上限（1-5，1 = 只把第一段作为文件夹）    |
+| `extStarter.taskGroupMaxLevel`       | 5      | 分组拆层深度上限（1-15；多个分隔符逐层拆成树）       |
 | `extStarter.taskGroupStripTaskLabel` | 开启   | 叶子任务剥掉分组前缀只显示剩余段（完整名见 tooltip） |
 | `extStarter.taskNumLastTasks`        | 10     | 「最近运行」展示条数（1-20，存储上限恒 20）          |
 | `extStarter.taskExpanded`            | 全展开 | 最近运行 / 收藏分组的默认展开状态                    |

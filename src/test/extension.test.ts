@@ -525,8 +525,9 @@ suite('Task Explorer 全流程真实环境验证（多任务类型 / 树结构 /
         `resourceUri 应指向 tasks.json（实际 ${String(fileItem.resourceUri)}）`
       )
 
-      // 文件节点下（v2.5 分组配置化，默认 maxLevel=1 + 叶子短名）：
-      // 无横线的 npm 任务是叶子，8 条 e2e-* 全部收进虚拟文件夹 e2e
+      // 文件节点下（v3.1 默认 maxLevel=5 + 叶子短名）：
+      // 无横线的 npm 任务是叶子；8 条 e2e-* 全部收进虚拟文件夹 e2e，
+      // 其中 e2e-shell-* 再共享前缀 → 第二层虚拟文件夹 shell
       const rootChildren = (await host.provider.getChildren(fileNodes[0]!)) as TaskExplorerNode[]
       const e2eFolder = rootChildren.find(
         (node) => node.kind === 'taskFolder' && node.name === 'e2e'
@@ -541,20 +542,59 @@ suite('Task Explorer 全流程真实环境验证（多任务类型 / 树结构 /
       assert.strictEqual((e2eFolderItem.iconPath as vscode.ThemeIcon).id, 'folder')
       assert.strictEqual(e2eFolderItem.collapsibleState, vscode.TreeItemCollapsibleState.Expanded)
 
-      // 默认深度 1 层：e2e 夹下直接是叶子；显示名剥前缀，entry.label 保持完整
-      const e2eChildren = (await host.provider.getChildren(e2eFolder)) as Extract<
+      // 默认深度 5 层：e2e 下继续按第二段拆出 dep / run / shell 三个虚拟文件夹，
+      // 其余三条任务没有二级分隔符，直接是叶子
+      const e2eChildren = (await host.provider.getChildren(e2eFolder)) as TaskExplorerNode[]
+      const e2eFolders = e2eChildren.filter(
+        (node): node is Extract<TaskExplorerNode, { kind: 'taskFolder' }> =>
+          node.kind === 'taskFolder'
+      )
+      assert.deepStrictEqual(
+        e2eFolders.map((node) => `${node.name}:${node.path}:${node.count}`).sort(),
+        ['dep:e2e-dep:2', 'run:e2e-run:1', 'shell:e2e-shell:2']
+      )
+      const e2eDirectLeaves = e2eChildren.filter(
+        (node): node is Extract<TaskExplorerNode, { kind: 'task' }> => node.kind === 'task'
+      )
+      assert.deepStrictEqual(
+        e2eDirectLeaves.map((node) => `${node.displayLabel}:${node.entry.label}`).sort(),
+        [
+          'locate:e2e-locate',
+          'process:e2e-process',
+          '长名称 带空格（v2）:e2e-长名称 带空格（v2）',
+        ].sort()
+      )
+
+      const folder = (name: string): Extract<TaskExplorerNode, { kind: 'taskFolder' }> =>
+        e2eFolders.find((node) => node.name === name)!
+      const taskStrings = async (name: string): Promise<string[]> => {
+        const children = (await host.provider.getChildren(folder(name))) as Extract<
+          TaskExplorerNode,
+          { kind: 'task' }
+        >[]
+        return children.map((node) => `${node.displayLabel}:${node.entry.label}`).sort()
+      }
+      // 各层叶子显示剥前缀短名（entry.label 保持完整）
+      assert.deepStrictEqual(await taskStrings('shell'), [
+        'build:e2e-shell-build',
+        'test:e2e-shell-test',
+      ])
+      assert.deepStrictEqual(await taskStrings('dep'), ['first:e2e-dep-first', 'main:e2e-dep-main'])
+      assert.deepStrictEqual(await taskStrings('run'), ['stop:e2e-run-stop'])
+
+      const shellChildren = (await host.provider.getChildren(folder('shell'))) as Extract<
         TaskExplorerNode,
         { kind: 'task' }
       >[]
-      assert.strictEqual(e2eChildren.length, 8)
+
       const directLeaves = rootChildren
         .filter((node) => node.kind === 'task')
         .map((node) => (node as Extract<TaskExplorerNode, { kind: 'task' }>).entry.label)
       assert.deepStrictEqual(directLeaves.sort(), ['npm: compile', 'npm: watch'])
 
-      const buildLeaf = e2eChildren.find((node) => node.entry.label === 'e2e-shell-build')!
+      const buildLeaf = shellChildren.find((node) => node.entry.label === 'e2e-shell-build')!
       const buildLeafItem = host.provider.getTreeItem(buildLeaf)
-      assert.strictEqual(buildLeafItem.label, 'shell-build') // 剥前缀短名
+      assert.strictEqual(buildLeafItem.label, 'build') // 剥前缀短名
       assert.strictEqual(
         String((buildLeafItem.tooltip as vscode.MarkdownString).value).startsWith(
           '**e2e-shell-build**'
@@ -563,26 +603,26 @@ suite('Task Explorer 全流程真实环境验证（多任务类型 / 树结构 /
         'tooltip 保留完整任务名'
       )
 
-      const iconOf = (label: string): string =>
-        (
-          host.provider.getTreeItem(e2eChildren.find((node) => node.entry.label === label)!)
-            .iconPath as vscode.ThemeIcon
-        ).id
+      const iconOf = (node: TaskExplorerNode): string =>
+        (host.provider.getTreeItem(node).iconPath as vscode.ThemeIcon).id
       const npmLeaf = rootChildren.find(
         (node) => node.kind === 'task' && node.entry.label === 'npm: compile'
       )!
+      assert.strictEqual(iconOf(npmLeaf), 'tools') // 分组 build 优先
+      assert.strictEqual(iconOf(buildLeaf), 'tools')
       assert.strictEqual(
-        (host.provider.getTreeItem(npmLeaf).iconPath as vscode.ThemeIcon).id,
-        'tools'
-      ) // 分组 build 优先
-      assert.strictEqual(iconOf('e2e-shell-build'), 'tools')
-      assert.strictEqual(iconOf('e2e-shell-test'), 'beaker')
-      assert.strictEqual(iconOf('e2e-process'), 'gear') // process 类型
+        iconOf(shellChildren.find((node) => node.entry.label === 'e2e-shell-test')!),
+        'beaker'
+      )
+      assert.strictEqual(
+        iconOf(e2eDirectLeaves.find((node) => node.entry.label === 'e2e-process')!),
+        'gear' // process 类型
+      )
 
-      // 配置继承：taskGroupMaxLevel=3 + stripLabel=false → e2e → shell → 完整名叶子
+      // 配置覆盖：taskGroupMaxLevel=1 + stripLabel=false → e2e 下平铺 8 条完整名叶子
       const extConfig = vscode.workspace.getConfiguration('extStarter')
       try {
-        await extConfig.update('taskGroupMaxLevel', 3, vscode.ConfigurationTarget.Global)
+        await extConfig.update('taskGroupMaxLevel', 1, vscode.ConfigurationTarget.Global)
         await extConfig.update('taskGroupStripTaskLabel', false, vscode.ConfigurationTarget.Global)
         // 配置写入到配置服务生效是异步的：轮询到实际值再下钻（失败带 inspect 诊断）
         const waitConfig = async (key: string, expected: unknown): Promise<void> => {
@@ -603,7 +643,7 @@ suite('Task Explorer 全流程真实环境验证（多任务类型 / 树结构 /
             await delay(100)
           }
         }
-        await waitConfig('taskGroupMaxLevel', 3)
+        await waitConfig('taskGroupMaxLevel', 1)
         await waitConfig('taskGroupStripTaskLabel', false)
         // 分组配置变化触发全树重建（与扩展内 onDidChangeConfiguration 行为一致）：
         // 重建后 group/file/taskFolder 都是新实例，必须重新取节点
@@ -623,27 +663,22 @@ suite('Task Explorer 全流程真实环境验证（多任务类型 / 树结构 /
           (node) => node.kind === 'taskFolder' && node.name === 'e2e'
         ) as Extract<TaskExplorerNode, { kind: 'taskFolder' }> | undefined
         assert.ok(e2eFolderAfter, '重建后 e2e 文件夹仍存在')
-        const level2 = (await host.provider.getChildren(e2eFolderAfter)) as Extract<
-          TaskExplorerNode,
-          { kind: 'taskFolder' | 'task' }
-        >[]
-        const shellFolder = level2.find(
-          (node) => node.kind === 'taskFolder' && node.name === 'shell'
-        ) as Extract<TaskExplorerNode, { kind: 'taskFolder' }> | undefined
-        assert.ok(shellFolder, 'taskGroupMaxLevel=3 应拆出二级文件夹 shell')
-        const shellLeaves = (await host.provider.getChildren(shellFolder)) as Extract<
+        const flatLeaves = (await host.provider.getChildren(e2eFolderAfter)) as Extract<
           TaskExplorerNode,
           { kind: 'task' }
         >[]
-        assert.deepStrictEqual(shellLeaves.map((node) => node.entry.label).sort(), [
-          'e2e-shell-build',
-          'e2e-shell-test',
-        ])
-        const deepLeafItem = host.provider.getTreeItem(shellLeaves[0]!)
-        assert.strictEqual(deepLeafItem.label, 'e2e-shell-build') // stripLabel=false 完整名
+        assert.strictEqual(flatLeaves.length, 8, 'maxLevel=1 时 e2e 下平铺 8 条叶子')
+        assert.ok(
+          flatLeaves.every((node) => node.displayLabel === undefined),
+          'stripLabel=false 时不剥前缀（displayLabel 为空）'
+        )
+        const flatLeafItem = host.provider.getTreeItem(
+          flatLeaves.find((node) => node.entry.label === 'e2e-shell-build')!
+        )
+        assert.strictEqual(flatLeafItem.label, 'e2e-shell-build') // stripLabel=false 完整名
 
         // 单击任务 = 运行命令 + 原始 Task 参数（红线）
-        const buildNode = shellLeaves.find((item) => item.entry.label === 'e2e-shell-build')!
+        const buildNode = flatLeaves.find((node) => node.entry.label === 'e2e-shell-build')!
         const buildItem = host.provider.getTreeItem(buildNode)
         assert.strictEqual(buildItem.command?.command, 'extStarter.runWorkspaceTask')
         assert.ok(buildItem.command?.arguments?.[0] instanceof vscode.Task)

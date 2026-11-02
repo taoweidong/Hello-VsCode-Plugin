@@ -141,12 +141,12 @@ export const CONFIG = {
    */
   buildApiBaseUrl: 'buildApiBaseUrl',
 
-  // 任务管理器树形展示（v2.5：继承 vscode-taskexplorer 的分组配置体系）
+  // 任务管理器树形展示（v2.5 继承 vscode-taskexplorer 的分组配置体系；v3.1 默认 5 层）
   /** 是否按分隔符分组任务 label（默认 true） */
   taskGroupWithSeparator: 'taskGroupWithSeparator',
   /** 分组分隔符（默认 '-'） */
   taskGroupSeparator: 'taskGroupSeparator',
-  /** 分组深度上限 1-5（默认 1：只按第一段分一层） */
+  /** 分组深度上限 1-15（默认 5：a-b-c-d 拆成 a→b→c→d 多层） */
   taskGroupMaxLevel: 'taskGroupMaxLevel',
   /** 叶子是否剥掉分组前缀只显示剩余段（默认 true，完整名见 tooltip） */
   taskGroupStripTaskLabel: 'taskGroupStripTaskLabel',

@@ -16,14 +16,17 @@
 工作区任务 (2)
 └─ tasks.json (2)               ← 单根工作区直接显示文件节点
    └─ common (2)                ← label 中的 `-` 作为层级：虚拟文件夹按段分组
-      ├─ common-down_pack_code  ← 叶子保留完整 label，单击即运行
-      └─ common-down_pwd_xml
+      ├─ down_pack_code         ← 叶子显示剥掉前缀的短名，单击即运行
+      └─ down_pwd_xml
 ```
 
-- **树形分组（可配置）**：工作区任务组的任务 label 按分隔符（默认 `-`）分段拆为
-  虚拟文件夹，默认只拆 1 层且叶子显示剥掉前缀的短名（完整名见 tooltip）——
-  `a-b-c` 默认显示为 `a → b-c`；深度、分隔符、短名开关均可配（见下方设置）；
-  无分隔符的任务直接挂文件节点下；最近运行 / 收藏保持平铺；
+- **树形分组（可配置，默认多层）**：工作区任务组的任务 label 按分隔符（默认 `-`）
+  分段拆为虚拟文件夹，默认拆 5 层（可配 1-15 层）且叶子显示剥掉前缀的短名
+  （完整名见 tooltip）——`a-b-c-d` 默认显示为 `a → b → c → d`；调小深度后
+  剩余段合并为叶子名（`maxLevel=1` 时 `a-b-c` 显示为 `a → b-c`）。分隔符、
+  深度、短名开关均可配（见下方设置），也支持多字符分隔符（如 `--`）；
+  连续分隔符（`a--b`）按空段忽略；无分隔符的任务直接挂文件节点下；
+  最近运行 / 收藏保持平铺；
 - **最近运行**：展示条数可配（默认 10），运行中的任务自动置顶；
 - 三个分组中的同名任务是**同一任务的引用**：运行态（转圈）、收藏态（星标）、
   定位行为在三处完全一致；
@@ -63,14 +66,14 @@
 
 ## 设置（任务管理器）
 
-| 设置项                               | 默认 | 说明                                                |
-| ------------------------------------ | ---- | --------------------------------------------------- |
-| `extStarter.taskGroupWithSeparator`  | 开启 | 按 label 分隔符拆虚拟文件夹分组                     |
-| `extStarter.taskGroupSeparator`      | `-`  | 分组分隔符（如改为 `/` 则 `a/b/c` 分到 a/b 下）     |
-| `extStarter.taskGroupMaxLevel`       | 1    | 拆层深度上限（1-5）；调大后 `a-b-c` 可拆出 a/b 两层 |
-| `extStarter.taskGroupStripTaskLabel` | 开启 | 叶子显示剥掉分组前缀的短名                          |
-| `extStarter.taskNumLastTasks`        | 10   | 最近运行展示条数（1-20）                            |
-| `extStarter.taskExpanded`            | 全开 | 最近运行 / 收藏分组默认展开状态                     |
+| 设置项                               | 默认 | 说明                                             |
+| ------------------------------------ | ---- | ------------------------------------------------ |
+| `extStarter.taskGroupWithSeparator`  | 开启 | 按 label 分隔符拆虚拟文件夹分组                  |
+| `extStarter.taskGroupSeparator`      | `-`  | 分组分隔符（支持多字符，如 `--`）                |
+| `extStarter.taskGroupMaxLevel`       | 5    | 拆层深度上限（1-15）；`a-b-c` 默认拆成 a → b → c |
+| `extStarter.taskGroupStripTaskLabel` | 开启 | 叶子显示剥掉分组前缀的短名                       |
+| `extStarter.taskNumLastTasks`        | 10   | 最近运行展示条数（1-20）                         |
+| `extStarter.taskExpanded`            | 全开 | 最近运行 / 收藏分组默认展开状态                  |
 
 ## 数据落点
 
