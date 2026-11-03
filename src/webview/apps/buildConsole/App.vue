@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
 import SchemaForm from '../../components/SchemaForm.vue'
 import { schemaDefaults, toFormFields } from '../../components/fieldAdapter'
 import type { FormField } from '../../formSchema'
@@ -34,6 +34,8 @@ const initialized = ref(false)
 const submitting = ref(false)
 const feedback = ref('')
 
+const formRef = useTemplateRef<typeof SchemaForm>('form')
+
 const runningCount = computed(
   () => tasks.value.filter((task) => task.status === 'queued' || task.status === 'running').length
 )
@@ -60,6 +62,11 @@ function requestList(): void {
 
 function onSubmit(): void {
   if (submitting.value) {
+    return
+  }
+  // 主按钮同样走 SchemaForm 必填校验（P2-F2，对齐 ServerForm：失败聚焦首个控件）
+  if (formRef.value && !formRef.value.validate()) {
+    formRef.value.focusFirst()
     return
   }
   errors.value = {}
@@ -146,6 +153,7 @@ onBeforeUnmount(() => {
         </header>
 
         <SchemaForm
+          ref="form"
           v-model="draft"
           :schema="fields"
           :errors="errors"

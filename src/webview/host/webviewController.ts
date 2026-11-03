@@ -100,7 +100,7 @@ const SUBMIT_TIMEOUT_MS = 10_000
  */
 class SubmitTimeoutError extends Error {
   constructor() {
-    super('提交处理超时（10 秒），已自动解锁')
+    super('提交处理超时（10 秒）')
   }
 }
 

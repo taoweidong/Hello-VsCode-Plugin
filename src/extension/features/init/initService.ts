@@ -1,4 +1,5 @@
 import * as vscode from 'vscode'
+import { TaskSignalSource } from '../../tasks/taskRunner'
 import type { InitContext, InitStep } from './initSteps'
 
 export type StepStatus = 'idle' | 'running' | 'done' | 'failed'
@@ -23,10 +24,15 @@ export const INIT_STEP_TIMEOUT_MS = 120000
  * - 步骤可单独重跑，也可全部执行；
  * - runStep 复用 running 互斥（T5.4 / P1-12）：runAll 执行期间单步直接返回并记录，
  *   杜绝并发写同一文件；步骤支持超时（timeoutMs，默认 120s）。
+ * - 超时裁决同时经 ctx.signal 向运行中的步骤下发取消信号（P2-B2）：探测型步骤
+ *   在候选命令间隙尽快退出，避免「状态已 failed、步骤仍在后台写文件」与后续
+ *   步骤并发；不协作的挂死步骤不阻塞后续（既有超时契约保持）。
  */
 export class InitService implements vscode.Disposable {
   private states: StepState[]
   private running = false
+  /** 当前运行中步骤的取消信号源（超时 / dispose 时触发；无步骤运行时为 undefined）。 */
+  private signalSource: TaskSignalSource | undefined
 
   private readonly _onDidChangeItems = new vscode.EventEmitter<void>()
   readonly onDidChangeItems = this._onDidChangeItems.event
@@ -96,9 +102,12 @@ export class InitService implements vscode.Disposable {
     state.message = undefined
     this._onDidChangeItems.fire()
 
+    const signalSource = new TaskSignalSource()
+    this.signalSource = signalSource
     const ctx: InitContext = {
       workspaceRoot: vscode.workspace.workspaceFolders?.[0]?.uri,
       output: this.output,
+      signal: signalSource.signal,
     }
     // 步骤超时（P1-12）：挂死步骤（如不可取消的全量环境探测）被裁决为 failed
     const timeoutMs = step.timeoutMs ?? INIT_STEP_TIMEOUT_MS
@@ -129,11 +138,17 @@ export class InitService implements vscode.Disposable {
       if (timer !== undefined) {
         clearTimeout(timer)
       }
+      // 超时路径：向仍在运行的步骤请求取消（P2-B2），不再有运行中步骤
+      signalSource.cancel()
+      signalSource.dispose()
+      this.signalSource = undefined
     }
     this._onDidChangeItems.fire()
   }
 
   dispose(): void {
+    // 停用时请求运行中的步骤尽快退出（步骤经 ctx.signal 协作）
+    this.signalSource?.cancel()
     this._onDidChangeItems.dispose()
   }
 }

@@ -102,7 +102,7 @@ export const SERVER_FIELD_DEFS: SchemaFieldDef[] = [
   },
   {
     key: 'password',
-    type: 'text',
+    type: 'password',
     label: '登录密码',
     maxLength: 200,
     placeholder: '选填',

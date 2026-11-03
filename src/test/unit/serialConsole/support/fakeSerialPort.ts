@@ -40,6 +40,8 @@ export class FakeSerialPortFactory implements SerialPortFactory {
   readonly openCalls: SerialPortOpenOptions[] = []
   /** 最近一次 open 返回的端口实例（供测试手动触发 data/close/error）。 */
   lastPort: FakeSerialPort | undefined
+  /** 全部已打开端口（按 open 顺序，与 openCalls 一一对应；多连接交错场景用）。 */
+  readonly opened: FakeSerialPort[] = []
   knownPorts: SerialPortInfoLike[] = []
   failOpenMessage: string | undefined
   /** open 前等待的闸门（模拟慢打开 / 连接中取消场景）。 */
@@ -55,6 +57,7 @@ export class FakeSerialPortFactory implements SerialPortFactory {
     this.openCalls.push(options)
     const port = new FakeSerialPort()
     this.lastPort = port
+    this.opened.push(port)
     return port
   }
 }

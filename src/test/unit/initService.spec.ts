@@ -107,6 +107,34 @@ describe('InitService 生命周期', () => {
     expect(svc.getStates()[0].message).toContain('步骤超时')
   })
 
+  it('步骤超时：向运行中步骤下发取消信号（ctx.signal，P2-B2）', async () => {
+    let cancelled = false
+    const steps: InitStep[] = [
+      {
+        id: 'cooperative',
+        title: '协作步骤',
+        description: '',
+        timeoutMs: 50,
+        async run(ctx) {
+          // 模拟探测型步骤：监听取消信号，收到即尽快退出
+          return await new Promise<string>((resolve) => {
+            const timer = setTimeout(() => resolve('自然结束'), 1000)
+            ctx.signal?.onCancellationRequested(() => {
+              cancelled = true
+              clearTimeout(timer)
+              resolve('已取消')
+            })
+          })
+        },
+      },
+    ]
+    const svc = makeService(steps)
+    await svc.runAll()
+    expect(svc.getStates()[0]?.status).toBe('failed')
+    expect(svc.getStates()[0]?.message).toContain('步骤超时')
+    expect(cancelled).toBe(true)
+  })
+
   it('单步失败不阻断后续步骤（原有容错保持）', async () => {
     const steps: InitStep[] = [
       { id: 'a', title: 'A', description: '', run: async () => 'ok-a' },

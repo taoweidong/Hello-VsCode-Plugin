@@ -1,6 +1,8 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import {
+  isCommandHistoryWire,
   isHostMessage,
+  isSerialServerWire,
   type CommandHistoryWire,
   type FieldDef,
   type SerialLinkStateWire,
@@ -24,7 +26,7 @@ function webviewWindow(): WebviewWindow {
 }
 
 /**
- * 串口控制台页面的消息编排（模式对齐 useFormPage / importWizard App）：
+ * 串口控制台页面的消息编排（buildConsole 页面未复用本 composable，自行编排）：
  * 宿主消息经 isHostMessage 守卫后按类型分发；页面侧只经 post 发送协议消息。
  * 表单类页面（init/submitAck/error）之外，本页是事件驱动控制台——
  * init 只在握手时出现一次，其余消息随时可到。
@@ -73,8 +75,10 @@ export function useConsolePage(options: ConsolePageOptions): {
         options.onInit(
           message.schema,
           {
-            servers: Array.isArray(extra.servers) ? (extra.servers as SerialServerWire[]) : [],
-            history: Array.isArray(extra.history) ? (extra.history as CommandHistoryWire[]) : [],
+            // 元素级守卫（P2-F4）：isHostMessage 对 init.extra 只验容器，
+            // 畸形元素在此过滤，不让坏数据进入 UI 状态
+            servers: Array.isArray(extra.servers) ? extra.servers.filter(isSerialServerWire) : [],
+            history: Array.isArray(extra.history) ? extra.history.filter(isCommandHistoryWire) : [],
             initialServerId:
               typeof extra.initialServerId === 'string' ? extra.initialServerId : null,
           },

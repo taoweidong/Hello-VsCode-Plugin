@@ -8,7 +8,9 @@ import type { LinkStatusSnapshot } from './serialConsolePanel'
  * 数据每次刷新从 store 拉取；连接状态读共享快照（面板/控制器更新）。
  * 单击条目 = 连接并打开控制台（与其他功能树的单击行为一致）。
  */
-export class SerialServersTreeProvider implements vscode.TreeDataProvider<SerialServerNode> {
+export class SerialServersTreeProvider
+  implements vscode.TreeDataProvider<SerialServerNode>, vscode.Disposable
+{
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
     SerialServerNode | undefined | void
   >()
@@ -83,6 +85,10 @@ export class SerialServersTreeProvider implements vscode.TreeDataProvider<Serial
     const tooltip = new vscode.MarkdownString()
     tooltip.appendMarkdown(lines.join('\n'))
     return tooltip
+  }
+
+  dispose(): void {
+    this._onDidChangeTreeData.dispose()
   }
 }
 

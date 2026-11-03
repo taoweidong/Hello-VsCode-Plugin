@@ -24,6 +24,7 @@ describe('toFormField：协议字段收窄', () => {
     ['select', 'select'],
     ['tags', 'tags'],
     ['boolean', 'boolean'],
+    ['password', 'password'],
   ])('已知 type「%s」原样保留', (given, expected) => {
     expect(toFormField(def({ type: given })).type).toBe(expected)
   })
@@ -44,14 +45,12 @@ describe('toFormField：协议字段收窄', () => {
         placeholder: '提示',
         hint: '说明',
         defaultValue: 'x',
-        datalist: 'category-list',
       })
     )
     expect(field.required).toBe(true)
     expect(field.placeholder).toBe('提示')
     expect(field.hint).toBe('说明')
     expect(field.defaultValue).toBe('x')
-    expect(field.datalist).toBe('category-list')
 
     const dirty = toFormField(
       def({
@@ -59,14 +58,12 @@ describe('toFormField：协议字段收窄', () => {
         placeholder: 1,
         hint: null,
         defaultValue: {},
-        datalist: 7,
       } as unknown as FieldDef)
     )
     expect(dirty.required).toBeUndefined()
     expect(dirty.placeholder).toBeUndefined()
     expect(dirty.hint).toBeUndefined()
     expect(dirty.defaultValue).toBeUndefined()
-    expect(dirty.datalist).toBeUndefined()
   })
 
   it('options：非对象 / 数组 / 缺 value·label 的项被过滤；过滤后为空则不置 options', () => {
@@ -118,6 +115,10 @@ describe('schemaDefaults：各类型的初始值', () => {
       a: '',
       b: '',
     })
+  })
+
+  it('password → 空串（与 text 同为文本值域，仅渲染为掩码）', () => {
+    expect(schemaDefaults(schema([{ key: 'p', type: 'password' }]))).toEqual({ p: '' })
   })
 
   it('tags → 空数组', () => {

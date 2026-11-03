@@ -5,6 +5,7 @@ import {
   type WebviewControllerDeps,
 } from '../../../webview/host/webviewController'
 import { deriveFormSchema, toFieldDefs } from '../../../webview/formSchema'
+import { reasonOf } from '../../services/errors'
 import type { BuildTaskWire } from '../../../webview/protocol'
 import { BUILD_FIELD_DEFS } from './buildSchema'
 import { createBuildApiClient, type BuildApiClient, type BuildTask } from './buildApiClient'
@@ -45,10 +46,6 @@ export function createBuildConsoleServices(output: vscode.OutputChannel): BuildC
 /** BuildTask → 协议线类型（匿名字面量展开获得隐式索引签名，与 toServerWire 同理）。 */
 export function toBuildTaskWire(task: BuildTask): BuildTaskWire {
   return { ...task }
-}
-
-function reasonOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
 }
 
 export function createBuildConsoleDeps(services: BuildConsoleServices): WebviewControllerDeps {

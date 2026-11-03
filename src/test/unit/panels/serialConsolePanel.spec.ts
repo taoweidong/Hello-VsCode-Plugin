@@ -125,7 +125,7 @@ describe('serialConsolePanel：init 与列表请求', () => {
     const panel = await openPanel(services)
     const init = lastPosted(panel, 'init')
     expect(init?.schema).toEqual(
-      expect.arrayContaining([expect.objectContaining({ key: 'password', type: 'text' })])
+      expect.arrayContaining([expect.objectContaining({ key: 'password', type: 'password' })])
     )
     expect(init?.extra).toMatchObject({
       servers: [expect.objectContaining({ id: 'srv-1', name: '服务器甲' })],
@@ -212,6 +212,65 @@ describe('serialConsolePanel：服务器保存（密码零落盘）', () => {
     expect(saved.createdAt).toBe(111)
     expect(saved.updatedAt).toBeGreaterThan(111)
   })
+
+  it('外部（树视图）删除后面板保存：已删除的服务器不复活（P1-1 写前重读）', async () => {
+    const { services, store } = makeServices([
+      makeServer({ id: 'srv-1', name: '甲' }),
+      makeServer({ id: 'srv-2', name: '乙' }),
+    ])
+    const panel = await openPanel(services)
+    // 树视图删除 srv-1 的落库效果：绕过面板 deps 推送通道直接改磁盘
+    await store.save([makeServer({ id: 'srv-2', name: '乙' })])
+    // 面板仍停留在旧列表（未收到推送），此时编辑保存 srv-2
+    panel.webview.__emit({
+      type: 'serialServerSave',
+      draft: { ...validDraft, id: 'srv-2', name: '乙改' },
+    })
+    await vi.waitFor(() => {
+      expect(lastPosted(panel, 'serialServers')?.servers).toHaveLength(1)
+    })
+    expect(lastPosted(panel, 'serialServers')?.servers).toEqual([
+      expect.objectContaining({ id: 'srv-2', name: '乙改' }),
+    ])
+  })
+
+  it('SecretStorage 写入失败：回 error 提示，不产生未处理拒绝（P2-B3）', async () => {
+    const { services, onServersChanged } = makeServices([])
+    const failingStorage: SecretStorageLike = {
+      get: () => Promise.resolve(undefined),
+      store: () => Promise.reject(new Error('keychain locked')),
+      delete: () => Promise.reject(new Error('keychain locked')),
+    }
+    services.secrets = failingStorage
+    const panel = await openPanel(services)
+    panel.webview.__emit({ type: 'serialServerSave', draft: { ...validDraft }, password: 'p@ss' })
+    await vi.waitFor(() => {
+      expect(lastPosted(panel, 'error')).toMatchObject({
+        message: expect.stringContaining('密码'),
+      })
+    })
+    // 服务器本体已保存并推送；密码写入失败被显式告知
+    expect(lastPosted(panel, 'serialServers')).toBeDefined()
+    expect(onServersChanged).toHaveBeenCalled()
+  })
+
+  it('SecretStorage 清理失败（删除服务器）：回 error 提示，列表照常推送（P2-B3）', async () => {
+    const { services } = makeServices([makeServer()])
+    const failingStorage: SecretStorageLike = {
+      get: () => Promise.resolve(undefined),
+      store: () => Promise.resolve(),
+      delete: () => Promise.reject(new Error('keychain locked')),
+    }
+    services.secrets = failingStorage
+    const panel = await openPanel(services)
+    panel.webview.__emit({ type: 'serialServerDelete', id: 'srv-1' })
+    await vi.waitFor(() => {
+      expect(lastPosted(panel, 'error')).toMatchObject({
+        message: expect.stringContaining('密码'),
+      })
+    })
+    expect(lastPosted(panel, 'serialServers')?.servers).toEqual([])
+  })
 })
 
 describe('serialConsolePanel：连接 / 下发 / 历史', () => {
@@ -281,6 +340,53 @@ describe('serialConsolePanel：连接 / 下发 / 历史', () => {
       expect(portFactory.lastPort?.written).toEqual(['root\n', 's3cret\n'])
     })
     expect(lastPosted(panel, 'commandHistory')).toBeUndefined()
+  })
+
+  it('自动登录等待期间切换连接：旧凭据不写入新服务器端口（P1-2 代际守卫）', async () => {
+    const seed = [
+      makeServer({
+        id: 'srv-1',
+        name: '甲',
+        serialPath: 'COM3',
+        autoLogin: true,
+        username: 'root',
+      }),
+      makeServer({ id: 'srv-2', name: '乙', serialPath: 'COM4' }),
+    ]
+    const { services, portFactory, secrets } = makeServices(seed)
+    secrets.set('extStarter.serialServer.srv-1.password', 's3cret')
+    const deps = makePanelDeps()
+    SerialConsolePanel.createOrShow(services, undefined, deps.deps, {
+      usernameDelayMs: 200,
+      passwordDelayMs: 200,
+    })
+    const panel = deps.panels[0]
+    panel.webview.__emit({ type: 'ready' })
+    await vi.waitFor(() => {
+      expect(lastPosted(panel, 'init')).toBeDefined()
+    })
+    // 连接甲（自动登录进入 200ms 等待窗口）后立刻切换到乙
+    panel.webview.__emit({ type: 'serialConnect', serverId: 'srv-1' })
+    await vi.waitFor(() => {
+      expect(lastPosted(panel, 'serialState')).toMatchObject({ state: 'connected' })
+    })
+    panel.webview.__emit({ type: 'serialConnect', serverId: 'srv-2' })
+    await vi.waitFor(() => {
+      expect(lastPosted(panel, 'serialState')).toMatchObject({
+        serverId: 'srv-2',
+        state: 'connected',
+      })
+    })
+    // 等过甲自动登录原定的发送时刻：任何端口都不得收到甲的凭据
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    const portByPath = portFactory.openCalls.map((call, index) => ({
+      path: call.path,
+      port: portFactory.opened[index],
+    }))
+    expect(portByPath).toHaveLength(2)
+    const allWritten = portByPath.flatMap(({ port }) => port.written).join('')
+    expect(allWritten).not.toContain('root')
+    expect(allWritten).not.toContain('s3cret')
   })
 
   it('disconnect 推送状态；删除已连接服务器时联动断开并清理密码', async () => {

@@ -48,17 +48,24 @@ describe('deriveFormSchema（领域 Schema → 表单字段）', () => {
     expect(SERVER_FIELD_DEFS.find((def) => def.key === 'baudRate')?.options?.[0].label).toBe('9600')
   })
 
-  it('toFieldDefs 透传全部表单属性（含 datalist 标记）', () => {
-    // datalist 是 FormField 层的页面附加属性（由页面按需叠加），不在领域 SchemaFieldDef 中
+  it('toFieldDefs 透传全部表单属性', () => {
     const fields: FormField[] = [
-      { key: 'name', label: '名称', type: 'text', required: true, datalist: 'hint-list' },
+      {
+        key: 'name',
+        label: '名称',
+        type: 'text',
+        required: true,
+        placeholder: '请输入',
+        hint: '说明',
+      },
     ]
     const defs = toFieldDefs(fields)
     expect(defs.find((def) => def.key === 'name')).toMatchObject({
       label: '名称',
       type: 'text',
       required: true,
-      datalist: 'hint-list',
+      placeholder: '请输入',
+      hint: '说明',
     })
   })
 })

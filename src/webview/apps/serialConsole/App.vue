@@ -181,6 +181,11 @@ function onFormUpdate(value: Record<string, unknown>): void {
 }
 
 function onReset(): void {
+  // 编辑态重置前确认（P2-F3）：Esc / 重置按钮都会丢弃已编辑字段，对齐宿主侧
+  // dirty 取消的确认语义；新增态无编辑内容，保持直接重置
+  if (editingId.value !== undefined && !window.confirm('放弃当前编辑内容并恢复默认值？')) {
+    return
+  }
   editingId.value = undefined
   fieldErrors.value = {}
   formValue.value = schemaDefaults(schema.value)

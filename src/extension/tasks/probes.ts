@@ -7,7 +7,7 @@
  * - 单个探针失败不阻塞其他探针（missing 状态隔离）。
  */
 export interface EnvironmentProbe {
-  /** 探针 id（稳定标识，与条目 label 小写一致） */
+  /** 探针 id（稳定标识；重检路由键是 label，id 仅作注册表标识） */
   id: string
   /** 展示名（同时是树视图条目 label 与重检路由键） */
   label: string

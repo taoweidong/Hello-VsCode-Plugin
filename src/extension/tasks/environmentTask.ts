@@ -119,13 +119,14 @@ export function createEnvironmentTask(executor: ProbeExecutor = defaultExecutor)
 
     async run(ctx: TaskContext): Promise<TaskResult> {
       const startedAt = Date.now()
-      const items: TaskItem[] = []
       const cancelled = () => ctx.signal.isCancellationRequested
 
-      for (const probe of ENVIRONMENT_PROBES) {
-        items.push(await probeToItem(executor, probe, ctx.signal))
-      }
-      items.push(...systemItems())
+      // 探针相互独立，并行探测（P2-B5：串行最坏 8×6s=48s → 并行最坏 6s）；
+      // 单探针内部的候选命令回退链保持串行，Promise.all 保序 → 条目顺序与注册表一致
+      const probeItems = await Promise.all(
+        ENVIRONMENT_PROBES.map((probe) => probeToItem(executor, probe, ctx.signal))
+      )
+      const items: TaskItem[] = [...probeItems, ...systemItems()]
 
       // ---- 汇总状态：全部就绪 → ok；有缺失 → warn；执行中被取消 → warn + 说明 ----
       const missing = items.filter((item) => item.status !== 'ok').length

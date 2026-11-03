@@ -39,8 +39,3 @@ export type IconName = keyof typeof ICON_NAMES
 export function iconClass(name: IconName): string {
   return `codicon codicon-${ICON_NAMES[name]}`
 }
-
-/** 运行时校验（配置数据里的图标名先过本守卫）。 */
-export function isIconName(value: unknown): value is IconName {
-  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(ICON_NAMES, value)
-}

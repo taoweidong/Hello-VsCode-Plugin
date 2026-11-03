@@ -97,7 +97,7 @@ function errorText(err: unknown): string {
 
 const steps: StepDef[] = [
   {
-    name: '1/9 Lint 与格式检查（eslint / prettier）',
+    name: '1/10 Lint 与格式检查（eslint / prettier）',
     run: (timeout) => {
       exec('npx eslint .', timeout)
       exec('npx prettier --check .', timeout)
@@ -105,7 +105,7 @@ const steps: StepDef[] = [
     },
   },
   {
-    name: '2/9 类型检查（tsc --noEmit，strict）',
+    name: '2/10 类型检查（tsc --noEmit，strict）',
     run: (timeout) => {
       exec('npx tsc -p tsconfig.node.json --noEmit', timeout)
       if (existsSync(path.join(root, 'tsconfig.webview.json'))) {
@@ -116,11 +116,11 @@ const steps: StepDef[] = [
     },
   },
   {
-    name: '3/9 宿主生产构建（build-extension --production）',
+    name: '3/10 宿主生产构建（build-extension --production）',
     run: (timeout) => exec('npx tsx scripts/build-extension.ts --production', timeout),
   },
   {
-    name: '4/9 Webview 构建（vite build）',
+    name: '4/10 Webview 构建（vite build）',
     run: (timeout) =>
       exec('npx vite build', timeout)
         .split(/\r?\n/)
@@ -128,11 +128,11 @@ const steps: StepDef[] = [
         .join('\n'),
   },
   {
-    name: '5/9 测试编译（tsc → out/）',
+    name: '5/10 测试编译（tsc → out/）',
     run: (timeout) => exec('npx tsc -p tsconfig.node.json --outDir out', timeout),
   },
   {
-    name: '6/9 静态一致性与样式门禁检查',
+    name: '6/10 静态一致性与样式门禁检查',
     run: () => {
       checkWebviewStyle(root)
       checkManifestConsistency(root)
@@ -140,7 +140,7 @@ const steps: StepDef[] = [
     },
   },
   {
-    name: '7/9 单元测试（vitest run --coverage）',
+    name: '7/10 单元测试（vitest run --coverage）',
     timeoutMs: 240000,
     run: (timeout) => {
       const output = exec('npx vitest run --coverage', timeout)
@@ -156,7 +156,7 @@ const steps: StepDef[] = [
     },
   },
   {
-    name: '8/9 宿主集成测试（@vscode/test-electron）',
+    name: '8/10 宿主集成测试（@vscode/test-electron）',
     timeoutMs: 600000,
     fullOnly: true,
     run: (timeout) => {
@@ -168,7 +168,7 @@ const steps: StepDef[] = [
     },
   },
   {
-    name: '9/9 打包内容与产物体积校验（vsce ls + bundle 预算）',
+    name: '9/10 打包内容与产物体积校验（vsce ls + bundle 预算）',
     timeoutMs: 180000,
     run: (timeout) => {
       // ---- 打包内容黑白名单（07 R-E-3：vsce package 零警告不能替代内容校验）----

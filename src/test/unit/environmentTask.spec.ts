@@ -97,6 +97,25 @@ describe('environmentTask 探测语义（可注入执行器）', () => {
     expect(result.summary).toContain('已取消')
   })
 
+  it('探针并行执行：多个探测命令同时在场，条目顺序保持注册表序（P2-B5）', async () => {
+    let inFlight = 0
+    let maxInFlight = 0
+    const executor: ProbeExecutor = async () => {
+      inFlight += 1
+      maxInFlight = Math.max(maxInFlight, inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      inFlight -= 1
+      return { err: null, stdout: 'v1.0\n', stderr: '' }
+    }
+    const result = await createEnvironmentTask(executor).run(makeContext())
+    // 串行实现下任何时刻至多 1 条命令在场；并行实现下探针数 > 1
+    expect(maxInFlight).toBeGreaterThan(1)
+    // 并行不改变结果顺序：探针条目仍按注册表顺序排列
+    const probeLabels = result.items.slice(0, ENVIRONMENT_PROBES.length).map((item) => item.label)
+    expect(probeLabels).toEqual(ENVIRONMENT_PROBES.map((probe) => probe.label))
+    expect(result.items.every((item) => item.status === 'ok')).toBe(true)
+  })
+
   it('run(ctx) 签名：真实执行器下能探测到 Node.js（测试环境运行前提）', async () => {
     const result = await createEnvironmentTask().run(makeContext())
     const node = result.items.find((item) => item.label === 'Node.js')

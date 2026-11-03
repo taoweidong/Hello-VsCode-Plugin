@@ -17,6 +17,7 @@ import {
 } from './serialLinkService'
 import { coerceServerDraft, SERVER_FIELD_DEFS } from './serverSchema'
 import type { IServerStore } from './serverStore'
+import { reasonOf } from '../../services/errors'
 
 /**
  * 串口命令控制台面板（宿主侧编排）。
@@ -100,10 +101,6 @@ async function getPasswordWithMigration(
   return legacy
 }
 
-function reasonOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
-
 /**
  * SerialServer → 协议线类型（接口缺隐式索引签名，经对象字面量展开获得；
  * 与 formSchema.toFieldDefs 的匿名字面量拷贝同理）。
@@ -131,8 +128,6 @@ export function createSerialConsoleDeps(
   const usernameDelay = options.usernameDelayMs ?? AUTO_LOGIN_USERNAME_DELAY_MS
   const passwordDelay = options.passwordDelayMs ?? AUTO_LOGIN_PASSWORD_DELAY_MS
 
-  /** 服务器缓存：init / serialServersRequest 时从 store 刷新，页面内增删改即时维护。 */
-  let servers: SerialServer[] = []
   /** 当前连接目标（serialState 推送时标识；断开不清除，便于页面关联错误信息）。 */
   let activeServerId: string | undefined
 
@@ -159,9 +154,22 @@ export function createSerialConsoleDeps(
   }
 
   async function pushServers(next: SerialServer[]): Promise<void> {
-    servers = next
     await post({ type: 'serialServers', servers: next.map(toServerWire) })
     services.onServersChanged?.()
+  }
+
+  /**
+   * 写前重读：store 是服务器列表的唯一真值源（P1-1）。
+   * 树视图删除 / 手改数据文件不经过面板 deps，任何变更操作前必须从 store
+   * 重读，避免基于陈旧内存列表整体覆写（复活已删除的服务器）。
+   */
+  async function loadServersOrPostError(): Promise<SerialServer[] | undefined> {
+    try {
+      return await services.store.load()
+    } catch (err) {
+      await post({ type: 'error', message: `加载服务器列表失败：${reasonOf(err)}` })
+      return undefined
+    }
   }
 
   async function pushHistory(): Promise<void> {
@@ -170,9 +178,14 @@ export function createSerialConsoleDeps(
 
   const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
-  /** 自动登录：连接后按序发送用户名 / 密码（凭据不经命令历史，不回显到日志）。 */
+  /** 自动登录：连接后按序发送用户名 / 密码（凭据不经命令历史，不回显到日志）。
+   * 代际守卫（P1-2）：等待期间连接被切换 / 断开时立即终止，凭据绝不写入
+   * 其他服务器的端口（link.send 只校验「已连接」，不校验端口归属）。 */
   async function maybeAutoLogin(server: SerialServer): Promise<void> {
     if (!server.autoLogin || server.username.length === 0) return
+    const stillCurrent = (): boolean =>
+      link.state() === 'connected' && link.connectedServerId() === server.id
+    if (!stillCurrent()) return
     const password = await getPasswordWithMigration(services.secrets, server.id)
     if (!password) {
       await post({
@@ -181,9 +194,12 @@ export function createSerialConsoleDeps(
       })
       return
     }
+    if (!stillCurrent()) return
     await wait(usernameDelay)
+    if (!stillCurrent()) return
     link.send(server.username)
     await wait(passwordDelay)
+    if (!stillCurrent()) return
     link.send(password)
   }
 
@@ -191,6 +207,10 @@ export function createSerialConsoleDeps(
     const coerced = coerceServerDraft(draft)
     if (!coerced.ok) {
       await post({ type: 'error', message: coerced.message, field: coerced.field })
+      return
+    }
+    const servers = await loadServersOrPostError()
+    if (!servers) {
       return
     }
     const now = Date.now()
@@ -212,13 +232,23 @@ export function createSerialConsoleDeps(
       return
     }
     if (password !== undefined && password.length > 0) {
-      await services.secrets.store(passwordKey(id), password)
+      // SecretStorage 在 keychain 锁定等场景会 reject（P2-B3）：显式上报，
+      // 不让「服务器已保存但密码没存」静默发生，也不产生未处理拒绝
+      try {
+        await services.secrets.store(passwordKey(id), password)
+      } catch (err) {
+        await post({ type: 'error', message: `服务器已保存，但写入登录密码失败：${reasonOf(err)}` })
+      }
     }
     services.logger?.(`串口服务器已保存：${next.name}（${next.serialPath}）`)
     await pushServers([...rest, next])
   }
 
   async function deleteServer(id: string): Promise<void> {
+    const servers = await loadServersOrPostError()
+    if (!servers) {
+      return
+    }
     const target = servers.find((server) => server.id === id)
     if (!target) {
       await post({ type: 'error', message: '要删除的服务器不存在，可能已被删除，请刷新列表。' })
@@ -231,7 +261,11 @@ export function createSerialConsoleDeps(
       await post({ type: 'error', message: `删除服务器失败：${reasonOf(err)}` })
       return
     }
-    await services.secrets.delete(passwordKey(id))
+    try {
+      await services.secrets.delete(passwordKey(id))
+    } catch (err) {
+      await post({ type: 'error', message: `服务器已删除，但清理保存的密码失败：${reasonOf(err)}` })
+    }
     if (link.connectedServerId() === id) {
       link.disconnect() // 删除当前连接的服务器：同步断开
     }
@@ -240,6 +274,10 @@ export function createSerialConsoleDeps(
   }
 
   async function connectServer(serverId: string): Promise<void> {
+    const servers = await loadServersOrPostError()
+    if (!servers) {
+      return
+    }
     const target = servers.find((server) => server.id === serverId)
     if (!target) {
       await post({ type: 'error', message: '要连接的服务器不存在，可能已被删除，请刷新列表。' })
@@ -273,6 +311,7 @@ export function createSerialConsoleDeps(
 
   return {
     buildInit: async () => {
+      let servers: SerialServer[]
       try {
         servers = await services.store.load()
       } catch (err) {
@@ -291,6 +330,11 @@ export function createSerialConsoleDeps(
       }
     },
     onPageMessage: (message: WebviewMessage) => {
+      // 页面消息处理器均为 fire-and-forget：统一兜底 catch（P2-B3），
+      // 处理器内部的错误已各自就地处理，这里只兜未预见的 rejection
+      const swallow = (task: Promise<unknown>): void => {
+        void task.catch((err: unknown) => services.logger?.(`[未处理] ${reasonOf(err)}`))
+      }
       switch (message.type) {
         case 'serialPortsRequest':
           void services.portFactory
@@ -309,28 +353,28 @@ export function createSerialConsoleDeps(
             )
           break
         case 'serialServerSave':
-          void saveServer(message.draft, message.password)
+          swallow(saveServer(message.draft, message.password))
           break
         case 'serialServerDelete':
-          void deleteServer(message.id)
+          swallow(deleteServer(message.id))
           break
         case 'serialConnect':
-          void connectServer(message.serverId)
+          swallow(connectServer(message.serverId))
           break
         case 'serialDisconnect':
           link.disconnect()
           break
         case 'serialSend':
-          void sendCommand(message.command)
+          swallow(sendCommand(message.command))
           break
         case 'commandHistoryRequest':
-          void pushHistory()
+          swallow(pushHistory())
           break
         case 'commandHistoryRemove':
-          void services.history.remove(message.id).then(() => pushHistory())
+          swallow(services.history.remove(message.id).then(() => pushHistory()))
           break
         case 'commandHistoryClear':
-          void services.history.clear().then(() => pushHistory())
+          swallow(services.history.clear().then(() => pushHistory()))
           break
         default:
           break // ready/dirty/submit/cancel 由控制器处理
@@ -405,10 +449,15 @@ export class SerialConsolePanel {
         return id
       },
     })
-    this.controller = WebviewController.createOrShow(
-      'serialConsole',
-      context,
-      extraDeps ? { ...baseDeps, ...extraDeps } : baseDeps
-    )
+    this.controller = WebviewController.createOrShow('serialConsole', context, {
+      ...baseDeps,
+      ...extraDeps,
+      // 面板关闭时清空单例引用（P3-D5）：下次 createOrShow 走全新装配而非悬挂引用
+      onDispose: () => {
+        SerialConsolePanel.current = undefined
+        baseDeps.onDispose?.()
+        extraDeps?.onDispose?.()
+      },
+    })
   }
 }

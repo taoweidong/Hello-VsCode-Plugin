@@ -49,7 +49,7 @@ export interface TaskContext {
  *
  * 当前内置任务做环境信息探测（Python/Node 版本等）；
  * 后续的「动作类」任务（如初始化、同步、构建等）同样实现本接口，
- * 在 src/tasks/taskRegistry.ts 的 TASKS 数组中注册即可被框架调度。
+ * 在 src/extension/tasks/taskRegistry.ts 的 TASKS 数组中注册即可被框架调度。
  */
 export interface StartupTask {
   id: string

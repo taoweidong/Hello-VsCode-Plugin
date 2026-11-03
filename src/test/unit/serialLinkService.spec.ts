@@ -150,6 +150,18 @@ describe('SerialLinkService', () => {
     expect(states.map((s) => s.state)).toEqual(['connecting', 'connected', 'disconnected'])
   })
 
+  it('多字节 UTF-8 字符跨 data 包拆分：按字节缓冲解码不产生乱码（P2-B1）', async () => {
+    const link = makeLink()
+    await link.connect(makeServer())
+    const port = factory.lastPort as FakeSerialPort
+    // 「中」的 UTF-8 为 3 字节，拆到两个 chunk；拆分点落在字符中间
+    const full = Buffer.from('日志中')
+    port.emit('data', full.subarray(0, 5))
+    port.emit('data', full.subarray(5))
+    await vi.advanceTimersByTimeAsync(SERIAL_DATA_BATCH_MS)
+    expect(dataEvents).toEqual([{ text: '日志中', seq: 1 }])
+  })
+
   // ---------------- 命令下发 ----------------
 
   it('send：按服务器 lineEnding 追加换行写入（lf 与 crlf）', async () => {

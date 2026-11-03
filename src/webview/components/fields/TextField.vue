@@ -3,8 +3,8 @@ import VInput from '../../ui/VInput.vue'
 import type { FormField } from '../../formSchema'
 
 /**
- * text 字段：单行输入（VInput）。schema 的 datalist 属性透传为输入框的 list，
- * 供页面渲染分类建议（datalist 元素由页面持有）。
+ * text 字段：单行输入（VInput）。
+ * password 类型（P2-B4）复用本组件但以掩码渲染，凭据输入不回显明文。
  */
 defineProps<{
   field: FormField
@@ -22,8 +22,8 @@ function asText(value: unknown): string {
 <template>
   <VInput
     :model-value="asText(modelValue)"
+    :type="field.type === 'password' ? 'password' : 'text'"
     :placeholder="field.placeholder"
-    :list="typeof field.datalist === 'string' ? field.datalist : undefined"
     :disabled="disabled"
     @update:model-value="emit('update:modelValue', $event)"
   ></VInput>

@@ -57,6 +57,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(taskRunner)
   const envProvider = new EnvironmentTreeProvider(taskRunner)
   context.subscriptions.push(
+    envProvider,
     vscode.window.createTreeView(VIEW.envViewId, { treeDataProvider: envProvider })
   )
   if (
@@ -86,6 +87,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const initProvider = new InitTreeProvider(() => initService.getStates())
   context.subscriptions.push(
     initService.onDidChangeItems(() => initProvider.refresh()),
+    initProvider,
     vscode.window.createTreeView(VIEW.initViewId, { treeDataProvider: initProvider })
   )
 

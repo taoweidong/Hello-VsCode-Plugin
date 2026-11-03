@@ -6,6 +6,64 @@
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-11-03
+
+### 修复（第四轮代码质量评估：docs/需求与优化方案/12）
+
+- **串口服务器「复活」缺陷（P1-1）**：树视图删除服务器后，面板内保存其他服务器
+  会把已删除的服务器写回数据文件——面板保存 / 删除 / 连接改为**写前从 store 重读**
+  （磁盘为唯一真值源），不再依赖可能陈旧的内存缓存。
+- **自动登录凭据误投递（P1-2）**：连接 A（自动登录）后在等待窗口内切换连接 B，
+  A 的用户名 / 密码会被写入 B 的串口——自动登录序列增加代际守卫，每次发送前
+  校验当前连接仍是发起目标。
+- **串口输出跨包乱码（P2）**：多字节 UTF-8 字符跨 data 包拆分时产生 U+FFFD
+  乱码，改用 `StringDecoder` 按字节缓冲解码；断开时残留不完整字节一次性刷出。
+- **初始化超时击穿互斥（P2）**：步骤超时仅裁决状态、后台仍在运行，与后续步骤
+  并发写同一文件——超时同时经 `ctx.signal` 下发协作取消（探测型步骤尽快退出）；
+  环境快照改用原子写（临时文件 + rename），并发 / 中断不再产生损坏 JSON。
+- **SecretStorage 静默失败（P2）**：保存 / 删除服务器时密码写入 keychain 失败
+  （如 keychain 锁定）无任何反馈且产生未处理拒绝——显式回 error 提示，页面消息
+  处理统一兜底 catch。
+- **环境探针串行最坏 48 秒（P2）**：探针相互独立却严格串行——改 `Promise.all`
+  并行（单探针候选命令回退链保持串行），最坏耗时从 8×6s 降到 6s；结果顺序不变。
+- **命令输入 ↓ 清空输入（P2）**：串口控制台未进入历史遍历时按 ↓ 会清空已输入
+  命令、历史草稿丢失——↓ 仅在遍历中生效，回到最底恢复进入遍历前的草稿；
+  遍历中重新输入即退出遍历。
+- **buildConsole 主按钮绕过校验（P2）**：主提交按钮不走 SchemaForm 必填校验，
+  空分支名要等宿主往返报错——主按钮改走本地校验（失败聚焦首个控件），与
+  serialConsole 行为对齐。
+- **编辑态 Esc 无确认（P2）**：编辑服务器时按 Esc 直接丢弃全部已编辑字段——
+  编辑态重置前 `confirm` 确认（拒绝保持编辑），新增态保持直接重置。
+- **密码明文渲染（P2）**：登录密码字段以普通文本框渲染——表单字段类型新增
+  `password`（掩码渲染），存储链路零明文的最后一块展示层缺口补齐。
+- **init.extra 元素级守卫（P2）**：`useConsolePage` 对 extra 列表只验数组不验元素，
+  畸形元素直入 UI 状态——改用 protocol 导出的元素守卫逐项过滤。
+
+### 变更
+
+- **覆盖率统计面扩容**：vitest 统计面从 8 组 glob 扩至全部可测模块（宿主命令 /
+  功能 / 任务 / 视图层 + Webview 全量），阈值按实测校准（实测 92.13S/85.73B/
+  90.89F/92.62L）；`features/build` 与 `webview/host` 两组历史缺口单独设线防回退。
+- **测试补全**：新增 16 个 spec 文件（+108 用例：环境信息树 / 初始化树 / 草稿箱
+  命令组 / pageCommands 双路由 / 串口控制器装配与 P1-1 集成回归 / serverGuard /
+  models / probes / buildSchema / CommandInput 历史遍历 / ConsoleOutput 滚动 /
+  HistoryPanel 双击与两段式清空 / VToolbar / iconNames / pages / gallery 冒烟）。
+- **P3 清理**：删除死代码（stableStringify、clearError 死事件、datalist 断头链、
+  isIconName）；修正 7 处注释 / 文案漂移（gate 步骤编号、探针 id 契约、
+  SubmitTimeoutError 文案等）；EnvironmentTreeProvider / InitTreeProvider /
+  SerialServersTreeProvider 补 Disposable（emitter 释放）；SerialConsolePanel
+  面板关闭清空单例引用；`reasonOf` 收敛为共享助手；serverGuard 对 baudRate
+  拒绝 NaN / 非正数；serverStore.load IO 错误经 onWarning 留痕后再上抛。
+- **测试桩增量**：vscode 测试桩新增 `activeTextEditor` 注入点与 `version` 常量
+  （draftCommands / copyCommands 成功路径单测可达）。
+
+### 文档
+
+- 新增 `docs/需求与优化方案/12-代码质量评估报告与分阶段优化方案.md`（第四轮评估：
+  9 维度质量评估 + P1×2/P2×9/P3×20+ 问题清单 + 六阶段实施方案与执行记录）。
+- agent.md「单元测试协议」强化：每一次 AI 交互必须执行前后端单元测试，全部通过
+  后才允许提交；测试未通过不得提交，先定位修复再重新验证。
+
 ## [3.1.0] - 2026-11-02
 
 ### 变更（任务树形分组默认多层，对齐 vscode-taskexplorer）

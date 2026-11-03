@@ -299,6 +299,19 @@ function __record(kind: string, payload?: unknown): void {
 /** 对话框 / QuickPick / InputBox 的排队应答（shift 取用；空则返回 undefined）。 */
 const dialogQueue: unknown[] = []
 
+/**
+ * 活动编辑器桩的最小结构面（draftCommands / copyCommands 只消费这三处：
+ * document.getText(selection)、document.fileName、document.uri）。测试直接构造。
+ */
+export interface ActiveTextEditorStub {
+  document: {
+    uri: Uri
+    fileName: string
+    getText(selection?: unknown): string
+  }
+  selection: unknown
+}
+
 export interface StubState {
   recorded: Recorded[]
   dialogQueue: unknown[]
@@ -321,7 +334,10 @@ export interface StubState {
   /** 可注入的 fetchTasks / executeTask 抛错 */
   fetchTasksError: unknown
   executeTaskError: unknown
-  /** 已创建的 FileSystemWatcher 桩（供测试用 __fireChange 等驱动） */
+  /** 可注入的活动编辑器（draftCommands / copyCommands 成功路径用；undefined = 无编辑器） */
+  activeTextEditor:
+    | ActiveTextEditorStub
+    | undefined /** 已创建的 FileSystemWatcher 桩（供测试用 __fireChange 等驱动） */
   fileWatchers: {
     onDidChange: (cb: () => unknown) => Disposable
     onDidCreate: (cb: () => unknown) => Disposable
@@ -347,6 +363,7 @@ export const __stubs: StubState = {
   documents: new Map(),
   fetchTasksError: undefined,
   executeTaskError: undefined,
+  activeTextEditor: undefined,
   fileWatchers: [],
 }
 
@@ -372,6 +389,7 @@ export function __resetStubs(options?: { keepWorkspaceFolders?: boolean }): void
   __stubs.documents.clear()
   __stubs.fetchTasksError = undefined
   __stubs.executeTaskError = undefined
+  __stubs.activeTextEditor = undefined
   __stubs.fileWatchers = []
   taskStartEmitter = new EventEmitter<FakeTaskExecution>()
   taskEndEmitter = new EventEmitter<FakeTaskExecution>()
@@ -414,6 +432,10 @@ function createOutputChannelStub(name: string) {
 
 export const window = {
   createOutputChannel: (name: string) => createOutputChannelStub(name),
+  /** 活动编辑器（测试经 __stubs.activeTextEditor 注入；真实形态见 ActiveTextEditorStub）。 */
+  get activeTextEditor(): ActiveTextEditorStub | undefined {
+    return __stubs.activeTextEditor
+  },
   showInformationMessage: (message: string, ...items: unknown[]) => {
     __record('showInformationMessage', { message, items })
     return Promise.resolve(nextDialogAnswer())
@@ -698,6 +720,9 @@ export const env = {
   uiKind: 1,
   language: 'zh-cn',
 }
+
+/** 宿主版本号（environmentTask 的 VSCode 条目渲染用；占位值避免 "stub undefined"）。 */
+export const version = '1.85.0-stub'
 
 /* ---------------- tasks（任务管理器 v2.3）---------------- */
 

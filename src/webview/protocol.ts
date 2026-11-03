@@ -154,7 +154,8 @@ function isSerialPortBrief(v: unknown): v is SerialPortBrief {
   )
 }
 
-function isSerialServerWire(v: unknown): v is SerialServerWire {
+/** 串口服务器线类型元素守卫（init.extra.servers / serialServers 列表共用）。 */
+export function isSerialServerWire(v: unknown): v is SerialServerWire {
   return (
     isPlainObject(v) &&
     typeof v.id === 'string' &&
@@ -178,7 +179,8 @@ function isSerialLinkStateWire(v: unknown): v is SerialLinkStateWire {
   return v === 'connecting' || v === 'connected' || v === 'disconnected' || v === 'error'
 }
 
-function isCommandHistoryWire(v: unknown): v is CommandHistoryWire {
+/** 命令历史线类型元素守卫（init.extra.history / commandHistory 列表共用）。 */
+export function isCommandHistoryWire(v: unknown): v is CommandHistoryWire {
   return (
     isPlainObject(v) &&
     typeof v.id === 'string' &&

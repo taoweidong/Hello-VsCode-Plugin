@@ -1,7 +1,8 @@
 import * as vscode from 'vscode'
 import { environmentTask } from '../../tasks/environmentTask'
 import { TaskSignalSource } from '../../tasks/taskRunner'
-import type { TaskResult } from '../../tasks/types'
+import type { TaskSignal, TaskResult } from '../../tasks/types'
+import { writeJsonAtomic } from '../../services/stores/atomicWrite'
 
 /**
  * 初始化步骤定义（09 方案阶段 2：dataFile / staticConfig 两步骤随
@@ -13,6 +14,11 @@ export interface InitContext {
   /** 当前工作区根目录（未打开工作区时为 undefined） */
   workspaceRoot?: vscode.Uri
   output: vscode.OutputChannel
+  /**
+   * 取消信号（P2-B2）：步骤超时 / 扩展停用时由 InitService 触发。
+   * 探测型步骤应在候选命令间隙检查并尽快退出；缺省时步骤自建（独立运行场景）。
+   */
+  signal?: TaskSignal
 }
 
 /**
@@ -73,14 +79,15 @@ export function createInitSteps(options?: CreateInitStepsOptions): InitStep[] {
         if (!ctx.workspaceRoot) {
           throw new Error('未打开工作区。')
         }
-        // T5.4 / P1-12：优先复用宿主注入的快照（如启动任务已探测过），无则现场运行
+        // T5.4 / P1-12：优先复用宿主注入的快照（如启动任务已探测过），无则现场运行；
+        // signal 优先用 InitContext 下发的（超时/停用可协作取消，P2-B2）
         const snapshotSource = options?.getEnvironmentSnapshot?.()
         const result =
           snapshotSource ??
           (await environmentTask.run({
             output: ctx.output,
             workspaceRoot: ctx.workspaceRoot,
-            signal: new TaskSignalSource().signal,
+            signal: ctx.signal ?? new TaskSignalSource().signal,
           }))
         const snapshot = {
           finishedAt: result.finishedAt,
@@ -92,12 +99,8 @@ export function createInitSteps(options?: CreateInitStepsOptions): InitStep[] {
           })),
         }
         const fileUri = vscode.Uri.joinPath(ctx.workspaceRoot, '.ext-starter/environment.json')
-        // 单步重跑时 artifactDir 可能尚未执行：确保目录存在再写入
-        await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(fileUri, '..'))
-        await vscode.workspace.fs.writeFile(
-          fileUri,
-          Buffer.from(JSON.stringify(snapshot, null, 2), 'utf8')
-        )
+        // 原子写（P2-B2）：临时文件 + rename，超时重跑 / 并发路径不产生损坏 JSON
+        await writeJsonAtomic(fileUri, snapshot)
         const okCount = result.items.filter((item) => item.status === 'ok').length
         const reused = snapshotSource ? '（复用已有检测结果）' : ''
         return `快照已写入${reused}（${okCount}/${result.items.length} 项就绪）。`

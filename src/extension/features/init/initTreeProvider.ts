@@ -21,7 +21,7 @@ const STATUS_LABEL: Record<StepState['status'], string> = {
  * 单击步骤即执行该步骤，执行结果（信息/耗时）显示在描述与 tooltip 中——
  * 演示「清单 + 单步动作」模式。
  */
-export class InitTreeProvider implements vscode.TreeDataProvider<StepState> {
+export class InitTreeProvider implements vscode.TreeDataProvider<StepState>, vscode.Disposable {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<StepState | undefined | void>()
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event
 
@@ -58,5 +58,9 @@ export class InitTreeProvider implements vscode.TreeDataProvider<StepState> {
       return []
     }
     return this.getStates()
+  }
+
+  dispose(): void {
+    this._onDidChangeTreeData.dispose()
   }
 }

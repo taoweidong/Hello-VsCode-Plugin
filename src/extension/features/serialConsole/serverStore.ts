@@ -48,7 +48,12 @@ export class JsonServerStore implements IServerStore {
       if (err instanceof vscode.FileSystemError && err.code === 'FileNotFound') {
         return [] // 首次使用：文件尚不存在，视为空数据
       }
-      throw err // IO 错误（无权限 / 文件被占用等）不是损坏，直接上抛
+      // IO 错误（无权限 / 文件被占用等）不是损坏：留痕输出通道后上抛，
+      // 调用方（树视图 getChildren 等）静默降级时用户仍可在输出通道看到原因
+      this.options.onWarning?.(
+        `读取服务器数据失败（${this.fileUri.fsPath}）：${err instanceof Error ? err.message : String(err)}`
+      )
+      throw err
     }
     if (text.charCodeAt(0) === 0xfeff) {
       text = text.slice(1) // 剥离 BOM，避免 JSON.parse 失败被误判为损坏

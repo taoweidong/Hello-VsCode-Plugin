@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { isHostMessage, isWebviewMessage } from '../../../webview/protocol'
+import {
+  isCommandHistoryWire,
+  isHostMessage,
+  isSerialServerWire,
+  isWebviewMessage,
+} from '../../../webview/protocol'
 
 /** protocol.ts 运行时守卫（03 §5.5 / 05 T2.4）：逐字段窄化，非法样例一律拒绝。 */
 describe('isWebviewMessage', () => {
@@ -281,5 +286,50 @@ describe('isHostMessage：串口控制台消息', () => {
     ],
   ])('拒绝非法消息：%s', (_name, sample) => {
     expect(isHostMessage(sample)).toBe(false)
+  })
+})
+
+/* ================= 元素级守卫导出（P2-F4：init.extra 元素过滤共用） ================= */
+
+describe('isSerialServerWire / isCommandHistoryWire（元素级守卫）', () => {
+  const validServer = {
+    id: 'srv-1',
+    name: '甲',
+    serialPath: 'COM3',
+    baudRate: 115200,
+    dataBits: 8,
+    stopBits: 1,
+    parity: 'none',
+    flowControl: 'none',
+    lineEnding: 'lf',
+    autoLogin: false,
+    username: '',
+    description: '',
+    createdAt: 1,
+    updatedAt: 1,
+  }
+
+  it('合法 SerialServerWire 通过；缺字段 / 类型不符 / 非对象一律拒绝', () => {
+    expect(isSerialServerWire(validServer)).toBe(true)
+    expect(isSerialServerWire({ ...validServer, id: 42 })).toBe(false)
+    expect(isSerialServerWire({ ...validServer, baudRate: '115200' })).toBe(false)
+    expect(isSerialServerWire({ ...validServer, name: undefined })).toBe(false)
+    expect(isSerialServerWire(null)).toBe(false)
+    expect(isSerialServerWire([validServer])).toBe(false)
+    expect(isSerialServerWire('srv-1')).toBe(false)
+  })
+
+  it('合法 CommandHistoryWire 通过；缺字段 / 类型不符拒绝', () => {
+    expect(isCommandHistoryWire({ id: 'h1', command: 'ls', lastUsedAt: 1, useCount: 2 })).toBe(true)
+    expect(isCommandHistoryWire({ id: 'h1', command: 'ls', lastUsedAt: '1', useCount: 2 })).toBe(
+      false
+    )
+    expect(isCommandHistoryWire({ id: 'h1', command: 'ls' })).toBe(false)
+    expect(isCommandHistoryWire(undefined)).toBe(false)
+  })
+
+  it('列表场景：filter(isSerialServerWire) 只保留合法元素（useConsolePage 的 init.extra 过滤语义）', () => {
+    const mixed = [validServer, { id: 'bad' }, null, validServer]
+    expect(mixed.filter(isSerialServerWire)).toHaveLength(2)
   })
 })

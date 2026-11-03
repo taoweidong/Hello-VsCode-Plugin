@@ -23,12 +23,16 @@ const STATUS_ICONS: Record<TaskStatus | 'missing', string> = {
  * - 每个启动任务一个分组节点，其下是探测到的条目（版本号等）；
  * - 后续新增任务（动作类）无需改此视图，自动出现新分组。
  */
-export class EnvironmentTreeProvider implements vscode.TreeDataProvider<EnvTreeNode> {
+export class EnvironmentTreeProvider
+  implements vscode.TreeDataProvider<EnvTreeNode>, vscode.Disposable
+{
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<EnvTreeNode | undefined | void>()
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event
 
+  private readonly subscription: vscode.Disposable
+
   constructor(private readonly runner: TaskRunner) {
-    runner.onDidChangeItems(() => this._onDidChangeTreeData.fire())
+    this.subscription = runner.onDidChangeItems(() => this._onDidChangeTreeData.fire())
   }
 
   getTreeItem(node: EnvTreeNode): vscode.TreeItem {
@@ -87,6 +91,11 @@ export class EnvironmentTreeProvider implements vscode.TreeDataProvider<EnvTreeN
       return node.result.items.map((item): EnvTreeNode => ({ kind: 'item', item }))
     }
     return []
+  }
+
+  dispose(): void {
+    this.subscription.dispose()
+    this._onDidChangeTreeData.dispose()
   }
 }
 

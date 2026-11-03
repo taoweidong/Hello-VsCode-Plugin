@@ -36,8 +36,6 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: Record<string, unknown>): void
   (e: 'submit'): void
   (e: 'cancel'): void
-  /** 宿主错误随输入清除：通知页面删除 errors 中对应字段（父级无需知道内部结构） */
-  (e: 'clearError', key: string): void
 }>()
 
 /** type → 字段组件注册表；新增字段类型在此登记一行。 */
@@ -47,6 +45,7 @@ const FIELD_REGISTRY: Record<string, Component> = {
   select: SelectField,
   tags: TagsField,
   boolean: BooleanField,
+  password: TextField,
 }
 
 function componentFor(field: FormField): Component {
@@ -70,10 +69,7 @@ function setValue(field: FormField, value: unknown): void {
     delete next[field.key]
     localErrors.value = next
   }
-  // 宿主错误（props.errors）同样随输入清除：通知页面删除对应字段错误
-  if (props.errors[field.key] !== undefined) {
-    emit('clearError', field.key)
-  }
+  // 宿主错误（props.errors）同样随输入清除：页面在 update 事件里整体刷新 errors
   emit('update:modelValue', { ...props.modelValue, [field.key]: value })
 }
 

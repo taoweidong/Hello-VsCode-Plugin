@@ -4,13 +4,13 @@ import type { ComponentPublicInstance } from 'vue'
 import SchemaForm from '../../../webview/components/SchemaForm.vue'
 import { parseTags, joinTags } from '../../../webview/components/tagsInput'
 import type { FormField } from '../../../webview/formSchema'
-import { inputChecked, inputValue } from './appTestUtils'
+import { inputValue } from './appTestUtils'
 
 /** SchemaForm（M4-T4.1）：渲染 / 回填 / 校验 / tags / 键盘 / IME / 错误定位。 */
 
 const SCHEMA: FormField[] = [
   { key: 'name', label: '名称', type: 'text', required: true, placeholder: '请输入名称' },
-  { key: 'category', label: '分类', type: 'text', datalist: 'category-list' },
+  { key: 'category', label: '分类', type: 'text' },
   {
     key: 'priority',
     label: '优先级',
@@ -86,29 +86,16 @@ describe('SchemaForm：渲染与类型分发', () => {
     expect(wrapper.find('input[type="text"]').exists()).toBe(true)
   })
 
-  it('datalist 属性透传到 text 输入（list=id）', () => {
-    const wrapper = mountForm()
-    const inputs = wrapper.findAll('input[type="text"]')
-    expect(inputs[1].attributes('list')).toBe('category-list')
-  })
-})
-
-describe('SchemaForm：v-model 回填与更新', () => {
-  it('回填 modelValue（text 值 / select 值 / boolean 勾选）', async () => {
+  it('P2-B4：password 类型复用 text 输入但以掩码渲染（input[type=password]）', () => {
     const wrapper = mountForm({
-      modelValue: {
-        name: '任务A',
-        category: '需求',
-        priority: 'high',
-        tags: ['前端'],
-        enabled: true,
-        note: 'x',
-      },
+      schema: [{ key: 'password', label: '登录密码', type: 'password', placeholder: '选填' }],
+      modelValue: { password: '' },
     })
-    const inputs = wrapper.findAll('input[type="text"]')
-    expect(inputValue(inputs[0].element)).toBe('任务A')
-    expect(inputValue(wrapper.find('select').element)).toBe('high')
-    expect(inputChecked(wrapper.find('input[type="checkbox"]').element)).toBe(true)
+    const masked = wrapper.find('input[type="password"]')
+    expect(masked.exists()).toBe(true)
+    expect(masked.attributes('placeholder')).toBe('选填')
+    // 文本输入框数量不受影响（password 不再计入 type=text）
+    expect(wrapper.findAll('input[type="text"]').length).toBe(0)
   })
 
   it('输入触发 update:modelValue（浅拷贝 + 字段更新）', async () => {

@@ -9,7 +9,7 @@ import type { FieldDef } from './protocol'
  * （09 方案阶段 2：条目领域的 ITEM_FIELD_DEFS / FORM_SCHEMA / UI_FIELD_EXTRAS
  * 已随条目领域删除；`deriveFormSchema` 是领域无关参数化派生，串口侧在用。）
  */
-export type FormFieldType = 'text' | 'textarea' | 'select' | 'tags' | 'boolean'
+export type FormFieldType = 'text' | 'textarea' | 'select' | 'tags' | 'boolean' | 'password'
 
 /**
  * 通用领域字段定义。
@@ -47,12 +47,6 @@ export interface FormField {
   defaultValue?: string
   /** select 类型的选项 */
   options?: { value: string; label: string }[]
-  /**
-   * 该字段需要「输入建议列表」的标记（text 输入的自动补全提示）。
-   * 值只作标记用、不是 DOM id —— datalist 元素的真实 id 由页面用 useId 派生（R-U-7），
-   * 避免固定 id 在多实例面板下重复。
-   */
-  datalist?: string
 }
 
 /**
@@ -88,6 +82,5 @@ export function toFieldDefs(schema: FormField[]): FieldDef[] {
     hint: field.hint,
     defaultValue: field.defaultValue,
     options: field.options?.map((option) => ({ ...option })),
-    datalist: field.datalist,
   }))
 }

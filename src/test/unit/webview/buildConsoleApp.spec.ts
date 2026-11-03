@@ -150,6 +150,9 @@ describe('buildConsole App（分支编译弹框）', () => {
     hostMessage({ type: 'init', page: 'buildConsole', schema: SCHEMA, value: null })
     await vi.advanceTimersByTimeAsync(0)
 
+    // 先填必填字段：本地校验通过后提交才会发往宿主（P2-F2 起主按钮走 SchemaForm 校验）
+    const input = wrapper?.find('input')
+    await input?.setValue('release/2.0.0')
     const submitButtonEl = wrapper
       ?.findAll('button')
       .find((candidate) => candidate.text().includes('提交构建'))
@@ -162,6 +165,26 @@ describe('buildConsole App（分支编译弹框）', () => {
     expect(wrapper?.text()).toContain('分支名不能为空。')
     expect(wrapper?.find('[role="alert"]').exists()).toBe(true)
     expect(submitButton()?.disabled).toBe(false) // 已解锁
+  })
+
+  it('P2-F2：主按钮本地校验——必填字段为空时拦截提交并提示，不发 submit', async () => {
+    await mountApp()
+    hostMessage({ type: 'init', page: 'buildConsole', schema: SCHEMA, value: null })
+    await vi.advanceTimersByTimeAsync(0)
+
+    const submitButtonEl = wrapper
+      ?.findAll('button')
+      .find((candidate) => candidate.text().includes('提交构建'))
+    await submitButtonEl?.trigger('click')
+    await vi.advanceTimersByTimeAsync(0)
+
+    // 未发 submit（不依赖宿主兜底报错）
+    expect(
+      api.posted.filter((message) => (message as { type?: string }).type === 'submit')
+    ).toHaveLength(0)
+    // SchemaForm 本地 required 错误可见（分支为 BUILD_FIELD_DEFS 的必填字段）
+    expect(wrapper?.text()).toContain('请填写')
+    expect(submitButton()?.disabled).toBe(false) // 未进入提交态
   })
 
   it('轮询：init 后每 3s 发一次 buildListRequest，卸载后停止', async () => {

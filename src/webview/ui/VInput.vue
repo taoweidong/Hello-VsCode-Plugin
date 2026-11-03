@@ -14,12 +14,12 @@ const props = withDefaults(
     invalid?: boolean
     disabled?: boolean
     maxlength?: number
-    /** 关联的 datalist 元素 id（分类输入建议等场景，datalist 由页面渲染） */
-    list?: string
+    /** 输入类型（password 用于凭据掩码渲染，P2-B4；其余场景保持 text） */
+    type?: 'text' | 'password'
     /** 覆盖 VFormField 生成的控件 id（一般无需传） */
     id?: string
   }>(),
-  { modelValue: '', invalid: false, disabled: false }
+  { modelValue: '', invalid: false, disabled: false, type: 'text' }
 )
 
 const emit = defineEmits<{ (e: 'update:modelValue', value: string): void }>()
@@ -40,11 +40,10 @@ function onInput(event: Event): void {
     :id="controlId"
     class="v-input"
     :class="{ 'v-input--invalid': isInvalid }"
-    type="text"
+    :type="type"
     :value="modelValue"
     :placeholder="placeholder"
     :maxlength="maxlength"
-    :list="list || undefined"
     :disabled="disabled"
     :aria-invalid="isInvalid || undefined"
     :aria-describedby="field?.describedBy.value"

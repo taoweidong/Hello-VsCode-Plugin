@@ -35,6 +35,12 @@ describe('VInput', () => {
     expect(wrapper.attributes('maxlength')).toBe('20')
     expect(wrapper.attributes('disabled')).toBeDefined()
   })
+
+  it('type=password：掩码渲染（P2-B4）；缺省保持 text', () => {
+    expect(mount(VInput, { props: {} }).attributes('type')).toBe('text')
+    const masked = mount(VInput, { props: { type: 'password' } })
+    expect(masked.attributes('type')).toBe('password')
+  })
 })
 
 describe('VTextarea', () => {

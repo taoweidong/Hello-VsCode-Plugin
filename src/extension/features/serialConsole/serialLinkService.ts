@@ -1,3 +1,4 @@
+import { StringDecoder } from 'node:string_decoder'
 import { LINE_ENDING_CHARS, type SerialServer } from './models'
 import type { SerialPortFactory, SerialPortLike } from './serialPortFactory'
 
@@ -6,6 +7,7 @@ import type { SerialPortFactory, SerialPortLike } from './serialPortFactory'
  *
  * - 状态机 disconnected → connecting → connected →（error | disconnected）；
  * - 数据 40ms 批处理（seq 单调递增），防止高频输出打爆 webview 消息通道；
+ * - 字节流经 StringDecoder 按 UTF-8 解码（多字节字符跨 data 包不产生乱码）；
  * - 连接中可断开（generation 代际守卫：open 迟到 resolve 不再进入 connected）；
  * - 切换服务器 = 自动断开旧连接再连新连接；
  * - close/flush 幂等：重复断开、拔线、I/O 错误都不产生重复状态通知。
@@ -44,6 +46,8 @@ export function createSerialLinkService(
   let seq = 0
   /** 代际计数：connect 发起时分配，disconnect/新 connect 使旧代际失效。 */
   let generation = 0
+  /** UTF-8 增量解码器：多字节字符跨 data 包拆分时按字节缓冲（P2-B1）。 */
+  const decoder = new StringDecoder('utf8')
 
   const setState = (next: LinkState, error?: string): void => {
     state = next
@@ -66,6 +70,12 @@ export function createSerialLinkService(
   /** 关闭端口并清理引用（不再发状态，由调用方决定下一状态）。 */
   const teardownPort = (): void => {
     flush()
+    // 解码器残留的不完整字节随断开一次性刷出（不静默丢弃），随后重置解码器
+    const tail = decoder.end()
+    if (tail.length > 0) {
+      seq += 1
+      hooks.onData(tail, seq)
+    }
     const current = port
     port = undefined
     server = undefined
@@ -81,7 +91,7 @@ export function createSerialLinkService(
   const attach = (opened: SerialPortLike): void => {
     opened.on('data', (chunk: Buffer) => {
       if (port !== opened) return
-      pendingText += chunk.toString('utf8')
+      pendingText += decoder.write(chunk)
       if (pendingTimer === undefined) {
         pendingTimer = setTimeout(() => {
           pendingTimer = undefined

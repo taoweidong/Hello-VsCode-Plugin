@@ -8,7 +8,14 @@ import type { FormField, FormFieldType } from '../formSchema'
  * 未知 type 回退 text（schema 前向兼容：宿主新增字段类型时旧页面不至于崩溃）。
  */
 
-const FIELD_TYPES: readonly FormFieldType[] = ['text', 'textarea', 'select', 'tags', 'boolean']
+const FIELD_TYPES: readonly FormFieldType[] = [
+  'text',
+  'textarea',
+  'select',
+  'tags',
+  'boolean',
+  'password',
+]
 
 function isFieldType(value: unknown): value is FormFieldType {
   return typeof value === 'string' && (FIELD_TYPES as readonly string[]).includes(value)
@@ -41,9 +48,6 @@ export function toFormField(def: FieldDef): FormField {
   }
   if (typeof def.defaultValue === 'string') {
     field.defaultValue = def.defaultValue
-  }
-  if (typeof def.datalist === 'string') {
-    field.datalist = def.datalist
   }
   if (Array.isArray(def.options)) {
     const options = def.options.filter(isOption).map((option) => ({ ...option }))

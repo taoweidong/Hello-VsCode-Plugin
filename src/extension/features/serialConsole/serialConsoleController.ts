@@ -116,6 +116,7 @@ export class SerialConsoleController implements vscode.Disposable {
 
   dispose(): void {
     this.link.disconnect()
+    this.treeProvider.dispose()
   }
 
   private post(message: Parameters<WebviewController['post']>[0]): unknown {

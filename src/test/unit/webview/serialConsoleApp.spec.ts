@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import App from '../../../webview/apps/serialConsole/App.vue'
@@ -174,6 +174,49 @@ describe('serialConsole 页面：服务器管理', () => {
     const nameInput = wrapper.find('input[placeholder="如：服务器甲"]')
     expect(inputValue(nameInput.element)).toBe('服务器甲')
     expect(wrapper.text()).toContain('编辑服务器')
+  })
+
+  it('P2-B4：密码输入以掩码渲染（type=password），值仍可提交给宿主单独携带', async () => {
+    wrapper = mount(App)
+    sendInit()
+    await wrapper.vm.$nextTick()
+    const passwordInput = wrapper.find('input[placeholder="选填"]')
+    expect(passwordInput.attributes('type')).toBe('password')
+    // 必填字段一并填写，让保存路径走通（本用例验证的是掩码渲染不改变提交语义）
+    await wrapper.find('input[placeholder="如：服务器甲"]').setValue('新服务器')
+    await wrapper.find('input[placeholder^="如 COM3"]').setValue('COM7')
+    await passwordInput.setValue('s3cret')
+    const saveButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('保存服务器'))
+    await saveButton?.trigger('click')
+    const save = (api.posted as { type?: string; password?: string }[]).find(
+      (message) => message.type === 'serialServerSave'
+    )
+    expect(save?.password).toBe('s3cret')
+  })
+
+  it('P2-F3：编辑态 Esc 重置需确认——拒绝保持编辑，确认后复位', async () => {
+    wrapper = mount(App)
+    sendInit()
+    await wrapper.vm.$nextTick()
+    const editButton = wrapper.findAll('.server-list__actions button')[1]
+    await editButton.trigger('click')
+    expect(wrapper.text()).toContain('编辑服务器')
+
+    const confirmSpy = vi
+      .spyOn(
+        (globalThis as unknown as { window: { confirm: (message?: string) => boolean } }).window,
+        'confirm'
+      )
+      .mockReturnValue(false)
+    await wrapper.find('form').trigger('keydown', { key: 'Escape' })
+    expect(confirmSpy).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('编辑服务器') // 拒绝：保持编辑态
+
+    confirmSpy.mockReturnValue(true)
+    await wrapper.find('form').trigger('keydown', { key: 'Escape' })
+    expect(wrapper.text()).toContain('新增服务器') // 确认：复位为新增态
   })
 
   it('保存：post serialServerSave（密码单独携带）；servers 推送后表单复位', async () => {
