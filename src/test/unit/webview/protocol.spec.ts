@@ -10,10 +10,7 @@ import {
 describe('isWebviewMessage', () => {
   it.each([
     ['ready', { type: 'ready' }],
-    ['dirty=true', { type: 'dirty', dirty: true }],
-    ['dirty=false', { type: 'dirty', dirty: false }],
     ['submit', { type: 'submit', draft: { name: '任务A' } }],
-    ['cancel', { type: 'cancel' }],
   ])('接受合法消息：%s', (_name, sample) => {
     expect(isWebviewMessage(sample)).toBe(true)
   })
@@ -25,11 +22,8 @@ describe('isWebviewMessage', () => {
     ['字符串', 'ready'],
     ['数字', 42],
     ['空对象', {}],
-    ['缺 type', { dirty: true }],
+    ['缺 type', { draft: true }],
     ['未知 type', { type: 'huge' }],
-    ['dirty 缺字段', { type: 'dirty' }],
-    ['dirty 类型错误', { type: 'dirty', dirty: 'yes' }],
-    ['dirty 为 null', { type: 'dirty', dirty: null }],
     ['submit 缺 draft', { type: 'submit' }],
     ['submit.draft 为 null', { type: 'submit', draft: null }],
     ['submit.draft 为数组', { type: 'submit', draft: [{ key: 'x' }] }],
@@ -111,10 +105,11 @@ describe('isHostMessage', () => {
   })
 })
 
-/* ================= 分支编译构建任务消息守卫（v2.0 弹框改造） ================= */
+/* ================= 任务管理 CRUD 消息守卫（v2.6：任务管理改造） ================= */
 
-const buildTask = {
-  id: 'build-1',
+const taskItem = {
+  id: 'task-1',
+  name: '编译任务',
   branch: 'release/1.0.0',
   buildType: 'full',
   status: 'running',
@@ -122,31 +117,79 @@ const buildTask = {
   createdAt: '2026-10-25T00:00:00.000Z',
 }
 
-describe('isWebviewMessage：构建任务消息', () => {
-  it.each([['buildListRequest', { type: 'buildListRequest' }]])(
-    '接受合法消息：%s',
-    (_name, sample) => {
-      expect(isWebviewMessage(sample)).toBe(true)
-    }
-  )
+describe('isWebviewMessage：任务管理消息', () => {
+  it.each([
+    ['taskListRequest', { type: 'taskListRequest', query: { page: 1, pageSize: 10 } }],
+    [
+      'taskListRequest 带过滤条件',
+      {
+        type: 'taskListRequest',
+        query: {
+          page: 2,
+          pageSize: 20,
+          keyword: '编译',
+          status: 'running',
+          buildType: 'incremental',
+        },
+      },
+    ],
+    ['taskDelete', { type: 'taskDelete', id: 'task-1' }],
+  ])('接受合法消息：%s', (_name, sample) => {
+    expect(isWebviewMessage(sample)).toBe(true)
+  })
+
+  it.each([
+    ['taskListRequest 缺 query', { type: 'taskListRequest' }],
+    ['taskListRequest.query 缺 page', { type: 'taskListRequest', query: { pageSize: 10 } }],
+    [
+      'taskListRequest.query.pageSize 非数字',
+      { type: 'taskListRequest', query: { page: 1, pageSize: '10' } },
+    ],
+    [
+      'taskListRequest.query.status 非法字面量',
+      { type: 'taskListRequest', query: { page: 1, pageSize: 10, status: 'done' } },
+    ],
+    [
+      'taskListRequest.query.buildType 非法字面量',
+      { type: 'taskListRequest', query: { page: 1, pageSize: 10, buildType: 'patch' } },
+    ],
+    [
+      'taskListRequest.query.keyword 非字符串',
+      { type: 'taskListRequest', query: { page: 1, pageSize: 10, keyword: 1 } },
+    ],
+    ['taskDelete 缺 id', { type: 'taskDelete' }],
+    ['taskDelete.id 非字符串', { type: 'taskDelete', id: 7 }],
+  ])('拒绝非法消息：%s', (_name, sample) => {
+    expect(isWebviewMessage(sample)).toBe(false)
+  })
 })
 
-describe('isHostMessage：构建任务消息', () => {
+describe('isHostMessage：任务管理消息', () => {
+  const page = (overrides: Record<string, unknown> = {}) => ({
+    items: [taskItem],
+    total: 1,
+    page: 1,
+    pageSize: 10,
+    ...overrides,
+  })
+
   it.each([
-    ['buildList 单任务', { type: 'buildList', tasks: [buildTask] }],
-    ['buildList 空列表', { type: 'buildList', tasks: [] }],
+    ['taskList 单任务', { type: 'taskList', page: page() }],
+    ['taskList 空列表', { type: 'taskList', page: page({ items: [], total: 0 }) }],
     [
-      'buildList 带可选字段',
+      'taskList 带可选字段',
       {
-        type: 'buildList',
-        tasks: [
-          {
-            ...buildTask,
-            notes: '备注',
-            message: '构建中',
-            finishedAt: '2026-10-25T01:00:00.000Z',
-          },
-        ],
+        type: 'taskList',
+        page: page({
+          items: [
+            {
+              ...taskItem,
+              notes: '备注',
+              message: '构建中',
+              finishedAt: '2026-10-25T01:00:00.000Z',
+            },
+          ],
+        }),
       },
     ],
   ])('接受合法消息：%s', (_name, sample) => {
@@ -154,19 +197,55 @@ describe('isHostMessage：构建任务消息', () => {
   })
 
   it.each([
-    ['buildList 缺 tasks', { type: 'buildList' }],
-    ['buildList.tasks 非数组', { type: 'buildList', tasks: 'x' }],
-    ['buildList 元素缺 id', { type: 'buildList', tasks: [{ branch: 'x' }] }],
+    ['taskList 缺 page', { type: 'taskList' }],
+    ['taskList.page 非对象', { type: 'taskList', page: 'x' }],
     [
-      'buildList.status 非法字面量',
-      { type: 'buildList', tasks: [{ ...buildTask, status: 'done' }] },
+      'taskList.page.items 非数组',
+      { type: 'taskList', page: { items: 'x', total: 1, page: 1, pageSize: 10 } },
     ],
-    ['buildList.progress 非数字', { type: 'buildList', tasks: [{ ...buildTask, progress: '42' }] }],
     [
-      'buildList.createdAt 非字符串',
-      { type: 'buildList', tasks: [{ ...buildTask, createdAt: 1 }] },
+      'taskList.page 元素缺 id',
+      { type: 'taskList', page: { items: [{ name: 'x' }], total: 1, page: 1, pageSize: 10 } },
     ],
-    ['buildList.notes 非字符串', { type: 'buildList', tasks: [{ ...buildTask, notes: 1 }] }],
+    [
+      'taskList.page.status 非法字面量',
+      {
+        type: 'taskList',
+        page: { items: [{ ...taskItem, status: 'done' }], total: 1, page: 1, pageSize: 10 },
+      },
+    ],
+    [
+      'taskList.page.progress 非数字',
+      {
+        type: 'taskList',
+        page: { items: [{ ...taskItem, progress: '42' }], total: 1, page: 1, pageSize: 10 },
+      },
+    ],
+    [
+      'taskList.page.createdAt 非字符串',
+      {
+        type: 'taskList',
+        page: { items: [{ ...taskItem, createdAt: 1 }], total: 1, page: 1, pageSize: 10 },
+      },
+    ],
+    [
+      'taskList.page.notes 非字符串',
+      {
+        type: 'taskList',
+        page: { items: [{ ...taskItem, notes: 1 }], total: 1, page: 1, pageSize: 10 },
+      },
+    ],
+    [
+      'taskList.page.buildType 非法字面量',
+      {
+        type: 'taskList',
+        page: { items: [{ ...taskItem, buildType: 'patch' }], total: 1, page: 1, pageSize: 10 },
+      },
+    ],
+    [
+      'taskList.page.total 非数字',
+      { type: 'taskList', page: { items: [], total: '1', page: 1, pageSize: 10 } },
+    ],
   ])('拒绝非法消息：%s', (_name, sample) => {
     expect(isHostMessage(sample)).toBe(false)
   })
@@ -196,7 +275,6 @@ const historyEntry = { id: 'h1', command: 'show version', lastUsedAt: 1, useCoun
 describe('isWebviewMessage：串口控制台消息', () => {
   it.each([
     ['serialPortsRequest', { type: 'serialPortsRequest' }],
-    ['serialServersRequest', { type: 'serialServersRequest' }],
     ['serialServerSave 最小', { type: 'serialServerSave', draft: { name: '甲' } }],
     [
       'serialServerSave 带密码',
@@ -206,7 +284,6 @@ describe('isWebviewMessage：串口控制台消息', () => {
     ['serialConnect', { type: 'serialConnect', serverId: 'srv-1' }],
     ['serialDisconnect', { type: 'serialDisconnect' }],
     ['serialSend', { type: 'serialSend', command: 'show version' }],
-    ['commandHistoryRequest', { type: 'commandHistoryRequest' }],
     ['commandHistoryRemove', { type: 'commandHistoryRemove', id: 'h1' }],
     ['commandHistoryClear', { type: 'commandHistoryClear' }],
   ])('接受合法消息：%s', (_name, sample) => {

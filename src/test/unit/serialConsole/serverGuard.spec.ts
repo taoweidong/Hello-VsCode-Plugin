@@ -117,4 +117,19 @@ describe('normalizeSerialServerList', () => {
     expect('nested' in server).toBe(false)
     expect('list' in server).toBe(false)
   })
+
+  it('密码类键一律不透传（零明文不变量）：外部文件混入 password 不入内存、不回写', () => {
+    const servers = normalizeSerialServerList([
+      {
+        ...validServer,
+        password: 'leaked-secret',
+        adminPassword: 'also-leaked',
+        user_password: 'snake-leaked',
+      },
+    ])
+    const server = servers[0] as unknown as Record<string, unknown>
+    expect('password' in server).toBe(false)
+    expect('adminPassword' in server).toBe(false)
+    expect('user_password' in server).toBe(false)
+  })
 })

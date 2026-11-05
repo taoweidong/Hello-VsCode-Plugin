@@ -4,20 +4,25 @@ import { defineConfig } from 'vitest/config'
 
 /**
  * 单元 / 组件测试配置（NFR-07 / docs/需求与优化方案/03 §6）：
- * - 不依赖 VSCode 宿主：`vscode` 模块统一替换为 src/test/unit/stubs/vscode.ts；
- * - jsdom 环境：既可跑纯逻辑，也可跑 Vue 组件（@vue/test-utils + vue 插件编译 SFC）；
- * - 覆盖率：v8 provider，阈值见 coverage.thresholds（M2 起步 60%，M6 提至 70/85）。
+ * - `vscode` 模块统一替换为 src/test/unit/stubs/vscode.ts（双工程共用同一别名）；
+ * - **双工程拆分（第五轮基建）**：仅 `src/test/unit/webview/**`（约 24 个组件 / 页面
+ *   用例）需要 jsdom；其余宿主侧用例在 node 环境跑——此前 jsdom 全局一刀切，
+ *   64 个文件各自实例化 jsdom（实测占整轮耗时的 93%+），拆分后宿主侧零环境开销；
+ * - setupFiles 全局清理：stubs 与 vscode api 单例在每个用例后复位（上收此前
+ *   26 个 spec 手工调用的 `__resetStubs` 纪律），保证文件间零状态依赖；
+ * - 覆盖率：v8 provider，阈值见 coverage.thresholds（12 方案阶段 4 全量统计面）。
  */
+
+/** 全局清理脚本（双工程共享）。 */
+const SETUP_FILE = path.resolve(__dirname, 'src/test/unit/setup.ts')
+
+/** 测试桩别名：宿主侧 spec 与 webview 侧 spec 都可能 import 到 vscode 模块。 */
+const VSCODE_ALIAS = [
+  { find: /^vscode$/, replacement: path.resolve(__dirname, 'src/test/unit/stubs/vscode.ts') },
+]
+
 export default defineConfig({
-  plugins: [vue()],
-  resolve: {
-    alias: [
-      { find: /^vscode$/, replacement: path.resolve(__dirname, 'src/test/unit/stubs/vscode.ts') },
-    ],
-  },
   test: {
-    environment: 'jsdom',
-    include: ['src/test/unit/**/*.spec.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
@@ -48,7 +53,7 @@ export default defineConfig({
       ],
       // 阈值为实测值减约 1pt 余量（12 方案阶段 4 实测：整体 92.13S/85.73B/90.89F/92.62L；
       // 见 docs/需求与优化方案/12-代码质量评估报告与分阶段优化方案.md §6）。
-      // 新增模块原则上应达到全局阈值；build / webview-host 两组历史缺口单独设线防回退。
+      // 新增模块原则上应达到全局阈值；taskManager / webview-host 两组历史缺口单独设线防回退。
       thresholds: {
         lines: 91.5,
         functions: 90,
@@ -62,14 +67,38 @@ export default defineConfig({
           statements: 90,
           branches: 85,
         },
-        'src/extension/features/build/**': {
-          lines: 85,
-          functions: 89,
-          statements: 85,
-          branches: 70,
+        'src/extension/features/taskManager/**': {
+          lines: 90,
+          functions: 90,
+          statements: 90,
+          branches: 85,
         },
         'src/webview/host/**': { lines: 88, functions: 83, statements: 88, branches: 77 },
       },
     },
+    projects: [
+      {
+        // Webview 侧：组件 / 页面用例需要 DOM（@vue/test-utils + vue 插件编译 SFC）
+        test: {
+          name: 'webview',
+          environment: 'jsdom',
+          include: ['src/test/unit/webview/**/*.spec.ts'],
+          setupFiles: [SETUP_FILE],
+        },
+        plugins: [vue()],
+        resolve: { alias: VSCODE_ALIAS },
+      },
+      {
+        // 宿主侧：纯逻辑 + vscode 测试桩，node 环境零 DOM 开销
+        test: {
+          name: 'host',
+          environment: 'node',
+          include: ['src/test/unit/**/*.spec.ts'],
+          exclude: ['src/test/unit/webview/**'],
+          setupFiles: [SETUP_FILE],
+        },
+        resolve: { alias: VSCODE_ALIAS },
+      },
+    ],
   },
 })

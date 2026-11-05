@@ -76,18 +76,29 @@ export function normalizeSerialServerList(
   return servers
 }
 
-/** 未知 string / number / boolean 字段透传（与 ItemDraft 开放扩展语义一致）。 */
+/**
+ * 未知 string / number / boolean 字段透传（与 ItemDraft 开放扩展语义一致）。
+ * 密码类键一律剔除：SerialServer 数据文件零明文不变量（models.ts / serverSchema.ts，
+ * 密码只进 SecretStorage）——手工编辑或外部工具写入数据文件的 password 字段若被
+ * 透传，下次保存即明文落盘并推送到 webview DOM（第五轮评估 P1）。
+ */
 function pickUnknownScalars(record: Record<string, unknown>): Record<string, unknown> {
   const extra: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(record)) {
     if (
       !isKnownServerField(key) &&
+      !isSecretLikeKey(key) &&
       (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
     ) {
       extra[key] = value
     }
   }
   return extra
+}
+
+/** 含 password 的键视作敏感字段（password / adminPassword / user_password 等变体）。 */
+function isSecretLikeKey(key: string): boolean {
+  return key.toLowerCase().includes('password')
 }
 
 const KNOWN_FIELDS = new Set([

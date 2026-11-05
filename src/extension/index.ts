@@ -2,11 +2,11 @@ import * as vscode from 'vscode'
 import { registerCommands } from './commands'
 import { CONFIG, VIEW } from './constants'
 import {
-  BuildConsolePanel,
-  createBuildConsoleDeps,
-  createBuildConsoleServices,
-} from './features/build/buildConsolePanel'
-import { BuildTasksTreeProvider } from './features/build/buildTasksTreeProvider'
+  TaskManagerPanel,
+  createTaskManagerDeps,
+  createTaskManagerServices,
+} from './features/taskManager/taskManagerPanel'
+import { TaskManagerTreeProvider } from './features/taskManager/taskManagerTreeProvider'
 import { DraftBoxService } from './features/drafts/draftBoxService'
 import { InitService } from './features/init/initService'
 import { InitTreeProvider } from './features/init/initTreeProvider'
@@ -74,7 +74,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   }
 
-  // ---------- 功能页面：环境初始化 / 分支编译（v2.0 弹框） ----------
+  // ---------- 功能页面：环境初始化 / 任务管理（v2.6 CRUD 实例） ----------
   // 环境快照复用（P1-12）：初始化的 envSnapshot 步骤优先复用启动任务已缓存的结果
   const initService = new InitService(
     createInitSteps({
@@ -91,22 +91,24 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.createTreeView(VIEW.initViewId, { treeDataProvider: initProvider })
   )
 
-  // ---------- 分支编译（v2.0：Webview 弹框 + HTTP 打桩/真实接口；v2.1：恢复侧边栏入口） ----------
-  const buildConsoleServices = createBuildConsoleServices(outputChannel)
-  context.subscriptions.push({ dispose: () => buildConsoleServices.api.dispose() })
-  BuildConsolePanel.configure(context)
-  // 「构建任务」树视图：与弹框页同源数据；可见期轮询（onDidChangeVisibility 门控）
-  const buildTasksProvider = new BuildTasksTreeProvider(buildConsoleServices.api)
-  context.subscriptions.push(buildTasksProvider)
-  buildConsoleServices.onAfterSubmit = () => void buildTasksProvider.refresh()
-  const buildTreeView = vscode.window.createTreeView(VIEW.buildViewId, {
-    treeDataProvider: buildTasksProvider,
+  // ---------- 任务管理（v2.6：Webview 弹框 + HTTP 打桩/真实接口；侧边栏树视图） ----------
+  const taskManagerServices = createTaskManagerServices(outputChannel)
+  context.subscriptions.push({ dispose: () => taskManagerServices.api.dispose() })
+  TaskManagerPanel.configure(context)
+  // 「任务管理」树视图：与弹框页同源数据；可见期轮询（onDidChangeVisibility 门控）
+  const taskManagerProvider = new TaskManagerTreeProvider(taskManagerServices.api)
+  context.subscriptions.push(taskManagerProvider)
+  taskManagerServices.onAfterChange = () => void taskManagerProvider.refresh()
+  const taskManagerTreeView = vscode.window.createTreeView(VIEW.taskManagerViewId, {
+    treeDataProvider: taskManagerProvider,
   })
   context.subscriptions.push(
-    buildTreeView,
-    buildTreeView.onDidChangeVisibility((event) => buildTasksProvider.setPolling(event.visible))
+    taskManagerTreeView,
+    taskManagerTreeView.onDidChangeVisibility((event) =>
+      taskManagerProvider.setPolling(event.visible)
+    )
   )
-  buildTasksProvider.setPolling(buildTreeView.visible) // 初始可见性（事件只在变化时触发）
+  taskManagerProvider.setPolling(taskManagerTreeView.visible) // 初始可见性（事件只在变化时触发）
 
   // ---------- 串口命令控制台：控制器（共享链路/状态）+ 树视图 ----------
   const serialConsole = new SerialConsoleController(context, outputChannel)
@@ -139,9 +141,9 @@ export function activate(context: vscode.ExtensionContext): void {
       case 'serialConsole':
         // 复用控制器的面板依赖：共享串口链路与状态，恢复面板功能完整
         return serialConsole.panelDepsOrCreate()
-      case 'buildConsole':
-        // 恢复面板：重建表单 schema 与消息处理（任务列表随 init 后轮询刷新）
-        return createBuildConsoleDeps(buildConsoleServices)
+      case 'taskManager':
+        // 恢复面板：重建表单 schema 与消息处理（查询参数 / 分页 / 增删改查）
+        return createTaskManagerDeps(taskManagerServices)
       default:
         return {} // gallery 无宿主侧业务
     }
@@ -151,8 +153,8 @@ export function activate(context: vscode.ExtensionContext): void {
     taskRunner,
     outputChannel,
     initService,
-    openBuildConsole: () => BuildConsolePanel.createOrShow(buildConsoleServices),
-    refreshBuildTasks: () => void buildTasksProvider.refresh(),
+    openTaskManager: () => TaskManagerPanel.createOrShow(taskManagerServices),
+    refreshTaskManager: () => void taskManagerProvider.refresh(),
     serialConsole,
     drafts,
     recheckEnvironmentItem,

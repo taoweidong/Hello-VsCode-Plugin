@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import type { SerialServerWire } from '../../../protocol'
+import { useTwoStepConfirm } from '../../../composables/useTwoStepConfirm'
 import VButton from '../../../ui/VButton.vue'
 import VEmptyState from '../../../ui/VEmptyState.vue'
 
@@ -22,8 +22,7 @@ const emit = defineEmits<{
   (e: 'delete', id: string): void
 }>()
 
-const armedId = ref<string | undefined>(undefined)
-let disarmTimer: ReturnType<typeof setTimeout> | undefined
+const deleteConfirm = useTwoStepConfirm()
 
 function isConnected(id: string): boolean {
   return props.activeServerId === id && props.linkState === 'connected'
@@ -38,17 +37,9 @@ function onRowClick(server: SerialServerWire): void {
 }
 
 function onDelete(id: string): void {
-  if (armedId.value === id) {
-    armedId.value = undefined
-    if (disarmTimer !== undefined) clearTimeout(disarmTimer)
+  if (deleteConfirm.confirm(id)) {
     emit('delete', id)
-    return
   }
-  armedId.value = id
-  if (disarmTimer !== undefined) clearTimeout(disarmTimer)
-  disarmTimer = setTimeout(() => {
-    armedId.value = undefined
-  }, 3_000)
 }
 </script>
 
@@ -100,10 +91,10 @@ function onDelete(id: string): void {
         ></VButton>
         <VButton
           variant="secondary"
-          :icon="armedId === server.id ? 'warning' : 'delete'"
-          :title="armedId === server.id ? '再次点击确认删除' : '删除'"
+          :icon="deleteConfirm.isArmed(server.id) ? 'warning' : 'delete'"
+          :title="deleteConfirm.isArmed(server.id) ? '再次点击确认删除' : '删除'"
           class="server-list__delete"
-          :class="{ 'server-list__delete--armed': armedId === server.id }"
+          :class="{ 'server-list__delete--armed': deleteConfirm.isArmed(server.id) }"
           @click="onDelete(server.id)"
         ></VButton>
       </div>

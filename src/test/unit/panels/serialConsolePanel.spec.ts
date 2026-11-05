@@ -141,15 +141,6 @@ describe('serialConsolePanel：init 与列表请求', () => {
     expect(lastPosted(panel, 'init')?.extra).toMatchObject({ initialServerId: 'srv-1' })
   })
 
-  it('serialServersRequest 刷新并推送列表', async () => {
-    const { services } = makeServices([])
-    const panel = await openPanel(services)
-    panel.webview.__emit({ type: 'serialServersRequest' })
-    await vi.waitFor(() => {
-      expect(lastPosted(panel, 'serialServers')).toBeDefined()
-    })
-  })
-
   it('serialPortsRequest 推送检测到的串口', async () => {
     const { services, portFactory } = makeServices()
     portFactory.knownPorts = [{ path: 'COM3' }, { path: 'COM4', manufacturer: 'USB-SERIAL' }]

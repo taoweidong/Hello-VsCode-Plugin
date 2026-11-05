@@ -4,13 +4,14 @@ import { createExtensionContextStub, __resetStubs, __stubs, Uri } from '../stubs
 import {
   WebviewController,
   webviewViewType,
+  type WebviewControllerDeps,
   type WebviewLike,
   type WebviewPanelLike,
 } from '../../../webview/host/webviewController'
 
 /**
  * WebviewController（05 T2.4）：
- * 守卫过滤 / submit 在途幂等与超时 / dirty 确认 / 幂等 dispose / 单例 reveal。
+ * 守卫过滤 / submit 在途幂等与超时 / 幂等 dispose / 单例 reveal。
  */
 
 interface FakePanel {
@@ -176,19 +177,12 @@ describe('消息分发（protocol 守卫）', () => {
     const controller = WebviewController.createOrShow('gallery', context, deps)
     await controller.ready
     panels[0].posted.length = 0
-    for (const junk of [
-      null,
-      undefined,
-      {},
-      { type: 'hack' },
-      { type: 'dirty', dirty: 'yes' },
-      42,
-    ]) {
+    for (const junk of [null, undefined, {}, { type: 'hack' }, 42]) {
       panels[0].webview.__emit(junk)
     }
     expect(panels[0].posted).toHaveLength(0)
     expect(logs.some((line) => line.includes('忽略无法识别'))).toBe(true)
-    expect(controller.isDirty).toBe(false)
+    controller.dispose()
   })
 
   it('ready → 回 init（page / 空 schema / null value）', async () => {
@@ -216,116 +210,62 @@ describe('消息分发（protocol 守卫）', () => {
       },
     ])
   })
-
-  it('dirty 上报更新 isDirty', async () => {
-    const { deps, panels } = makeDeps()
-    const controller = WebviewController.createOrShow('gallery', context, deps)
-    await controller.ready
-    panels[0].webview.__emit({ type: 'dirty', dirty: true })
-    expect(controller.isDirty).toBe(true)
-    panels[0].webview.__emit({ type: 'dirty', dirty: false })
-    expect(controller.isDirty).toBe(false)
-  })
 })
 
-describe('dirty 确认（switchTarget）', () => {
-  it('非 dirty 直接放行（不弹窗）', async () => {
+describe('registerSerializer（窗口重载恢复）', () => {
+  it('为每个页面注册 serializer；反序列化重建控制器并随 init 传回持久化状态', async () => {
     const { deps } = makeDeps()
-    const controller = WebviewController.createOrShow('gallery', context, deps)
-    await controller.ready
-    await expect(controller.confirmSwitchTarget()).resolves.toBe(true)
-    expect(__stubs.recorded.filter((r) => r.kind === 'showWarningMessage')).toHaveLength(0)
-  })
+    const serializerContext = createExtensionContextStub() as unknown as vscode.ExtensionContext
+    // 工厂形态 deps：覆盖「按 pageId 分发」分支
+    WebviewController.registerSerializer(serializerContext, () => deps)
+    expect(__stubs.registeredSerializers.size).toBe(3)
 
-  it('dirty 时模态确认：确认丢弃 → true 并清 dirty', async () => {
-    const { deps, panels } = makeDeps()
-    const controller = WebviewController.createOrShow('gallery', context, deps)
-    await controller.ready
-    panels[0].webview.__emit({ type: 'dirty', dirty: true })
-    __stubs.dialogQueue.push('放弃修改并继续')
-    await expect(controller.confirmSwitchTarget()).resolves.toBe(true)
-    const warning = __stubs.recorded.find((r) => r.kind === 'showWarningMessage')
-    expect(warning).toBeDefined()
-    // 模态 + 中文确认项
-    const payload = warning?.args[0] as { message: string; items: unknown[] }
-    expect(payload.items.some((item) => (item as { modal?: boolean }).modal === true)).toBe(true)
-    expect(controller.isDirty).toBe(false)
-  })
-
-  it('dirty 时模态确认：用户取消 → false 且 dirty 保留', async () => {
-    const { deps, panels } = makeDeps()
-    const controller = WebviewController.createOrShow('gallery', context, deps)
-    await controller.ready
-    panels[0].webview.__emit({ type: 'dirty', dirty: true })
-    __stubs.dialogQueue.push(undefined)
-    await expect(controller.confirmSwitchTarget()).resolves.toBe(false)
-    expect(controller.isDirty).toBe(true)
+    // 模拟窗口重载恢复 taskManager 面板（带持久化状态）
+    const panel = createFakePanel(webviewViewType('taskManager'), '任务管理')
+    const serializer = __stubs.registeredSerializers.get(webviewViewType('taskManager'))
+    await serializer!.deserializeWebviewPanel(panel as never, { draft: { name: '任务A' } })
+    // 页面加载完成后上报 ready，宿主回 init（携带持久化状态）
+    panel.webview.__emit({ type: 'ready' })
+    await WebviewController.get('taskManager')!.ready
+    expect(panel.posted[0]).toMatchObject({
+      type: 'init',
+      page: 'taskManager',
+      extra: { persisted: { draft: { name: '任务A' } } },
+    })
+    // 恢复后的控制器进注册表：后续消息按单例路由
+    expect(WebviewController.get('taskManager')).toBeDefined()
+    WebviewController.get('taskManager')!.dispose()
   })
 })
 
-describe('cancel 路径 dirty 确认（U-1：Esc / 点取消）', () => {
-  it('dirty=false 时 cancel 直接触发 onCancel，不弹确认', async () => {
-    const { deps, panels } = makeDeps()
-    const onCancel = vi.fn()
-    const controller = WebviewController.createOrShow('gallery', context, { ...deps, onCancel })
-    await controller.ready
-    panels[0].webview.__emit({ type: 'cancel' })
-    await vi.waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1))
-    expect(__stubs.recorded.filter((r) => r.kind === 'showWarningMessage')).toHaveLength(0)
-    expect(controller.isDirty).toBe(false)
-  })
-
-  it('dirty=true 时弹模态确认，选「放弃修改并关闭」→ onCancel 触发', async () => {
-    const { deps, panels } = makeDeps()
-    const onCancel = vi.fn()
-    const controller = WebviewController.createOrShow('gallery', context, { ...deps, onCancel })
-    await controller.ready
-    panels[0].webview.__emit({ type: 'dirty', dirty: true })
-    __stubs.dialogQueue.push('放弃修改并关闭')
-    panels[0].webview.__emit({ type: 'cancel' })
-    await vi.waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1))
-    const warning = __stubs.recorded.find((r) => r.kind === 'showWarningMessage')
-    expect(warning).toBeDefined()
-    const payload = warning?.args[0] as { message: string; items: unknown[] }
-    expect(payload.message).toContain('未保存的修改')
-    // 模态 + 中文确认项
-    expect(payload.items.some((item) => (item as { modal?: boolean }).modal === true)).toBe(true)
-    expect(controller.isDirty).toBe(false)
-  })
-
-  it('dirty=true 时关闭确认弹窗（undefined）→ onCancel 不触发、面板保持打开', async () => {
-    const { deps, panels } = makeDeps()
-    const onCancel = vi.fn()
-    const controller = WebviewController.createOrShow('gallery', context, { ...deps, onCancel })
-    await controller.ready
-    panels[0].webview.__emit({ type: 'dirty', dirty: true })
-    __stubs.dialogQueue.push(undefined)
-    panels[0].webview.__emit({ type: 'cancel' })
-    // 排空微任务：等待 handleCancel 的模态确认流程走完（弹窗应答 undefined → 直接 return）
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(onCancel).not.toHaveBeenCalled()
-    expect(panels[0].disposeCalls).toBe(0)
-    expect(controller.isDirty).toBe(true)
+describe('createOrShow open 失败兜底', () => {
+  it('面板工厂抛错：如实弹错提示、记日志并清理注册表（不再静默）', async () => {
+    const { deps, logs } = makeDeps()
+    const failing = {
+      ...deps,
+      createPanel: () => {
+        throw new Error('面板创建失败')
+      },
+    } as unknown as WebviewControllerDeps
+    const controller = WebviewController.createOrShow('gallery', context, failing)
+    await vi.waitFor(() => {
+      expect(
+        __stubs.recorded.some(
+          (entry) =>
+            entry.kind === 'showErrorMessage' &&
+            String((entry.args[0] as { message?: string } | undefined)?.message).includes(
+              '打开失败'
+            )
+        )
+      ).toBe(true)
+    })
+    expect(WebviewController.get('gallery')).toBeUndefined()
+    expect(logs.some((line) => line.includes('打开失败'))).toBe(true)
+    controller.dispose() // 清理路径已走完，dispose 幂等兜底
   })
 })
 
-describe('R-U-9 协议健壮性（cancel 重入 / init 同步抛错）', () => {
-  it('连点 cancel（dirty 确认在途）只弹一次模态、onCancel 只触发一次', async () => {
-    const { deps, panels } = makeDeps()
-    const onCancel = vi.fn()
-    const controller = WebviewController.createOrShow('gallery', context, { ...deps, onCancel })
-    await controller.ready
-    panels[0].webview.__emit({ type: 'dirty', dirty: true })
-    __stubs.dialogQueue.push('放弃修改并关闭')
-    panels[0].webview.__emit({ type: 'cancel' })
-    panels[0].webview.__emit({ type: 'cancel' }) // 确认在途期间的第二次触发（连点 / 连按 Esc）
-    await vi.waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1))
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(onCancel).toHaveBeenCalledTimes(1)
-    expect(__stubs.recorded.filter((entry) => entry.kind === 'showWarningMessage')).toHaveLength(1)
-    controller.dispose()
-  })
-
+describe('R-U-9 协议健壮性（init 同步抛错）', () => {
   it('同步 buildInit 抛错：下发 error 而非炸掉 onDidReceiveMessage 监听器', async () => {
     const { deps, panels, logs } = makeDeps()
     const controller = WebviewController.createOrShow('gallery', context, {
@@ -344,8 +284,8 @@ describe('R-U-9 协议健壮性（cancel 重入 / init 同步抛错）', () => {
     })
     expect(logs.some((line) => line.includes('init 载荷构造失败'))).toBe(true)
     // 监听器仍然存活：后续消息照常处理（同步抛错不再是「炸掉整个面板消息通道」）
-    panels[0].webview.__emit({ type: 'dirty', dirty: true })
-    expect(controller.isDirty).toBe(true)
+    panels[0].webview.__emit({ type: 'hack' })
+    expect(logs.filter((line) => line.includes('忽略无法识别')).length).toBeGreaterThan(0)
     controller.dispose()
   })
 })
@@ -458,11 +398,12 @@ describe('dispose 幂等', () => {
     panels[0].__close()
     expect(panels[0].disposeCalls).toBe(0)
     expect(WebviewController.get('gallery')).toBeUndefined()
-    expect(controller.isDirty).toBe(false)
 
     // 关闭后再次 createOrShow 创建新面板
     const again = WebviewController.createOrShow('gallery', context, deps)
     await again.ready
     expect(panels).toHaveLength(2)
+    controller.dispose()
+    again.dispose()
   })
 })

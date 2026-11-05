@@ -9,6 +9,7 @@ import type {
 import type { FormField } from '../../formSchema'
 import { schemaDefaults, toFormFields } from '../../components/fieldAdapter'
 import { useConsolePage, type ConsoleLinkState } from '../../composables/useConsolePage'
+import { useTwoStepConfirm } from '../../composables/useTwoStepConfirm'
 import { useVsCodeApi } from '../../shared/useVsCodeApi'
 import AppShell from '../../ui/AppShell.vue'
 import VBadge from '../../ui/VBadge.vue'
@@ -48,6 +49,8 @@ const command = ref('')
 let echoSeq = 0
 /** 保存后等待 serialServers 推送时复位表单（区分「自己的保存」与外部列表刷新）。 */
 let awaitingSaveReset = false
+/** 编辑态重置的两段式布防确认（Esc / 重置按钮共用同一布防态）。 */
+const resetConfirm = useTwoStepConfirm()
 
 const connected = computed(() => link.state === 'connected')
 const connecting = computed(() => link.state === 'connecting')
@@ -118,6 +121,8 @@ const { initialized, post } = useConsolePage({
   onError(message, field) {
     saving.value = false
     sending.value = false
+    // 保存失败：本次保存的复位期望作废——随后的外部 servers 推送不得误清编辑表单
+    awaitingSaveReset = false
     if (field) {
       fieldErrors.value = { ...fieldErrors.value, [field]: message }
     } else {
@@ -156,6 +161,7 @@ function onEdit(id: string): void {
   selectedServerId.value = id
   editingId.value = id
   fieldErrors.value = {}
+  resetConfirm.disarm()
   formValue.value = {
     id: server.id,
     name: server.name,
@@ -181,11 +187,13 @@ function onFormUpdate(value: Record<string, unknown>): void {
 }
 
 function onReset(): void {
-  // 编辑态重置前确认（P2-F3）：Esc / 重置按钮都会丢弃已编辑字段，对齐宿主侧
-  // dirty 取消的确认语义；新增态无编辑内容，保持直接重置
-  if (editingId.value !== undefined && !window.confirm('放弃当前编辑内容并恢复默认值？')) {
+  // 编辑态重置前两段式布防确认（P2-F3）：Esc / 重置按钮都会丢弃已编辑字段，
+  // 首次触发仅布防（3s 内再触发才执行）；浏览器模态 confirm 在 webview 沙箱下
+  // 恒被忽略（第五轮评估 P0），故改页内布防。新增态无编辑内容，保持直接重置
+  if (editingId.value !== undefined && !resetConfirm.confirm('reset')) {
     return
   }
+  resetConfirm.disarm()
   editingId.value = undefined
   fieldErrors.value = {}
   formValue.value = schemaDefaults(schema.value)
@@ -272,6 +280,7 @@ watch(
             :ports="ports"
             :editing="editing"
             :saving="saving"
+            :reset-armed="resetConfirm.isArmed('reset')"
             @update:model-value="onFormUpdate"
             @submit="onSave"
             @reset="onReset"

@@ -1,4 +1,5 @@
 import type { HostMessage } from '../../../webview/protocol'
+import type { VsCodeApi } from '../../../webview/shared/useVsCodeApi'
 
 /**
  * 页面级组件测试的工具（类型层不依赖 DOM lib：根 tsconfig 仅 ES2022）。
@@ -29,6 +30,31 @@ export function hostMessage(message: HostMessage): void {
     }
   ).MessageEvent
   browserWindow.dispatchEvent(new MessageEventCtor('message', { data: message }))
+}
+
+/**
+ * 统一的 vscode api mock（第五轮基建：替代各 spec 手写双轨 mock——
+ * serialConsole 的 createApiMock 与 taskManager 的 window.acquireVsCodeApi 直挂）。
+ * 记录 postMessage 调用序列 + state 读写；经 __setVsCodeApiForTest 注入，
+ * 清理由 setup.ts 统一负责。
+ */
+export function createHostApiMock(
+  initialState: unknown = undefined
+): VsCodeApi & { posted: unknown[]; state: unknown } {
+  const api = {
+    posted: [] as unknown[],
+    state: initialState,
+    postMessage(message: unknown): void {
+      api.posted.push(message)
+    },
+    getState<T>(): T | undefined {
+      return api.state as T | undefined
+    },
+    setState<T>(state: T): void {
+      api.state = state
+    },
+  }
+  return api
 }
 
 /** 输入类控件的 value。 */

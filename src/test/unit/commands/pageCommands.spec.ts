@@ -13,7 +13,7 @@ import { __resetStubs, __stubs } from '../stubs/vscode'
  * 功能页面命令组（此前仅 runInitStep 入参归一化有用例）：
  * refreshEnvironment 双路由（label 命中探针 → 单检；否则全量）、
  * showEnvironmentOutput、runAllInit、runInitStep 无参 QuickPick 路径、
- * buildBranch / buildRefreshTasks 的路由。
+ * openTaskManager / refreshTaskManager 的路由。
  */
 
 function makeDeps() {
@@ -24,15 +24,15 @@ function makeDeps() {
     taskRunner,
     outputChannel: output,
     initService,
-    openBuildConsole: vi.fn(),
-    refreshBuildTasks: vi.fn(),
+    openTaskManager: vi.fn(),
+    refreshTaskManager: vi.fn(),
     context: { extensionUri: vscode.Uri.file(process.cwd()) } as unknown as vscode.ExtensionContext,
     recheckEnvironmentItem: vi.fn(async () => undefined),
     spies: {},
   }
   deps.spies.recheck = deps.recheckEnvironmentItem as unknown as ReturnType<typeof vi.fn>
-  deps.spies.openBuildConsole = deps.openBuildConsole as unknown as ReturnType<typeof vi.fn>
-  deps.spies.refreshBuildTasks = deps.refreshBuildTasks as unknown as ReturnType<typeof vi.fn>
+  deps.spies.openTaskManager = deps.openTaskManager as unknown as ReturnType<typeof vi.fn>
+  deps.spies.refreshTaskManager = deps.refreshTaskManager as unknown as ReturnType<typeof vi.fn>
   return deps
 }
 
@@ -113,13 +113,13 @@ describe('runInitStep 无参 QuickPick 路径', () => {
 })
 
 describe('其余路由', () => {
-  it('showEnvironmentOutput 调 outputChannel.show；buildBranch / buildRefreshTasks 路由注入目标', () => {
+  it('showEnvironmentOutput 调 outputChannel.show；openTaskManager / refreshTaskManager 路由注入目标', () => {
     registrar.registered.get(COMMAND.showEnvironmentOutput)?.()
-    registrar.registered.get(COMMAND.buildBranch)?.()
-    registrar.registered.get(COMMAND.buildRefreshTasks)?.()
+    registrar.registered.get(COMMAND.openTaskManager)?.()
+    registrar.registered.get(COMMAND.refreshTaskManager)?.()
     expect(__stubs.recorded.some((entry) => entry.kind === 'outputShow')).toBe(true)
-    expect(deps.spies.openBuildConsole).toHaveBeenCalledTimes(1)
-    expect(deps.spies.refreshBuildTasks).toHaveBeenCalledTimes(1)
+    expect(deps.spies.openTaskManager).toHaveBeenCalledTimes(1)
+    expect(deps.spies.refreshTaskManager).toHaveBeenCalledTimes(1)
   })
 
   it('runAllInit 调 initService.runAll', async () => {

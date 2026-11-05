@@ -2,7 +2,7 @@
   "name": "hello-vscode-plugin",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "publisher": "your-publisher",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -60,8 +60,8 @@
           "visibility": "collapsed"
         },
         {
-          "id": "extStarter.buildView",
-          "name": "%view.build.name%",
+          "id": "extStarter.taskManagerView",
+          "name": "%view.taskManager.name%",
           "visibility": "collapsed"
         },
         {
@@ -97,8 +97,8 @@
         "icon": "$(play)"
       },
       {
-        "command": "extStarter.buildBranch",
-        "title": "%command.buildBranch.title%",
+        "command": "extStarter.openTaskManager",
+        "title": "%command.openTaskManager.title%",
         "category": "%command.category%",
         "icon": "$(tools)"
       },
@@ -167,8 +167,8 @@
         "icon": "$(folder-library)"
       },
       {
-        "command": "extStarter.buildRefreshTasks",
-        "title": "%command.buildRefreshTasks.title%",
+        "command": "extStarter.refreshTaskManager",
+        "title": "%command.refreshTaskManager.title%",
         "category": "%command.category%",
         "icon": "$(refresh)"
       },
@@ -272,13 +272,13 @@
           "group": "navigation@3"
         },
         {
-          "command": "extStarter.buildBranch",
-          "when": "view == extStarter.buildView",
+          "command": "extStarter.openTaskManager",
+          "when": "view == extStarter.taskManagerView",
           "group": "navigation@2"
         },
         {
-          "command": "extStarter.buildRefreshTasks",
-          "when": "view == extStarter.buildView",
+          "command": "extStarter.refreshTaskManager",
+          "when": "view == extStarter.taskManagerView",
           "group": "navigation@3"
         },
         {
@@ -469,10 +469,10 @@
           "default": true,
           "description": "%configuration.serialConsoleEnabled.description%"
         },
-        "extStarter.buildApiBaseUrl": {
+        "extStarter.taskApiBaseUrl": {
           "type": "string",
           "default": "",
-          "description": "%configuration.buildApiBaseUrl.description%"
+          "description": "%configuration.taskApiBaseUrl.description%"
         },
         "extStarter.taskGroupWithSeparator": {
           "type": "boolean",

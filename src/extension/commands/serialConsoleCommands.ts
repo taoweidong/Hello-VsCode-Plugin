@@ -18,8 +18,6 @@ import type { CommandRegistrar } from './shared'
 
 export interface SerialConsoleCommandDeps {
   controller: SerialConsoleController
-  /** 扩展上下文：SerialConsolePanel.configure 已由 extension.ts 完成，此处仅类型完备。 */
-  context: vscode.ExtensionContext
 }
 
 export function registerSerialConsoleCommands(

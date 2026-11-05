@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { CommandHistoryWire } from '../../../protocol'
+import { useTwoStepConfirm } from '../../../composables/useTwoStepConfirm'
 import VButton from '../../../ui/VButton.vue'
 import VEmptyState from '../../../ui/VEmptyState.vue'
 import VInput from '../../../ui/VInput.vue'
@@ -21,8 +22,7 @@ const emit = defineEmits<{
 }>()
 
 const search = ref('')
-const clearArmed = ref(false)
-let clearTimer: ReturnType<typeof setTimeout> | undefined
+const clearConfirm = useTwoStepConfirm()
 
 const filtered = computed(() => {
   const keyword = search.value.trim().toLowerCase()
@@ -38,17 +38,9 @@ function formatTime(at: number): string {
 }
 
 function onClear(): void {
-  if (clearArmed.value) {
-    clearArmed.value = false
-    if (clearTimer !== undefined) clearTimeout(clearTimer)
+  if (clearConfirm.confirm('clear')) {
     emit('clear')
-    return
   }
-  clearArmed.value = true
-  if (clearTimer !== undefined) clearTimeout(clearTimer)
-  clearTimer = setTimeout(() => {
-    clearArmed.value = false
-  }, 3_000)
 }
 </script>
 
@@ -66,11 +58,11 @@ function onClear(): void {
         variant="secondary"
         icon="clearAll"
         :disabled="entries.length === 0"
-        :class="{ 'history-panel__clear--armed': clearArmed }"
-        :title="clearArmed ? '再次点击确认清空' : '清空历史'"
+        :class="{ 'history-panel__clear--armed': clearConfirm.isArmed('clear') }"
+        :title="clearConfirm.isArmed('clear') ? '再次点击确认清空' : '清空历史'"
         @click="onClear"
       >
-        {{ clearArmed ? '确认清空' : '清空' }}
+        {{ clearConfirm.isArmed('clear') ? '确认清空' : '清空' }}
       </VButton>
     </div>
 

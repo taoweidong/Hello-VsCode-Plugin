@@ -12,7 +12,7 @@ describe('WEBVIEW_PAGES', () => {
     expect(WEBVIEW_PAGES.map((page) => page.id)).toEqual([
       'gallery',
       'serialConsole',
-      'buildConsole',
+      'taskManager',
     ])
     expect(new Set(WEBVIEW_PAGES.map((page) => page.id)).size).toBe(WEBVIEW_PAGES.length)
   })
@@ -24,10 +24,10 @@ describe('WEBVIEW_PAGES', () => {
   })
 
   it('findWebviewPage：命中返回定义；未知 id 返回 undefined', () => {
-    expect(findWebviewPage('serialConsole')).toEqual({
-      id: 'serialConsole',
-      title: '串口控制台',
-      entry: 'src/webview/apps/serialConsole/main.ts',
+    expect(findWebviewPage('taskManager')).toEqual({
+      id: 'taskManager',
+      title: '任务管理',
+      entry: 'src/webview/apps/taskManager/main.ts',
     })
     expect(findWebviewPage('nope')).toBeUndefined()
   })

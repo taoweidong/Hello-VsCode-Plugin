@@ -16,7 +16,6 @@ import { renderWebviewHtml } from './webviewHtml'
  * - 每个 pageId 一个实例（模块级注册表）；
  * - 消息先过 protocol.ts 守卫，未知消息记日志不抛错（修复 W7）；
  * - submit 在途幂等，10s 超时自动解锁并回 error（修复 W8 宿主侧）；
- * - dirty 跟踪：切换目标前经模态确认；取消 / Esc 同样先经模态确认（拒绝则面板保持打开）；
  * - 草稿持久化：页面侧经 webview getState/setState 自行保存，宿主只在
  *   serializer 恢复时把持久化状态随 init.extra.persisted 传回（保留恢复入口）；
  * - dispose 幂等：onDidDispose 只清理资源，不再反向 panel.dispose；dispose 标志防重入（修复 P1-17）；
@@ -61,16 +60,13 @@ export interface WebviewControllerDeps {
   resolveAssets?: (webview: WebviewLike) => Promise<WebviewAssets>
   /** 提交处理器：成功回 submitAck，抛错 / 超时回 error（err.field 为字符串时随 error 下发）。 */
   onSubmit?: (draft: Record<string, unknown>) => Promise<void>
-  /** 取消回调（页面点取消 / Esc）。 */
-  onCancel?: () => void
   /**
    * init 载荷构造（M4 接入用）；缺省 schema 为空、value 为 null。
    * 可返回 Promise（宿主需要异步取数，如 service.getCategories / 编辑目标回查）。
    */
   buildInit?: (context: BuildInitContext) => WebviewInitPayload | Promise<WebviewInitPayload>
   /**
-   * 页面专属消息分发（protocol.ts 中 ready/dirty/submit/cancel 之外的消息，
-   * 如批量导入向导的 browseFolder / requestPreview / executeImport / cancelImport）。
+   * 页面专属消息分发（protocol.ts 中 ready/submit 之外的消息，如串口与任务消息）。
    */
   onPageMessage?: (message: WebviewMessage) => void
   /**
@@ -189,9 +185,6 @@ export class WebviewController {
   private panel: WebviewPanelLike | undefined
   private messageDisposable: vscode.Disposable | undefined
   private disposed = false
-  private dirty = false
-  /** 取消流程在途标志（R-U-9）：连点「取消」/ 连按 Esc 只弹一次模态，不重复 onCancel。 */
-  private cancelPending = false
   private submitting = false
   private submitTimer: ReturnType<typeof setTimeout> | undefined
   private restoredState: unknown
@@ -230,57 +223,6 @@ export class WebviewController {
       resolveReady = resolve
     })
     this.readyResolve = resolveReady
-  }
-
-  get isDirty(): boolean {
-    return this.dirty
-  }
-
-  /** 切换目标前确认：dirty 时弹模态警告，用户拒绝则返回 false。 */
-  async confirmSwitchTarget(action = '切换目标'): Promise<boolean> {
-    if (!this.dirty) {
-      return true
-    }
-    const discard = '放弃修改并继续'
-    const choice = await vscode.window.showWarningMessage(
-      `当前有未保存的修改，${action}将丢失这些修改。`,
-      { modal: true },
-      discard
-    )
-    if (choice !== discard) {
-      return false
-    }
-    this.dirty = false
-    return true
-  }
-
-  /**
-   * 取消 / Esc：dirty 时先模态确认，拒绝则面板保持打开（页面无感知，协议不变）。
-   * R-U-9：确认模态弹出期间用户可再次点「取消」/ 按 Esc，此前会叠加多个模态、
-   * 且确认后 onCancel 被调用多次；用 cancelPending 保证一次只走一遍取消流程。
-   */
-  private async handleCancel(): Promise<void> {
-    if (this.cancelPending) {
-      return
-    }
-    this.cancelPending = true
-    try {
-      if (this.dirty) {
-        const discard = '放弃修改并关闭'
-        const choice = await vscode.window.showWarningMessage(
-          '当前有未保存的修改，关闭面板将丢失这些修改。',
-          { modal: true },
-          discard
-        )
-        if (choice !== discard) {
-          return // 用户拒绝：面板保持打开，页面状态不变
-        }
-      }
-      this.dirty = false
-      this.deps.onCancel?.()
-    } finally {
-      this.cancelPending = false
-    }
   }
 
   reveal(): void {
@@ -353,17 +295,11 @@ export class WebviewController {
       case 'ready':
         void this.postInit()
         break
-      case 'dirty':
-        this.dirty = raw.dirty
-        break
       case 'submit':
         void this.handleSubmit(raw.draft)
         break
-      case 'cancel':
-        void this.handleCancel()
-        break
       default:
-        // 页面专属消息（批量导入向导等）：交由业务层的 onPageMessage 分发
+        // 页面专属消息（串口控制台 / 任务管理等）：交由业务层的 onPageMessage 分发
         this.deps.onPageMessage?.(raw)
         break
     }
@@ -491,7 +427,6 @@ export class WebviewController {
 
   private releaseResources(): void {
     this.panel = undefined
-    this.dirty = false
     this.submitting = false
     if (this.submitTimer) {
       clearTimeout(this.submitTimer)

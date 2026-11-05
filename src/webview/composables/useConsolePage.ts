@@ -26,7 +26,7 @@ function webviewWindow(): WebviewWindow {
 }
 
 /**
- * 串口控制台页面的消息编排（buildConsole 页面未复用本 composable，自行编排）：
+ * 串口控制台页面的消息编排（taskManager 页面未复用本 composable，自行编排）：
  * 宿主消息经 isHostMessage 守卫后按类型分发；页面侧只经 post 发送协议消息。
  * 表单类页面（init/submitAck/error）之外，本页是事件驱动控制台——
  * init 只在握手时出现一次，其余消息随时可到。

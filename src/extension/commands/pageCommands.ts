@@ -8,7 +8,7 @@ import { type CommandRegistrar, statusIcon } from './shared'
 
 /**
  * 功能页面场景命令分组（C-15 拆分；09 方案阶段 2 后）——组件画廊 /
- * 环境信息 / 环境初始化 / 分支编译（v2.0：Webview 弹框 buildConsole）。
+ * 环境信息 / 环境初始化 / 任务管理（v2.6：Webview 弹框 taskManager）。
  */
 
 /** 本组依赖（CommandDeps 中与本组相关的字段，由 index.ts 组装时整体传入）。 */
@@ -16,10 +16,10 @@ export interface PageCommandDeps {
   taskRunner: TaskRunner
   outputChannel: vscode.OutputChannel
   initService: InitService
-  /** 打开分支编译弹框（v2.0：BuildConsolePanel.createOrShow，由 extension.ts 注入）。 */
-  openBuildConsole: () => void
-  /** 刷新构建任务树视图（v2.1：标题栏命令的路由目标）。 */
-  refreshBuildTasks: () => void
+  /** 打开任务管理弹框（v2.6：TaskManagerPanel.createOrShow，由 extension.ts 注入）。 */
+  openTaskManager: () => void
+  /** 刷新任务管理树视图（v2.6：标题栏命令的路由目标）。 */
+  refreshTaskManager: () => void
   /** 扩展上下文：openGallery 打开画廊页面需要（WebviewController.createOrShow 第二参）。 */
   context: vscode.ExtensionContext
   /** 单探针重检（09 方案 §6.1：树节点单击「重新检测此项」的路由目标）。 */
@@ -31,8 +31,8 @@ export function registerPageCommands(register: CommandRegistrar, deps: PageComma
     taskRunner,
     outputChannel,
     initService,
-    openBuildConsole,
-    refreshBuildTasks,
+    openTaskManager,
+    refreshTaskManager,
     context,
     recheckEnvironmentItem,
   } = deps
@@ -94,15 +94,15 @@ export function registerPageCommands(register: CommandRegistrar, deps: PageComma
     }
   })
 
-  /* ---------- 功能页面：分支编译出包（任务自动化模式） ---------- */
-  // v2.0：分支编译 = Webview 弹框（表单提交 HTTP + 任务列表）；无参设计，
-  // 命令面板 / 树视图标题栏 / 任务条目单击统一入口（原本地流水线随 BuildService 退役）
-  register(COMMAND.buildBranch, () => {
-    openBuildConsole()
+  /* ---------- 功能页面：任务管理（典型 CRUD 实例：增删改查 + 查询 + 分页） ---------- */
+  // v2.6：任务管理 = Webview 弹框（上部查询参数 + 下部任务表格）；无参设计，
+  // 命令面板 / 树视图标题栏 / 任务条目单击统一入口
+  register(COMMAND.openTaskManager, () => {
+    openTaskManager()
   })
 
-  // v2.1：构建任务树视图标题栏刷新
-  register(COMMAND.buildRefreshTasks, () => {
-    refreshBuildTasks()
+  // 任务管理树视图标题栏刷新
+  register(COMMAND.refreshTaskManager, () => {
+    refreshTaskManager()
   })
 }

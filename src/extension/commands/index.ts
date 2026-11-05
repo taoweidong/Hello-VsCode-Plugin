@@ -16,10 +16,10 @@ export interface CommandDeps {
   taskRunner: TaskRunner
   outputChannel: vscode.OutputChannel
   initService: InitService
-  /** 打开分支编译弹框（v2.0：BuildConsolePanel.createOrShow，extension.ts 注入闭包）。 */
-  openBuildConsole: () => void
-  /** 刷新构建任务树视图（v2.1）。 */
-  refreshBuildTasks: () => void
+  /** 打开任务管理弹框（v2.6：TaskManagerPanel.createOrShow，extension.ts 注入闭包）。 */
+  openTaskManager: () => void
+  /** 刷新任务管理树视图（v2.6）。 */
+  refreshTaskManager: () => void
   /** 串口命令控制台（树视图 + 面板 + 历史的扩展级组装单元） */
   serialConsole: SerialConsoleController
   /** 草稿箱（右键示例载体，09 方案 §3.5） */
@@ -44,7 +44,7 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
     context.subscriptions.push(vscode.commands.registerCommand(commandId, callback))
   }
   registerPageCommands(register, { ...deps, context })
-  registerSerialConsoleCommands(register, { controller: deps.serialConsole, context })
+  registerSerialConsoleCommands(register, { controller: deps.serialConsole })
   registerDraftCommands(register, { drafts: deps.drafts })
   registerCopyCommands(register) // v2.2：拷贝示例（无宿主依赖，剪贴板即全部）
   registerTaskExplorerCommands(register, { controller: deps.taskExplorer }) // v2.3：任务管理器

@@ -360,7 +360,7 @@ export class TaskExplorerTreeProvider
       this.entries = await loadWorkspaceTasks()
       this.loadError = undefined
     } catch (error) {
-      // 失败保留上次成功结果（与 BuildTasksTreeProvider 行为一致）
+      // 失败保留上次成功结果（与 TaskManagerTreeProvider 行为一致）
       this.loadError = error instanceof Error ? error.message : String(error)
       this.output.appendLine(`[taskExplorer] 任务加载失败：${this.loadError}`)
     }

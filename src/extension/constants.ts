@@ -3,7 +3,9 @@
  * 09 方案阶段 2：itemsView / featureConfigView / staticConfigView 三视图随
  * 条目 / 特性配置 / 静态配置领域删除；v2.0：分支编译改造为 Webview 弹框；
  * v2.1：恢复「构建任务」树视图作为侧边栏入口（数据同一 HTTP 接口，见
- * buildTasksTreeProvider）——纯弹框无任何常驻菜单是 v2.0 的实测回归。
+ * taskManagerTreeProvider）——纯弹框无任何常驻菜单是 v2.0 的实测回归；
+ * v2.6：分支编译整体改造为「任务管理」CRUD 实例（增删改查 + 查询参数 +
+ * 分页表格），命令 / 视图 / 配置键随之更名为 taskManager / taskApiBaseUrl。
  */
 export const VIEW = {
   /** ActivityBar 视图容器 ID */
@@ -12,18 +14,20 @@ export const VIEW = {
   envViewId: 'extStarter.envView',
   /** 环境初始化视图 ID */
   initViewId: 'extStarter.initView',
-  /** 构建任务树视图 ID（v2.1：分支编译侧边栏入口） */
-  buildViewId: 'extStarter.buildView',
+  /**
+   * 任务管理树视图 ID（v2.6：原「构建任务」侧边栏入口）。
+   * 命名区分：TaskManager = taskManager CRUD 实例（演示打桩/真实接口切换），
+   * TaskExplorer = 工作区 tasks.json 的任务管理器（v2.3）——两者定位不同，勿混淆。
+   */
+  taskManagerViewId: 'extStarter.taskManagerView',
   /** 串口服务器树视图 ID */
   serialServersViewId: 'extStarter.serialServersView',
-  /** 构建任务树条目的 contextValue */
-  buildTaskContextValue: 'buildTask',
   /** 串口服务器树条目的 contextValue（未连接） */
   serialServerContextValue: 'serialServer',
   /** 串口服务器树条目的 contextValue（已连接，图标/菜单可区分） */
   serialServerConnectedContextValue: 'serialServerConnected',
 
-  /** 任务管理器树视图 ID（v2.3：仅加载工作区 .vscode/tasks.json 任务） */
+  /** 任务管理器树视图 ID（v2.3：仅加载工作区 .vscode/tasks.json 任务；见上方命名区分） */
   taskExplorerViewId: 'extStarter.taskExplorerView',
   /** 工作区文件夹节点 */
   taskExplorerFolderContextValue: 'taskExplorerFolder',
@@ -64,11 +68,11 @@ export const COMMAND = {
   /** 环境初始化：执行单个步骤（树条目单击 / inline 按钮） */
   runInitStep: 'extStarter.runInitStep',
 
-  // 分支编译（v2.0：Webview 弹框 buildConsole，HTTP 接口打桩模拟）
-  /** 分支编译：打开构建控制台（表单提交 + 任务列表） */
-  buildBranch: 'extStarter.buildBranch',
-  /** 构建任务树视图标题栏：手动刷新任务列表（另有 3s 可见期自动轮询） */
-  buildRefreshTasks: 'extStarter.buildRefreshTasks',
+  // 任务管理（v2.6：分支编译改造为 CRUD 实例——增删改查 + 查询参数 + 分页表格）
+  /** 任务管理：打开控制台弹框（上部查询参数 + 下部任务表格） */
+  openTaskManager: 'extStarter.openTaskManager',
+  /** 任务管理树视图标题栏：手动刷新任务列表（另有 3s 可见期自动轮询） */
+  refreshTaskManager: 'extStarter.refreshTaskManager',
 
   // Webview 页面（Vue 3）
   /** 打开组件画廊（开发用：设计系统视觉验收基准） */
@@ -127,7 +131,8 @@ export const COMMAND = {
 
 /**
  * 配置项键名（对应设置里的 extStarter.*）。
- * v2.0：新增 buildApiBaseUrl（分支编译 HTTP 接口基地址，留空 = 打桩模拟）。
+ * v2.0：新增构建接口基地址（分支编译，留空 = 打桩模拟）；
+ * v2.6：随「任务管理」改造更名为 taskApiBaseUrl（GET/POST/PUT/DELETE /tasks）。
  */
 export const CONFIG = {
   section: 'extStarter',
@@ -136,10 +141,10 @@ export const CONFIG = {
   /** 串口控制台开关（特性开关体系退场后平铺，09 §3.4/S1） */
   serialConsoleEnabled: 'serialConsoleEnabled',
   /**
-   * 构建任务 HTTP 接口基地址（v2.0 分支编译改造）：
-   * 留空（默认）= 打桩模拟；填写后切换真实接口（POST/GET /builds）。
+   * 任务管理后端接口基地址（v2.6 任务管理改造）：
+   * 留空（默认）= 打桩模拟；填写后切换真实接口（GET/POST/PUT/DELETE /tasks）。
    */
-  buildApiBaseUrl: 'buildApiBaseUrl',
+  taskApiBaseUrl: 'taskApiBaseUrl',
 
   // 任务管理器树形展示（v2.5 继承 vscode-taskexplorer 的分组配置体系；v3.1 默认 5 层）
   /** 是否按分隔符分组任务 label（默认 true） */

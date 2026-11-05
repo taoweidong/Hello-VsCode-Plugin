@@ -17,6 +17,8 @@ const props = defineProps<{
   ports: SerialPortBrief[]
   editing: boolean
   saving: boolean
+  /** 编辑态重置的两段式布防态（由页面级 useTwoStepConfirm 持有，Esc / 按钮共用）。 */
+  resetArmed: boolean
 }>()
 
 const emit = defineEmits<{
@@ -54,8 +56,14 @@ function pickPort(path: string): void {
       <VButton variant="secondary" icon="plug" title="检测本机串口" @click="emit('detect')">
         检测串口
       </VButton>
-      <VButton variant="secondary" icon="refresh" title="恢复默认值" @click="emit('reset')">
-        重置
+      <VButton
+        variant="secondary"
+        :icon="resetArmed ? 'warning' : 'refresh'"
+        :title="resetArmed ? '再次点击确认重置' : '恢复默认值'"
+        :class="{ 'server-form__reset--armed': resetArmed }"
+        @click="emit('reset')"
+      >
+        {{ resetArmed ? '确认重置' : '重置' }}
       </VButton>
     </VToolbar>
 
@@ -110,6 +118,10 @@ function pickPort(path: string): void {
   font-weight: 600;
 }
 
+.server-form__reset--armed {
+  color: var(--ui-error);
+}
+
 .server-form__ports {
   display: flex;
   flex-wrap: wrap;
@@ -118,7 +130,8 @@ function pickPort(path: string): void {
 }
 
 .server-form__chip {
-  padding: 2px var(--ui-space-2);
+  /* 第五轮：垂直内边距 2px 登记为 --ui-chip-pad-y（原 px 字面量混写擦边过门禁） */
+  padding: var(--ui-chip-pad-y) var(--ui-space-2);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
   background: var(--ui-surface);

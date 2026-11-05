@@ -86,7 +86,7 @@ afterEach(() => {
 describe('registerSerialConsoleCommands', () => {
   it('注册全部 6 个命令', () => {
     const { registered, register } = makeRegistrar()
-    registerSerialConsoleCommands(register, { controller, context: makeContext() })
+    registerSerialConsoleCommands(register, { controller })
     for (const key of [
       COMMAND.openSerialConsole,
       COMMAND.addSerialServer,
@@ -104,7 +104,7 @@ describe('registerSerialConsoleCommands', () => {
       .spyOn(SerialConsolePanel, 'createOrShow')
       .mockImplementation(() => undefined)
     const { registered, register } = makeRegistrar()
-    registerSerialConsoleCommands(register, { controller, context: makeContext() })
+    registerSerialConsoleCommands(register, { controller })
 
     registered.get(COMMAND.openSerialConsole)?.()
     expect(panelSpy).toHaveBeenCalledWith(expect.anything(), undefined)
@@ -119,7 +119,7 @@ describe('registerSerialConsoleCommands', () => {
       .spyOn(SerialConsolePanel, 'createOrShow')
       .mockImplementation(() => undefined)
     const { registered, register } = makeRegistrar()
-    registerSerialConsoleCommands(register, { controller, context: makeContext() })
+    registerSerialConsoleCommands(register, { controller })
 
     registered.get(COMMAND.openSerialConsole)?.()
     expect(panelSpy).not.toHaveBeenCalled()
@@ -129,7 +129,7 @@ describe('registerSerialConsoleCommands', () => {
   it('refreshSerialServers 刷新树视图', () => {
     const refreshSpy = vi.spyOn(controller.treeProvider, 'refresh')
     const { registered, register } = makeRegistrar()
-    registerSerialConsoleCommands(register, { controller, context: makeContext() })
+    registerSerialConsoleCommands(register, { controller })
     registered.get(COMMAND.refreshSerialServers)?.()
     expect(refreshSpy).toHaveBeenCalled()
   })
@@ -138,7 +138,7 @@ describe('registerSerialConsoleCommands', () => {
     __stubs.dialogQueue.push('删除')
     const deleteSpy = vi.spyOn(controller, 'deleteServer').mockResolvedValue('deleted' as never)
     const { registered, register } = makeRegistrar()
-    registerSerialConsoleCommands(register, { controller, context: makeContext() })
+    registerSerialConsoleCommands(register, { controller })
     await registered.get(COMMAND.deleteSerialServer)?.(makeNode('srv-7'))
     expect(deleteSpy).toHaveBeenCalledWith('srv-7')
   })
@@ -147,7 +147,7 @@ describe('registerSerialConsoleCommands', () => {
     // 桩的 showWarningMessage 返回 undefined（等于用户取消模态）
     const deleteSpy = vi.spyOn(controller, 'deleteServer').mockResolvedValue('deleted' as never)
     const { registered, register } = makeRegistrar()
-    registerSerialConsoleCommands(register, { controller, context: makeContext() })
+    registerSerialConsoleCommands(register, { controller })
     await registered.get(COMMAND.deleteSerialServer)?.(makeNode('srv-7'))
     expect(deleteSpy).not.toHaveBeenCalled()
   })

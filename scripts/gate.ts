@@ -141,7 +141,9 @@ const steps: StepDef[] = [
   },
   {
     name: '7/10 单元测试（vitest run --coverage）',
-    timeoutMs: 240000,
+    // 第五轮：240s 曾紧于慢机 / CI 冷缓存下的实测墙钟（拆分双工程前 jsdom 环境开销
+    // 就超过此值），表现为门禁「随机红」——放宽到 600s 与第⑧步一致留足余量
+    timeoutMs: 600000,
     run: (timeout) => {
       const output = exec('npx vitest run --coverage', timeout)
       return (

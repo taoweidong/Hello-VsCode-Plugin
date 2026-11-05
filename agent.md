@@ -6,8 +6,8 @@
 ## 项目概述
 
 - **是什么**：Hello VSCode 插件（v1.0.0 起由「CRUD 演示集合」按 09 方案收敛重构）：
-  4 视图（环境信息 / 环境初始化 / 构建任务 / 串口服务器）+ 3 Webview 页面
-  （gallery 组件画廊 / serialConsole 串口控制台 / buildConsole 分支编译弹框）+ 草稿箱右键示例（8 条入口）+
+  4 视图（环境信息 / 环境初始化 / 任务管理 / 串口服务器）+ 3 Webview 页面
+  （gallery 组件画廊 / serialConsole 串口控制台 / taskManager 任务管理 CRUD 弹框）+ 草稿箱右键示例（8 条入口）+
   启动任务框架（窗口加载完成自动执行：初始化脚本 + 环境探针）。
 - **技术栈**：TypeScript（strict，tsconfig node / webview 双工程）+ esbuild（宿主构建）+
   Vite（Webview 构建）+ Vitest（单测）+ mocha/@vscode/test-electron（集成）+ Playwright（e2e）。
@@ -45,7 +45,9 @@ npm run gate
 
 - **每一次 AI 交互都必须执行前端与后端的单元测试，全部通过后才允许提交代码。**
   本项目两侧共用同一条命令：`npm run test:unit`（Vitest，一次性覆盖宿主侧「后端」
-  与 Webview 侧「前端」的全部单元 / 组件用例，不启动 VSCode，全量 < 30s）。
+  （`src/extension/**`，node 环境）与 Webview 侧「前端」（`src/webview/**` 及其
+  `src/test/unit/webview/` 用例，jsdom 环境）的全部单元 / 组件用例，不启动 VSCode，
+  全量 < 30s）。两侧用例都必须通过——只绿一侧不算通过。
   - **测试未通过时不得提交**：先定位并修复问题，再重新运行验证，直到全部通过；
     禁止跳过、注释或伪造测试通过；
   - 日常对话轮次：每轮改过代码 / 配置 / 文档，收尾前必须跑 `npm run test:unit`
@@ -84,7 +86,7 @@ src/extension/（宿主侧，只 import vscode，不 import Vue）
   index.ts        组装：旧键迁移 → 启动任务 → 视图 → 命令（激活时机 onStartupFinished）
   constants.ts    命令 / 视图 / 配置 / 存储 ID 的单一来源
   commands/       pageCommands / serialConsoleCommands / draftCommands + shared
-  features/       drafts 草稿箱 / init 任务编排 / build 异步长任务 / serialConsole 真实业务
+  features/       drafts 草稿箱 / init 任务编排 / taskManager 任务管理（CRUD 实例） / serialConsole 真实业务
   providers/      环境信息树视图
   services/       legacyMigration 旧键迁移 + stores/atomicWrite 原子写
   tasks/          StartupTask 注册表（taskRegistry）+ TaskRunner 调度 + probes 环境探针
@@ -112,6 +114,11 @@ src/test/（unit: Vitest + vscode 测试桩；集成: mocha + @vscode/test-elect
 6. **shell 拼接外部输入前必须白名单校验**（先例：分支名 `BRANCH_NAME_PATTERN`）。
 7. **测试卫生**：测试创建的临时目录必须在 `finally` 中 `fs.rmSync` 清理。
 8. **eslint 豁免管理**：新增文件级 / 目录级豁免必须在注释中注明根因与消除条件；随代码修复及时删除豁免，禁止只增不减。
+9. **webview 禁用浏览器模态**：`window.confirm / alert / prompt` 在 VS Code webview
+   沙箱（iframe 无 allow-modals）下被静默忽略——confirm 恒返回 false、alert/prompt
+   无任何效果。确认交互一律改用页内两段式布防确认（首点布防、限时内再点执行）或经
+   宿主 `showWarningMessage` 模态，禁止依赖 confirm 返回值（样式门禁会扫描
+   `src/webview` 违规；第五轮评估 P0 教训）。
 
 ## 常用命令
 

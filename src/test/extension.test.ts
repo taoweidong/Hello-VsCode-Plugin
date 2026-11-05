@@ -32,7 +32,7 @@ import type { TaskExplorerNode } from '../extension/features/taskExplorer/taskEx
 /**
  * 宿主集成测试（@vscode/test-electron，09 方案阶段 2 后）：
  * 条目 / 特性配置 / 静态配置 / 存储层四组已随领域删除，
- * 保留启动任务框架 / 环境初始化 / 分支编译 / Task Explorer（v2.3 冒烟 + 全流程）
+ * 保留启动任务框架 / 环境初始化 / 任务管理（CRUD） / Task Explorer（v2.3 冒烟 + 全流程）
  * 与「全流程真实环境验证」（其余领域的深度覆盖在单测）。
  */
 
@@ -250,9 +250,9 @@ suite('环境初始化', () => {
   })
 })
 
-suite('分支编译（v2.1 端到端冒烟）', () => {
-  test('buildBranch 打开弹框：真实宿主出现面板标签页；buildRefreshTasks 可执行', async () => {
-    await vscode.commands.executeCommand('extStarter.buildBranch')
+suite('任务管理（v2.6 端到端冒烟）', () => {
+  test('openTaskManager 打开弹框：真实宿主出现面板标签页；refreshTaskManager 可执行', async () => {
+    await vscode.commands.executeCommand('extStarter.openTaskManager')
     // 经公开 API 断言（测试进程与扩展 bundle 是两个模块实例，不能查内部注册表）：
     // 面板创建成功 ⇔ 出现 viewType 匹配的编辑器标签页
     const hasPanel = (): boolean =>
@@ -260,16 +260,38 @@ suite('分支编译（v2.1 端到端冒烟）', () => {
         .flatMap((group) => group.tabs)
         .some((tab) => {
           // 测试宿主的 Tab 不暴露 viewType（proposed API，dump 实证为 undefined）：
-          // 兼容 label 匹配（webview 面板标签 = 页面标题「分支编译」）
+          // 兼容 label 匹配（webview 面板标签 = 页面标题「任务管理」）
           const viewType = String((tab as unknown as { viewType?: string }).viewType ?? '')
-          return viewType.endsWith('.buildConsole') || (tab.label ?? '').includes('分支编译')
+          return viewType.endsWith('.taskManager') || (tab.label ?? '').includes('任务管理')
         })
     await vi_tabWait(hasPanel)
-    assert.ok(hasPanel(), '分支编译弹框面板应已创建（tabGroups 可见）')
+    assert.ok(hasPanel(), '任务管理弹框面板应已创建（tabGroups 可见）')
 
     await assert.doesNotReject(async () => {
-      await vscode.commands.executeCommand('extStarter.buildRefreshTasks')
+      await vscode.commands.executeCommand('extStarter.refreshTaskManager')
     }, '刷新命令应可执行（树视图 + provider 接线成功）')
+  })
+})
+
+suite('串口控制台（命令装配冒烟）', () => {
+  test('openSerialConsole 打开面板；打开态下 addSerialServer / refreshSerialServers 可执行', async () => {
+    // 此前 serialConsole 六条命令的装配接线无任何一层测试（第五轮评估盲区 1）：
+    // 这里走真实宿主验证「命令 → 控制器 → 面板」链路
+    await vscode.commands.executeCommand('extStarter.openSerialConsole')
+    const hasPanel = (): boolean =>
+      vscode.window.tabGroups.all
+        .flatMap((group) => group.tabs)
+        .some((tab) => {
+          const viewType = String((tab as unknown as { viewType?: string }).viewType ?? '')
+          return viewType.endsWith('.serialConsole') || (tab.label ?? '').includes('串口控制台')
+        })
+    await vi_tabWait(hasPanel)
+    assert.ok(hasPanel(), '串口控制台面板应已创建（tabGroups 可见）')
+
+    await assert.doesNotReject(async () => {
+      await vscode.commands.executeCommand('extStarter.addSerialServer')
+      await vscode.commands.executeCommand('extStarter.refreshSerialServers')
+    }, '新增 / 刷新命令应可执行（命令 → 控制器接线成功）')
   })
 })
 
@@ -377,6 +399,20 @@ suite('Task Explorer 全流程真实环境验证（多任务类型 / 树结构 /
   suiteSetup(async function (this: Mocha.Context): Promise<void> {
     this.timeout(30000)
     originalTasksJson = nodeFs.readFileSync(TASKS_JSON_PATH, 'utf8')
+    // 残留防护（第五轮）：宿主进程硬崩会跳过 suiteTeardown，tasks.json 里留下
+    // 上轮 e2e-* fixtures——先清掉再读「原件」，避免脏数据被当原样恢复
+    if (originalTasksJson.includes('"e2e-')) {
+      nodeFs.writeFileSync(
+        TASKS_JSON_PATH,
+        JSON.stringify({
+          version: 2,
+          tasks: (JSON.parse(originalTasksJson) as { tasks: unknown[] }).tasks.filter(
+            (entry) => !String((entry as { label?: unknown }).label ?? '').startsWith('e2e-')
+          ),
+        })
+      )
+      originalTasksJson = nodeFs.readFileSync(TASKS_JSON_PATH, 'utf8')
+    }
     const original = JSON.parse(originalTasksJson) as {
       version: string
       tasks: Record<string, unknown>[]
@@ -969,18 +1005,18 @@ ${fileB.fsPath}`
     }
   })
 
-  test('分支编译弹框：命令打开面板；任务刷新命令可执行', async () => {
-    await vscode.commands.executeCommand('extStarter.buildBranch')
+  test('任务管理弹框：命令打开面板；任务刷新命令可执行', async () => {
+    await vscode.commands.executeCommand('extStarter.openTaskManager')
     // 面板创建是异步装配（createOrShow → open() 未被命令 await）：
     // 若此前的面板已被关闭，这里是全新创建，必须轮询等待标签页出现
     const hasPanel = (): boolean =>
       vscode.window.tabGroups.all
         .flatMap((group) => group.tabs)
-        .some((tab) => (tab.label ?? '').includes('分支编译'))
+        .some((tab) => (tab.label ?? '').includes('任务管理'))
     await vi_tabWait(hasPanel)
     assert.ok(hasPanel(), '弹框面板应已打开')
     await assert.doesNotReject(async () => {
-      await vscode.commands.executeCommand('extStarter.buildRefreshTasks')
+      await vscode.commands.executeCommand('extStarter.refreshTaskManager')
     })
   })
 })

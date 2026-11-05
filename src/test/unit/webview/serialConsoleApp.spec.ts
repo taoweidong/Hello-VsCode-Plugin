@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import App from '../../../webview/apps/serialConsole/App.vue'
-import { __setVsCodeApiForTest, type VsCodeApi } from '../../../webview/shared/useVsCodeApi'
+import { __setVsCodeApiForTest } from '../../../webview/shared/useVsCodeApi'
 import { deriveFormSchema, toFieldDefs } from '../../../webview/formSchema'
 import { SERVER_FIELD_DEFS } from '../../../extension/features/serialConsole/serverSchema'
 import type { FieldDef, SerialServerWire } from '../../../webview/protocol'
-import { hostMessage, inputValue } from './appTestUtils'
+import { createHostApiMock, hostMessage, inputValue } from './appTestUtils'
 
 /**
  * 串口控制台页面：init 装配 / 服务器管理与保存（密码剥离）/ 连接与发送（本地回显）/
@@ -36,20 +36,8 @@ function makeServer(overrides: Partial<SerialServerWire> = {}): SerialServerWire
 }
 
 function createApiMock(initialState: unknown = undefined) {
-  const api: VsCodeApi & { posted: unknown[]; state: unknown } = {
-    posted: [],
-    state: initialState,
-    postMessage(message: unknown): void {
-      this.posted.push(message)
-    },
-    getState<T>(): T | undefined {
-      return this.state as T | undefined
-    },
-    setState<T>(state: T): void {
-      this.state = state
-    },
-  }
-  return api
+  // 第五轮基建：mock 实现收敛到 appTestUtils（替代本文件手写双轨版本）
+  return createHostApiMock(initialState)
 }
 
 function sendInit(extra: Record<string, unknown> = {}): void {
@@ -196,7 +184,7 @@ describe('serialConsole 页面：服务器管理', () => {
     expect(save?.password).toBe('s3cret')
   })
 
-  it('P2-F3：编辑态 Esc 重置需确认——拒绝保持编辑，确认后复位', async () => {
+  it('P2-F3：编辑态 Esc 重置两段式布防——首键布防保持编辑，再键确认复位', async () => {
     wrapper = mount(App)
     sendInit()
     await wrapper.vm.$nextTick()
@@ -204,19 +192,24 @@ describe('serialConsole 页面：服务器管理', () => {
     await editButton.trigger('click')
     expect(wrapper.text()).toContain('编辑服务器')
 
-    const confirmSpy = vi
-      .spyOn(
-        (globalThis as unknown as { window: { confirm: (message?: string) => boolean } }).window,
-        'confirm'
-      )
-      .mockReturnValue(false)
-    await wrapper.find('form').trigger('keydown', { key: 'Escape' })
-    expect(confirmSpy).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).toContain('编辑服务器') // 拒绝：保持编辑态
+    // P0 守护：webview 沙箱下浏览器模态 confirm 恒被忽略，页面不得依赖它
+    const confirmSpy = vi.spyOn(
+      (globalThis as unknown as { window: { confirm: (message?: string) => boolean } }).window,
+      'confirm'
+    )
 
-    confirmSpy.mockReturnValue(true)
+    // 首次 Esc：仅布防，保持编辑态，重置按钮进入确认态
     await wrapper.find('form').trigger('keydown', { key: 'Escape' })
-    expect(wrapper.text()).toContain('新增服务器') // 确认：复位为新增态
+    expect(confirmSpy).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('编辑服务器')
+    expect(
+      wrapper.findAll('button').find((button) => button.text().includes('确认重置'))
+    ).toBeDefined()
+
+    // 再次 Esc（限时内）：确认复位为新增态
+    await wrapper.find('form').trigger('keydown', { key: 'Escape' })
+    expect(wrapper.text()).toContain('新增服务器')
+    expect(confirmSpy).not.toHaveBeenCalled()
   })
 
   it('保存：post serialServerSave（密码单独携带）；servers 推送后表单复位', async () => {
@@ -264,6 +257,33 @@ describe('serialConsole 页面：服务器管理', () => {
     await nameInput.setValue('甲')
     await wrapper.vm.$nextTick()
     expect(wrapper.text()).not.toContain('名称不能为空。')
+  })
+
+  it('保存失败后：外部 servers 推送不清空编辑态（awaitingSaveReset 泄漏防护）', async () => {
+    wrapper = mount(App)
+    sendInit()
+    await wrapper.vm.$nextTick()
+    const editButton = wrapper.findAll('.server-list__actions button')[1]
+    await editButton.trigger('click')
+    await wrapper.find('input[placeholder="如：服务器甲"]').setValue('改动名')
+    const saveButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('保存修改'))
+    await saveButton?.trigger('click')
+
+    // 保存失败回 error(field)：awaitingSaveReset 必须同步清除
+    hostMessage({ type: 'error', message: '名称不能为空。', field: 'name' })
+    await wrapper.vm.$nextTick()
+
+    // 随后任意外部列表推送（如其他端变更）：不得误清当前编辑
+    hostMessage({
+      type: 'serialServers',
+      servers: [makeServer(), makeServer({ id: 'srv-2', name: '服务器乙' })],
+    })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.text()).toContain('编辑服务器')
+    const nameInput = wrapper.find('input[placeholder="如：服务器甲"]')
+    expect(inputValue(nameInput.element)).toBe('改动名')
   })
 
   it('两段式删除：首次布防、再次点击才 post serialServerDelete', async () => {

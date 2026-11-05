@@ -13,7 +13,6 @@
   --ui-fg: var(--vscode-foreground, #cccccc);
   --ui-fg-muted: var(--vscode-descriptionForeground, #9d9d9d);
   --ui-fg-disabled: var(--vscode-disabledForeground, rgba(204, 204, 204, 0.6));
-  --ui-fg-selected: var(--vscode-list-activeSelectionForeground, #ffffff);
 
   /* ---- 背景 / 表面 ---- */
   --ui-bg: var(--vscode-editor-background, #1e1e1e);
@@ -38,11 +37,16 @@
   --ui-btn2-fg: var(--vscode-button-secondaryForeground, #ffffff);
   --ui-btn2-hover: var(--vscode-button-secondaryHoverBackground, #45494e);
 
-  /* ---- 焦点 / 错误 ---- */
+  /* ---- 焦点 / 状态色 ---- */
   --ui-focus: var(--vscode-focusBorder, #007fd4);
   --ui-error: var(--vscode-errorForeground, #f48771);
   --ui-error-border: var(--vscode-inputValidation-errorBorder, #be1100);
-  --ui-error-bg: var(--vscode-inputValidation-errorBackground, #5a1d1d);
+  /* R-U-10：进度条填充——语义属 progress 而非 focus，不再复用 --ui-focus */
+  --ui-progress: var(--vscode-progressBar-background, var(--ui-focus));
+  /* 第五轮：成功反馈色（此前页面侧 var(--ui-success, var(--ui-fg)) 静默回退正文色） */
+  --ui-success: var(--vscode-testingIconPassed, var(--vscode-charts-green, #89d185));
+  /* 第五轮：模态遮罩（taskManager 弹框背景，原为 rgba 硬编码擦边过门禁） */
+  --ui-dialog-scrim: rgba(0, 0, 0, 0.35);
 
   /* ---- 复选框 ---- */
   --ui-check-bg: var(--vscode-checkbox-background, #3c3c3c);
@@ -51,14 +55,10 @@
   /* R-U-4：accent-color 原先在 VCheckbox 内直接消费 --vscode-*，绕过了令牌层 */
   --ui-check-selected: var(--vscode-checkbox-select-background, var(--ui-focus));
 
-  /* ---- 徽标 / 链接 / 键帽 ---- */
+  /* ---- 徽标 / 链接 ---- */
   --ui-badge-bg: var(--vscode-badge-background, #4d4d4d);
   --ui-badge-fg: var(--vscode-badge-foreground, #ffffff);
   --ui-link: var(--vscode-textLink-foreground, #3794ff);
-  --ui-link-active: var(--vscode-textLink-activeForeground, #3794ff);
-  --ui-kbd-border: var(--vscode-keybindingLabel-border, rgba(204, 204, 204, 0.4));
-  --ui-kbd-bg: var(--vscode-keybindingLabel-background, rgba(128, 128, 128, 0.17));
-  --ui-kbd-fg: var(--vscode-keybindingLabel-foreground, #cccccc);
 
   /* ---- 字体 / 动效 ---- */
   --ui-font: var(--vscode-font-family, system-ui, 'Segoe UI', sans-serif);
@@ -83,8 +83,6 @@
   --ui-input-pad-y: 4px;
   /* 04 §3：按钮内边距 4px 14px（14px 为登记刻度） */
   --ui-btn-pad-x: 14px;
-  /* R-U-10：进度条填充——语义属 progress 而非 focus，不再复用 --ui-focus */
-  --ui-progress: var(--vscode-progressBar-background, var(--ui-focus));
   /* R-U-4：此前在组件/页面层硬编码的隐式几何规格，按 04 §9.4 登记 */
   --ui-badge-size: 16px; /* VBadge 徽标最小宽/高 */
   --ui-toolbar-divider-height: 16px; /* VToolbarDivider 高 */
@@ -97,12 +95,20 @@
   --ui-shell-width-form: 560px; /* AppShell width=form */
   --ui-shell-width-settings: 720px; /* AppShell width=settings */
   --ui-shell-width-wizard: 960px; /* AppShell width=wizard */
-  --ui-file-list-max-height: 320px; /* 导入向导文件列表滚动区最大高 */
   /* 串口控制台（serialConsole）页面布局规格登记 */
   --ui-console-side-width: 320px; /* 左栏（服务器管理）宽度 */
   --ui-console-output-min-height: 160px; /* 控制台输出区最小高度 */
   --ui-history-max-height: 180px; /* 历史命令列表滚动区最大高 */
   --ui-status-dot-size: 8px; /* 服务器列表状态圆点尺寸 */
+  /* 第五轮：表单芯片（串口检测 chips）内边距——原 2px 字面量混写擦边过门禁 */
+  --ui-chip-pad-y: 2px;
+  /* 任务管理（taskManager）页面布局规格登记（R-U-4） */
+  --ui-task-message-max-width: 260px; /* 表格行 message 截断最大宽 */
+  --ui-task-status-dot: 6px; /* 运行状态圆点尺寸 */
+  --ui-task-progress-width: 96px; /* 进度条轨道宽 */
+  --ui-task-progress-radius: 3px; /* 进度条轨道圆角 */
+  --ui-task-select-min-width: 120px; /* 分页每页条数下拉最小宽 */
+  --ui-task-action-size: 28px; /* 弹框内图标按钮尺寸 */
 }
 
 /* 页面基础样式：正文 13px、行高 1.5、背景透明跟随宿主 */

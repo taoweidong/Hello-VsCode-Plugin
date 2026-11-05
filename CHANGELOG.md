@@ -4,7 +4,96 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [3.3.0] - 2026-11-05
+
+### 新增（任务管理 CRUD 实例）
+
+- **「分支编译」整体改造为「任务管理」CRUD 实例**：
+  - 页面改为**上部查询参数区 + 下部数据表格区 + 分页**的典型 CRUD 布局：
+    关键字 / 状态 / 构建类型 / 每页条数 → 查询 · 重置；表格展示名称 / 分支 /
+    类型 / 状态 / 进度 / 信息 / 备注 / 时间，底部分页栏翻页。
+  - 支持**增删改查**：新建 / 编辑走 SchemaForm 弹框（任务名称、分支名必填，
+    构建类型默认完整，备注选填），删除行内二次确认；校验失败经 `error.field`
+    回传定位控件。
+  - **模拟调用后端接口**：`TaskApiClient` 双实现——`StubTaskApiClient`
+    （内存表 + 服务端分页语义：keyword / status / buildType 服务侧过滤、
+    创建时间倒序、分页切片）与 `HttpTaskApiClient`
+    （GET / POST / PUT / DELETE `/tasks`，`AbortSignal.timeout(10s)`）；
+    `extStarter.taskApiBaseUrl` 留空 = 打桩，非空 = 真实接口，页面与协议层零改动。
+  - 协议新增 `TaskItemWire` / `TaskPageWire` / `TaskQueryWire` 与
+    `taskListRequest` / `taskDelete` 消息及运行时守卫（增改统一走通用 `submit`
+    生命周期，`draft.id` 区分新建 / 编辑）；面板维护 `lastQuery`，
+    编辑 / 删除沿用当前查询条件刷新，新建成功后回第 1 页。
+- 领域字段表 `TASK_FIELD_DEFS`、侧边栏 `TaskManagerTreeProvider` 同步落地；
+  命令 `extStarter.buildBranch` → `extStarter.openTaskManager`、
+  `extStarter.buildRefreshTasks` → `extStarter.refreshTaskManager`，
+  视图 `extStarter.buildView` → `extStarter.taskManagerView`，
+  设置 `extStarter.buildApiBaseUrl` → `extStarter.taskApiBaseUrl`。
+- 测试：新增 `taskApiClient` / `taskManagerPanel` / `taskManagerTreeProvider` /
+  `taskSchema` / `taskManagerApp` 单测（fake timers 驱动打桩状态机与分页切片）、
+  protocol CRUD 守卫用例、Playwright e2e `taskManager.spec.ts`；
+  门禁 `--fast` 全绿（63 测试文件 / 688 用例，宿主产物 96.1 KB，12 chunk 最大 72.4 KB）。
+
+### 修复（第五轮代码质量评估）
+
+- **「删除 / 重置」在真实 VS Code 中失效（P0）**：webview 沙箱 iframe 无
+  allow-modals，`window.confirm` 恒返回 false——任务管理删除确认与串口控制台
+  编辑态重置确认因此永远无法执行（单测 mock confirm、e2e 跑普通浏览器恰好都
+  掩盖了这一点）。改为页内两段式布防确认（`useTwoStepConfirm`：首点布防、
+  3s 内再点执行、超时自动解除），serialConsole 既有 ServerList / HistoryPanel
+  的两份实现一并收敛到该 composable；样式门禁新增规则 8 禁用浏览器模态
+  （confirm / alert / prompt）防复发。
+- **任务管理弹框可永久卡死 / 轮询误报「已保存」（P1）**：弹框关闭原本只认
+  `taskList` 应答——宿主刷新失败吞错时 `saving` 恒 true、取消按钮禁用；且
+  3s 轮询的 `taskList` 应答先落时会误关弹框并伪造成功反馈。改为 `submitAck`
+  （宿主提交生命周期应答）关框，`taskList` 只负责数据刷新。
+- **保存按钮绕过本地必填校验（P1）**：空必填要等宿主往返报错——主按钮改走
+  SchemaForm 本地校验并聚焦首个控件（对齐 serialConsole，v3.2.0 P2-F2 缺陷
+  在新页面的复发）。
+- **串口服务器加载守卫透传密码字段（P1 安全）**：手工编辑或外部工具写入数据
+  文件的 `password` 类键会被并入内存对象，下次保存即明文落盘并推送到页面——
+  加载守卫剔除全部 `*password*` 键，守住数据文件零明文不变量。
+- **HTTP 任务接口响应零校验（P1）**：`(await response.json()) as T` 盲断言，
+  畸形响应在下游抛无上下文 TypeError——恢复响应契约校验（items 数组逐项 +
+  分页字段 + 任务对象必填字段），非法时抛带 method/path 的可诊断错误。
+- **弹框生命周期与轮询条件（P1/P2）**：init 失败（initialized 恒 false）时
+  页面每 3s 空转请求——轮询条件改为「init 完成 且 存在排队 / 运行中任务」；
+  taskManager 页面改经 `useVsCodeApi` 共享单例取 vscode api（原本地重复定义，
+  违反仓库单例约定）。
+- **查询并发防护（P2）**：页面轮询 / 树轮询 / 手动刷新并发时慢的过期应答会
+  覆盖新结果——面板 pushQuery 加请求序号丢弃过期应答；侧边栏树 refresh 加
+  in-flight 单飞（对齐 taskExplorer 惯例）；`onAfterChange` 移到写操作成功
+  路径（纯读轮询不再驱动树刷新，HTTP 模式请求量减半）；删除后按最新 total
+  钳制页码，不再驻留超界空页。
+- **串口保存失败后的状态泄漏（P2）**：保存失败（error 回包）后
+  `awaitingSaveReset` 标志未清除，随后任意外部服务器列表推送会误清正在编辑
+  的表单——onError 同步复位标志。
+- **CSS 令牌失效与孤儿清理（P2）**：页面引用未登记的 `--ui-space-5/8`，
+  `var()` 静默失效导致空态占位与弹框内边距归零——改用既有刻度；遮罩
+  `rgba(0,0,0,.35)` 与芯片 2px 内边距登记为 `--ui-dialog-scrim` /
+  `--ui-chip-pad-y` 语义令牌；补登记 `--ui-success` 成功反馈色；清理 7 个
+  零消费者孤儿令牌（逐个 grep 复核，消费中的 `--ui-error-border` /
+  `--ui-progress` 等保留）。
+- **死代码清理（行为不变）**：删除从未接线的协议消息 `taskCreate` /
+  `taskUpdate` / `serialServersRequest` / `commandHistoryRequest` / `dirty` /
+  `cancel` 及宿主侧不可达分支（dirty 模态确认 / handleCancel / 未用类型
+  `TaskCreatePayloadWire` / `TaskUpdatePayloadWire`）；删除无消费者的
+  `panelOptions` 字段与 `taskManagerTask` contextValue（命令 deps 的死
+  `context` 字段一并移除）；`WebviewPageId` 改由页面注册表派生。
+
+### 测试与基建（第五轮）
+
+- **测试基建提速**：vitest 由 jsdom 全局一刀切拆分为双工程——仅 webview 侧
+  用例（24 文件）保留 jsdom，宿主侧 39 文件改 node 环境（jsdom 实例化 64→25，
+  全量墙钟 20.3s→约 8s）；gate 第⑦步超时 240s→600s（原值曾紧于慢机实测墙钟，
+  表现为门禁「随机红」）；新增 setupFiles 全用例后清理（stubs + vscode api
+  单例复位上收），逐文件独立性经 67 个 spec 单独运行验证。
+- **盲区补测（63→67 文件 / 688→704 用例）**：taskManager 弹框生命周期与轮询、
+  本地校验拦截；panel 失败路径（branch 空校验 / update 抛错）；树视图图标
+  id 与轮询周期（原断言空转强化）；serverGuard 密码剔除；HTTP 响应契约校验；
+  并发防护与页码钳制；ServerForm / ServerList 组件级与 useConsolePage 直接
+  用例；webviewController 序列化恢复与 open 失败兜底；宿主集成新增串口控制台
+  六命令装配冒烟（原为零覆盖盲区）与 tasks.json e2e-* 残留防护。
 
 ## [3.2.0] - 2026-11-03
 

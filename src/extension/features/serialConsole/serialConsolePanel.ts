@@ -344,14 +344,6 @@ export function createSerialConsoleDeps(
               post({ type: 'error', message: `检测串口失败：${reasonOf(err)}` })
             )
           break
-        case 'serialServersRequest':
-          void services.store
-            .load()
-            .then((loaded) => pushServers(loaded))
-            .catch((err: unknown) =>
-              post({ type: 'error', message: `加载服务器列表失败：${reasonOf(err)}` })
-            )
-          break
         case 'serialServerSave':
           swallow(saveServer(message.draft, message.password))
           break
@@ -367,9 +359,6 @@ export function createSerialConsoleDeps(
         case 'serialSend':
           swallow(sendCommand(message.command))
           break
-        case 'commandHistoryRequest':
-          swallow(pushHistory())
-          break
         case 'commandHistoryRemove':
           swallow(services.history.remove(message.id).then(() => pushHistory()))
           break
@@ -377,7 +366,7 @@ export function createSerialConsoleDeps(
           swallow(services.history.clear().then(() => pushHistory()))
           break
         default:
-          break // ready/dirty/submit/cancel 由控制器处理
+          break // ready/submit 由控制器处理
       }
     },
     onDispose: () => {

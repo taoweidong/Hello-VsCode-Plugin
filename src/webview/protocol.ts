@@ -6,9 +6,9 @@
  * - 宿主与 Webview 共享本文件：禁止 import vscode / DOM / Node 专属 API；
  * - 守卫逐字段窄化：null、缺字段、未知 type 一律拒绝，未知消息只记日志不抛错；
  * - 向后兼容地扩展：新增消息只追加联合分支与守卫 case，不改既有分支形状。
- * - 09 方案阶段 2：importWizard 的 8 条分支（selectFolder / importPreview /
- *   importProgress / importDone / browseFolder / requestPreview / executeImport /
- *   cancelImport）随条目领域删除，当前 22 条 = 通用 7 + 串口 15。
+ * - 第五轮清理（2026-11）：删除六条从未接线 / 随功能退场的消息（dirty / cancel /
+ *   serialServersRequest / commandHistoryRequest / taskCreate / taskUpdate），
+ *   当前 21 条 = 宿主→页面 9 + 页面→宿主 12。
  */
 
 /** init 消息携带的表单字段描述（结构最小集；完整 Schema 由领域层提供，M5-T5.1 接入）。 */
@@ -59,15 +59,41 @@ export interface CommandHistoryWire {
   useCount: number
 }
 
-/** 构建任务状态（与 features/build/buildApiClient 的 BuildTaskStatus 对齐）。 */
-export type BuildTaskStatusWire = 'queued' | 'running' | 'success' | 'failed'
+/** 任务状态（与 features/taskManager/taskApiClient 的 TaskStatus 对齐）。 */
+export type TaskItemStatusWire = 'queued' | 'running' | 'success' | 'failed'
 
-/** 构建任务在协议层的最小结构面（HTTP 接口返回的任务快照，打桩模拟 / 真实接口同形）。 */
-export interface BuildTaskWire {
+/** 任务构建类型（与 taskApiClient 的 TaskBuildType 对齐）。 */
+export type TaskBuildTypeWire = 'full' | 'incremental'
+
+/** 任务查询参数（页面上部查询区 → 宿主分页列表接口）。 */
+export interface TaskQueryWire {
+  keyword?: string
+  status?: TaskItemStatusWire | 'all'
+  buildType?: TaskBuildTypeWire | 'all'
+  page: number
+  pageSize: number
+  /** 允许透传扩展字段 */
+  [extra: string]: unknown
+}
+
+/** 任务分页结果（表格展示 + 分页控件）。 */
+export interface TaskPageWire {
+  items: TaskItemWire[]
+  total: number
+  page: number
+  pageSize: number
+  /** 允许透传扩展字段 */
+  [extra: string]: unknown
+}
+
+/** 任务行类型（HTTP 接口返回的任务快照，打桩模拟 / 真实接口同形）。 */
+export interface TaskItemWire {
   id: string
+  /** 任务名称（列表主显示字段） */
+  name: string
   branch: string
-  buildType: string
-  status: BuildTaskStatusWire
+  buildType: TaskBuildTypeWire
+  status: TaskItemStatusWire
   /** 进度 0-100（queued 为 0） */
   progress: number
   notes?: string
@@ -101,19 +127,15 @@ export type HostMessage =
   | { type: 'serialData'; seq: number; text: string }
   /** 命令历史（MRU 序，已去重） */
   | { type: 'commandHistory'; entries: CommandHistoryWire[] }
-  /** 构建任务列表全量（页面轮询 / 提交后刷新的应答） */
-  | { type: 'buildList'; tasks: BuildTaskWire[] }
+  /** 任务分页列表（页面查询 / 轮询 / 增删改后的刷新应答） */
+  | { type: 'taskList'; page: TaskPageWire }
 
 /** Webview → 宿主 */
 export type WebviewMessage =
   | { type: 'ready' }
-  | { type: 'dirty'; dirty: boolean }
   | { type: 'submit'; draft: Record<string, unknown> }
-  | { type: 'cancel' }
   /** 请求枚举本机串口 */
   | { type: 'serialPortsRequest' }
-  /** 请求服务器列表全量 */
-  | { type: 'serialServersRequest' }
   /** 保存服务器（新增或编辑；password 单独走 SecretStorage，不进 draft 持久化） */
   | { type: 'serialServerSave'; draft: Record<string, unknown>; password?: string }
   /** 删除服务器（同时清理其 SecretStorage 密码） */
@@ -124,14 +146,14 @@ export type WebviewMessage =
   | { type: 'serialDisconnect' }
   /** 下发命令（宿主追加换行符写入串口） */
   | { type: 'serialSend'; command: string }
-  /** 请求命令历史 */
-  | { type: 'commandHistoryRequest' }
   /** 删除单条历史 */
   | { type: 'commandHistoryRemove'; id: string }
   /** 清空历史 */
   | { type: 'commandHistoryClear' }
-  /** 请求构建任务列表全量（页面轮询） */
-  | { type: 'buildListRequest' }
+  /** 查询任务列表（按关键字 / 状态 / 构建类型过滤 + 分页） */
+  | { type: 'taskListRequest'; query: TaskQueryWire }
+  /** 删除任务（按 id → 后端 delete） */
+  | { type: 'taskDelete'; id: string }
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -190,12 +212,13 @@ export function isCommandHistoryWire(v: unknown): v is CommandHistoryWire {
   )
 }
 
-function isBuildTaskWire(v: unknown): v is BuildTaskWire {
+function isTaskItemWire(v: unknown): v is TaskItemWire {
   return (
     isPlainObject(v) &&
     typeof v.id === 'string' &&
+    typeof v.name === 'string' &&
     typeof v.branch === 'string' &&
-    typeof v.buildType === 'string' &&
+    (v.buildType === 'full' || v.buildType === 'incremental') &&
     (v.status === 'queued' ||
       v.status === 'running' ||
       v.status === 'success' ||
@@ -208,6 +231,37 @@ function isBuildTaskWire(v: unknown): v is BuildTaskWire {
   )
 }
 
+function isTaskQueryWire(v: unknown): v is TaskQueryWire {
+  return (
+    isPlainObject(v) &&
+    typeof v.page === 'number' &&
+    typeof v.pageSize === 'number' &&
+    (v.keyword === undefined || typeof v.keyword === 'string') &&
+    (v.status === undefined ||
+      v.status === 'all' ||
+      v.status === 'queued' ||
+      v.status === 'running' ||
+      v.status === 'success' ||
+      v.status === 'failed') &&
+    (v.buildType === undefined || v.buildType === 'all' || isTaskBuildType(v.buildType))
+  )
+}
+
+function isTaskBuildType(v: unknown): v is TaskBuildTypeWire {
+  return v === 'full' || v === 'incremental'
+}
+
+function isTaskPageWire(v: unknown): v is TaskPageWire {
+  return (
+    isPlainObject(v) &&
+    Array.isArray(v.items) &&
+    v.items.every(isTaskItemWire) &&
+    typeof v.total === 'number' &&
+    typeof v.page === 'number' &&
+    typeof v.pageSize === 'number'
+  )
+}
+
 /** 宿主收到消息时先过本守卫，再按 type 分发。 */
 export function isWebviewMessage(v: unknown): v is WebviewMessage {
   if (!isPlainObject(v)) {
@@ -216,15 +270,9 @@ export function isWebviewMessage(v: unknown): v is WebviewMessage {
   switch (v.type) {
     case 'ready':
       return true
-    case 'dirty':
-      return typeof v.dirty === 'boolean'
     case 'submit':
       return isPlainObject(v.draft)
-    case 'cancel':
-      return true
     case 'serialPortsRequest':
-      return true
-    case 'serialServersRequest':
       return true
     case 'serialServerSave':
       return isPlainObject(v.draft) && (v.password === undefined || typeof v.password === 'string')
@@ -236,14 +284,14 @@ export function isWebviewMessage(v: unknown): v is WebviewMessage {
       return true
     case 'serialSend':
       return typeof v.command === 'string'
-    case 'commandHistoryRequest':
-      return true
     case 'commandHistoryRemove':
       return typeof v.id === 'string'
     case 'commandHistoryClear':
       return true
-    case 'buildListRequest':
-      return true
+    case 'taskListRequest':
+      return isTaskQueryWire(v.query)
+    case 'taskDelete':
+      return typeof v.id === 'string'
     default:
       return false
   }
@@ -281,8 +329,8 @@ export function isHostMessage(v: unknown): v is HostMessage {
       return typeof v.seq === 'number' && typeof v.text === 'string'
     case 'commandHistory':
       return Array.isArray(v.entries) && v.entries.every(isCommandHistoryWire)
-    case 'buildList':
-      return Array.isArray(v.tasks) && v.tasks.every(isBuildTaskWire)
+    case 'taskList':
+      return isTaskPageWire(v.page)
     default:
       return false
   }

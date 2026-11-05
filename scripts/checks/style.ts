@@ -25,6 +25,11 @@
  *   7. dist 产物 CSS 禁止站点根绝对资源引用 `url(/…)`（09 方案 §4.2 F2）：
  *      webview 无 <base>、资源根是 dist/webview，`url(/assets/…)` 必 404
  *      （正是 v0.7.0 全图标不显示的病根）；红线锚在构建产物上防回归。
+ *   8. 禁止 .vue / .ts 源码调用浏览器模态 `window.confirm / alert / prompt`
+ *      （第五轮评估 P0：webview 沙箱 iframe 无 allow-modals，模态被静默忽略——
+ *      confirm 恒返回 false，依赖它的删除 / 重置在真实产品里永远无法执行；
+ *      确认交互一律改用页内两段式布防确认 composables/useTwoStepConfirm.ts
+ *      或经宿主 showWarningMessage 模态，agent.md 硬性规约 9）。
  * 违规统一收集「文件:行」后一次性 assert 抛出（fail-fast 由门禁步骤捕获）。
  */
 import assert from 'node:assert'
@@ -74,6 +79,8 @@ const DIST_FORBIDDEN_RE = /\beval\s*\(|new Function|unsafe-eval|unsafe-inline/
 const DIST_ROOT_ABSOLUTE_URL_RE = /url\(\s*['"]?\//
 /** 模板静态 style 属性（07 R-E-12；`:style` / `v-bind:style` 前缀字符排除，不误伤 CSSOM 绑定）。 */
 const STATIC_STYLE_ATTR_RE = /(?<![:\w-])style\s*=\s*['"]/
+/** 浏览器模态调用（第五轮评估 P0 / agent.md 硬性规约 9；webview 沙箱下恒被忽略）。 */
+const BROWSER_MODAL_RE = /\bwindow\s*\.\s*(?:confirm|alert|prompt)\s*\(/
 
 interface WebviewSourceFile {
   /** 相对 src/webview 的 POSIX 路径（用于错误信息与豁免判定）。 */
@@ -249,6 +256,13 @@ export function checkWebviewStyle(root: string): void {
         }
         if (/\binnerHTML\b/.test(lines[i])) {
           violations.push(`${file.rel}:${i + 1} 禁止 innerHTML 赋值（XSS 面，04 §9.2）`)
+        }
+        // 规则 8：浏览器模态在 webview 沙箱下恒被静默忽略（第五轮评估 P0）
+        if (BROWSER_MODAL_RE.test(lines[i])) {
+          violations.push(
+            `${file.rel}:${i + 1} 禁止浏览器模态 confirm/alert/prompt（webview 沙箱下恒被忽略，` +
+              `确认交互改用 useTwoStepConfirm 两段式布防或宿主 showWarningMessage；agent.md 规约 9）`
+          )
         }
       }
     }
