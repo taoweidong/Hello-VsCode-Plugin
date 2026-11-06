@@ -26,7 +26,6 @@
 | `--ui-surface`                                          | `editorWidget-background`（回退 `editor-background`）             | 卡片 / 分组面板               |
 | `--ui-surface-hover`                                    | `list-hoverBackground`                                            | 列表 / 工具栏项 hover         |
 | `--ui-surface-selected`                                 | `list-activeSelectionBackground`                                  | 选中态                        |
-| `--ui-fg-selected`                                      | `list-activeSelectionForeground`                                  | 选中文字                      |
 | `--ui-border`                                           | `widget-border`（回退 `panel-border`）                            | 分隔线 / 卡片描边             |
 | `--ui-input-bg`                                         | `input-background`                                                | 输入控件背景                  |
 | `--ui-input-fg`                                         | `input-foreground`                                                | 输入文字                      |
@@ -37,12 +36,15 @@
 | `--ui-btn-bg-hover`                                     | `button-hoverBackground`                                          | 主按钮 hover                  |
 | `--ui-btn2-bg` / `--ui-btn2-fg` / `--ui-btn2-hover`     | `button-secondaryBackground` / `-Foreground` / `-HoverBackground` | 次按钮                        |
 | `--ui-focus`                                            | `focusBorder`                                                     | 焦点环                        |
+| `--ui-progress`                                         | `progressBar-background`（回退 `--ui-focus`）                     | 进度条填充                    |
 | `--ui-error`                                            | `errorForeground`                                                 | 错误文字 / 必填星号           |
-| `--ui-error-border` / `--ui-error-bg`                   | `inputValidation-errorBorder` / `-errorBackground`                | 校验错误态                    |
+| `--ui-error-border`                                     | `inputValidation-errorBorder`                                     | 校验错误描边                  |
+| `--ui-success`                                          | `testingIconPassed`（回退 `charts-green`）                        | 成功反馈                      |
+| `--ui-dialog-scrim`                                     | 常量 `rgba(0, 0, 0, 0.35)`                                        | 模态遮罩                      |
 | `--ui-check-bg` / `--ui-check-border` / `--ui-check-fg` | `checkbox-background` / `checkbox-border` / `checkbox-foreground` | 复选框                        |
+| `--ui-check-selected`                                   | `checkbox-select-background`（回退 `--ui-focus`）                 | 复选框选中色                  |
 | `--ui-badge-bg` / `--ui-badge-fg`                       | `badge-background` / `badge-foreground`                           | 计数徽标                      |
-| `--ui-link` / `--ui-link-active`                        | `textLink-foreground` / `textLink-activeForeground`               | 链接                          |
-| `--ui-kbd-border` / `--ui-kbd-bg` / `--ui-kbd-fg`       | `keybindingLabel-border` / `-background` / `-foreground`          | 键帽提示                      |
+| `--ui-link`                                             | `textLink-foreground`                                             | 链接                          |
 | `--ui-font`                                             | `font-family`                                                     | 全局字体                      |
 | `--ui-font-size`                                        | `font-size`（回退 13px）                                          | 正文字号                      |
 | `--ui-motion`                                           | `0.1s ease`（常量）                                               | 过渡                          |
@@ -147,6 +149,17 @@
 | 设置页（特性配置） | 720px          | 分组卡片（`--ui-surface` + 1px 边框）+ 开关列表     |
 | 向导页（批量导入） | 960px          | 步骤条（muted 当前高亮）+ 内容 + 上一步/下一步/执行 |
 | 画廊页（开发）     | 全宽           | 组件 × 状态 × 主题区块网格                          |
+
+### 5.1 窄面板响应式降级（v3.3.1 登记）
+
+面板可被分屏 / 侧边停靠压窄，全宽页必须有降级出口，宁滚不挤：
+
+- 断点写裸 px（媒体查询非尺寸声明，不受 §9.4 令牌门禁约束；同 AppShell 400px 先例）；
+- taskManager：筛选区 ≤840px 关键字占整行、其余两列排布，≤480px 单列；
+  八列表格 `min-width: var(--ui-task-table-min-width)` 外包横向滚动容器；
+  分页栏 `flex-wrap: wrap`；
+- serialConsole：双栏 ≤760px 堆叠为单列（左栏解除固定宽），状态条 `flex-wrap: wrap`；
+- 数据表行悬停 `--ui-surface-hover`（对齐 §4.9 VTable 行 hover 规格）。
 
 ## 6. 图标策略（ADR-13）
 

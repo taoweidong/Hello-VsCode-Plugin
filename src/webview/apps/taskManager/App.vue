@@ -48,10 +48,10 @@ function post(message: unknown): void {
 }
 
 const STATUS_META: Record<TaskItemStatusWire, { label: string; cls: string }> = {
-  queued: { label: '排队中', cls: 'status--queued' },
-  running: { label: '运行中', cls: 'status--running' },
-  success: { label: '成功', cls: 'status--success' },
-  failed: { label: '失败', cls: 'status--failed' },
+  queued: { label: '排队中', cls: 'task-status--queued' },
+  running: { label: '运行中', cls: 'task-status--running' },
+  success: { label: '成功', cls: 'task-status--success' },
+  failed: { label: '失败', cls: 'task-status--failed' },
 }
 
 const BUILD_TYPE_LABEL: Record<TaskBuildTypeWire, string> = {
@@ -347,82 +347,87 @@ function progressWidth(task: TaskItemWire): string {
         </span>
       </div>
 
-      <table class="task-table">
-        <thead>
-          <tr>
-            <th scope="col">任务名称</th>
-            <th scope="col">分支</th>
-            <th scope="col">类型</th>
-            <th scope="col">状态</th>
-            <th scope="col">进度</th>
-            <th scope="col">信息 / 备注</th>
-            <th scope="col">创建时间</th>
-            <th scope="col">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="loading && items.length === 0">
-            <td class="task-table__placeholder" colspan="8"><VLoading label="加载任务列表…" /></td>
-          </tr>
-          <tr v-else-if="items.length === 0">
-            <td class="task-table__placeholder" colspan="8">
-              <VEmptyState
-                title="暂无任务"
-                description="调整查询条件，或新建一个任务。"
-                icon="info"
-              >
-                <template #action>
-                  <VButton variant="primary" icon="add" title="新建任务" @click="openCreate">
-                    新建任务
-                  </VButton>
-                </template>
-              </VEmptyState>
-            </td>
-          </tr>
-          <template v-else>
-            <tr v-for="task in items" :key="task.id" class="task-row">
-              <td class="task-row__name">{{ task.name }}</td>
-              <td class="task-row__branch">{{ task.branch }}</td>
-              <td class="task-row__type">
-                {{ BUILD_TYPE_LABEL[task.buildType] ?? task.buildType }}
-              </td>
-              <td class="task-row__status">
-                <span class="task-status" :class="STATUS_META[task.status].cls">
-                  {{ STATUS_META[task.status].label }}
-                </span>
-              </td>
-              <td class="task-row__progress">
-                <div
-                  class="task-progress"
-                  role="progressbar"
-                  :aria-valuenow="task.progress"
-                  aria-valuemin="0"
-                  aria-valuemax="100"
-                >
-                  <div class="task-progress__bar" :style="{ width: progressWidth(task) }"></div>
-                </div>
-                <span class="task-progress__text">{{ task.progress }}%</span>
-              </td>
-              <td class="task-row__message">
-                <span v-if="task.message" class="task-row__message-text">{{ task.message }}</span>
-                <span v-else-if="task.notes" class="task-row__notes">{{ task.notes }}</span>
-                <span v-else class="task-row__notes muted">—</span>
-              </td>
-              <td class="task-row__time">{{ formatTime(task.createdAt) }}</td>
-              <td class="task-row__actions">
-                <VButton variant="icon" icon="edit" title="编辑任务" @click="openEdit(task)" />
-                <VButton
-                  variant="icon"
-                  :icon="deleteConfirm.isArmed(task.id) ? 'warning' : 'delete'"
-                  :title="deleteConfirm.isArmed(task.id) ? '再次点击确认删除' : '删除任务'"
-                  :class="{ 'task-row__delete--armed': deleteConfirm.isArmed(task.id) }"
-                  @click="confirmDelete(task)"
-                />
+      <!-- 横向滚动容器：八列表格在窄面板下保列宽可读，宁滚不挤 -->
+      <div class="task-table-scroll">
+        <table class="task-table">
+          <thead>
+            <tr>
+              <th scope="col">任务名称</th>
+              <th scope="col">分支</th>
+              <th scope="col">类型</th>
+              <th scope="col">状态</th>
+              <th scope="col">进度</th>
+              <th scope="col">信息 / 备注</th>
+              <th scope="col">创建时间</th>
+              <th scope="col">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="loading && items.length === 0">
+              <td class="task-table__placeholder" colspan="8">
+                <VLoading label="加载任务列表…" />
               </td>
             </tr>
-          </template>
-        </tbody>
-      </table>
+            <tr v-else-if="items.length === 0">
+              <td class="task-table__placeholder" colspan="8">
+                <VEmptyState
+                  title="暂无任务"
+                  description="调整查询条件，或新建一个任务。"
+                  icon="info"
+                >
+                  <template #action>
+                    <VButton variant="primary" icon="add" title="新建任务" @click="openCreate">
+                      新建任务
+                    </VButton>
+                  </template>
+                </VEmptyState>
+              </td>
+            </tr>
+            <template v-else>
+              <tr v-for="task in items" :key="task.id" class="task-row">
+                <td class="task-row__name">{{ task.name }}</td>
+                <td class="task-row__branch">{{ task.branch }}</td>
+                <td class="task-row__type">
+                  {{ BUILD_TYPE_LABEL[task.buildType] ?? task.buildType }}
+                </td>
+                <td class="task-row__status">
+                  <span class="task-status" :class="STATUS_META[task.status].cls">
+                    {{ STATUS_META[task.status].label }}
+                  </span>
+                </td>
+                <td class="task-row__progress">
+                  <div
+                    class="task-progress"
+                    role="progressbar"
+                    :aria-valuenow="task.progress"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                  >
+                    <div class="task-progress__bar" :style="{ width: progressWidth(task) }"></div>
+                  </div>
+                  <span class="task-progress__text">{{ task.progress }}%</span>
+                </td>
+                <td class="task-row__message">
+                  <span v-if="task.message" class="task-row__message-text">{{ task.message }}</span>
+                  <span v-else-if="task.notes" class="task-row__notes">{{ task.notes }}</span>
+                  <span v-else class="task-row__notes muted">—</span>
+                </td>
+                <td class="task-row__time">{{ formatTime(task.createdAt) }}</td>
+                <td class="task-row__actions">
+                  <VButton variant="icon" icon="edit" title="编辑任务" @click="openEdit(task)" />
+                  <VButton
+                    variant="icon"
+                    :icon="deleteConfirm.isArmed(task.id) ? 'warning' : 'delete'"
+                    :title="deleteConfirm.isArmed(task.id) ? '再次点击确认删除' : '删除任务'"
+                    :class="{ 'task-row__delete--armed': deleteConfirm.isArmed(task.id) }"
+                    @click="confirmDelete(task)"
+                  />
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
 
       <!-- 分页 -->
       <nav class="task-pagination" aria-label="分页">
@@ -494,6 +499,28 @@ function progressWidth(task: TaskItemWire): string {
   margin-bottom: var(--ui-space-4);
 }
 
+/* 排版优化：窄面板降级——关键字占整行、其余两列排布，避免五列互相挤压。
+   断点为裸 px（媒体查询非尺寸声明，不受令牌门禁约束；同 AppShell 400px 先例） */
+@media (max-width: 840px) {
+  .task-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .task-filters > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 480px) {
+  .task-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .task-filters > :last-child {
+    justify-self: start;
+  }
+}
+
 .task-feedback {
   margin: 0 0 var(--ui-space-3);
   padding: var(--ui-space-1) var(--ui-space-2);
@@ -536,8 +563,13 @@ function progressWidth(task: TaskItemWire): string {
   margin-left: auto;
 }
 
+.task-table-scroll {
+  overflow-x: auto;
+}
+
 .task-table {
   width: 100%;
+  min-width: var(--ui-task-table-min-width);
   border-collapse: collapse;
   font-size: 0.92em;
 }
@@ -565,9 +597,13 @@ function progressWidth(task: TaskItemWire): string {
   text-align: center;
 }
 
+.task-row:hover {
+  background: var(--ui-surface-hover);
+}
+
 .task-row__name {
   font-weight: 600;
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .task-row__branch,
@@ -603,9 +639,22 @@ function progressWidth(task: TaskItemWire): string {
   display: inline-flex;
   align-items: center;
   gap: var(--ui-space-1);
-  padding: 2px var(--ui-space-1);
+  padding: var(--ui-task-status-pad-y) var(--ui-space-1);
   border-radius: var(--ui-radius);
   background: var(--ui-surface-hover);
+}
+
+/* 排版优化：状态按语义着色（此前四种状态视觉无差别，只能靠文字区分） */
+.task-status--queued {
+  color: var(--ui-fg-muted);
+}
+
+.task-status--success {
+  color: var(--ui-success);
+}
+
+.task-status--failed {
+  color: var(--ui-error);
 }
 
 .task-status--running::before {
@@ -648,6 +697,7 @@ function progressWidth(task: TaskItemWire): string {
 
 .task-pagination {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--ui-space-3);
   padding: var(--ui-space-2) var(--ui-space-3);

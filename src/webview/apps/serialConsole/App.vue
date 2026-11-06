@@ -352,6 +352,22 @@ watch(
   gap: var(--ui-space-3);
 }
 
+/* 排版优化：窄面板（分屏 / 侧边停靠）下双栏堆叠为单列，左栏不再挤压右栏。
+   断点为裸 px（媒体查询非尺寸声明，不受令牌门禁约束；同 AppShell 400px 先例） */
+@media (max-width: 760px) {
+  .console {
+    flex-direction: column;
+  }
+
+  .console__side {
+    width: auto;
+  }
+
+  .console__side-section--form {
+    max-height: none;
+  }
+}
+
 .console__side-section {
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
@@ -373,6 +389,7 @@ watch(
 
 .console__statusbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--ui-space-2);
 }

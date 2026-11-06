@@ -4,6 +4,30 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.3.1] - 2026-11-06
+
+### 修复
+
+- **任务管理「运行中」状态动画从未生效**：`STATUS_META` 产出的类名
+  `status--running` 与样式选择器 `.task-status--running` 不匹配，运行中任务的
+  脉冲圆点从未渲染。统一为 `task-status--*`。
+
+### 优化（界面排版）
+
+- **任务管理**：筛选参数区窄面板降级（≤840px 关键字占整行、≤480px 单列堆叠）；
+  八列表格最小宽 720px（新令牌 `--ui-task-table-min-width`）+ 横向滚动容器——
+  窄面板宁滚不挤；分页栏可换行；状态徽标按语义着色（排队灰 / 成功绿 / 失败红，
+  补登记 `--ui-task-status-pad-y`）；数据行悬停底色；任务名 `overflow-wrap`
+  替代 `word-break: break-all`（英文单词不再断在字符中间）。
+- **串口控制台**：双栏布局 ≤760px 堆叠为单列（分屏 / 侧边停靠不再挤压右栏），
+  状态条可换行。
+- **文档与代码架构一致性校正**：设计系统 04 §2 令牌表双向对齐——补收
+  `--ui-progress` / `--ui-success` / `--ui-dialog-scrim` / `--ui-check-selected`
+  四个已登记令牌，移除从未落地的 `--ui-fg-selected` / `--ui-error-bg` /
+  `--ui-link-active` / `--ui-kbd-*` 幽灵行；新增 §5.1 窄面板响应式降级规格；
+  开发指南 06 同步 `WEBVIEW_PAGES` 页面清单（补 taskManager）、组件数（13→12）
+  与 e2e 用例清单。
+
 ## [3.3.0] - 2026-11-05
 
 ### 新增（任务管理 CRUD 实例）

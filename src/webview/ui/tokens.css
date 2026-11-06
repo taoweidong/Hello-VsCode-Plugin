@@ -109,6 +109,8 @@
   --ui-task-progress-radius: 3px; /* 进度条轨道圆角 */
   --ui-task-select-min-width: 120px; /* 分页每页条数下拉最小宽 */
   --ui-task-action-size: 28px; /* 弹框内图标按钮尺寸 */
+  --ui-task-table-min-width: 720px; /* 八列表格最小宽：窄面板横向滚动而非挤压列 */
+  --ui-task-status-pad-y: 2px; /* 状态徽标垂直内边距（原 2px 字面量混写，同 chip 登记口径） */
 }
 
 /* 页面基础样式：正文 13px、行高 1.5、背景透明跟随宿主 */
