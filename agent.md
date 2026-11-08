@@ -14,8 +14,9 @@
 - **仓库**：https://github.com/taoweidong/Hello-VsCode-Plugin
 - **扩展内品牌**：Hello VSCode Plugin / Hello VSCode 插件（ID 前缀 `extStarter`，manifest 文案走
   `package.nls*.json` 的 `%key%` 占位符）。总览事实源是根目录 `README.md`（精简版，
-  详情在四层文档）；**文档总入口**是 `docs/README.md`（四层：操作指导 /
-  功能介绍 / 开发指南 / 设计与决策），按功能的二次开发文档在 `docs/开发指南/`。
+  详情在 docs 五层文档）；**文档总入口**是 `docs/README.md`（五层 + 历史归档：
+  操作指导 / 功能介绍 / 基础系统介绍 / 设计架构 / 开发指南 / 需求与优化方案），
+  按功能的二次开发文档在 `docs/开发指南/`。
 
 ## 一键式质量门禁（强制）
 
