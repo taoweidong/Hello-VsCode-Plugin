@@ -1,7 +1,7 @@
 <svg width="900" height="560" viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif">
   <rect width="900" height="560" rx="8" fill="#3c3c3c"/>
   <rect width="900" height="34" rx="8" fill="#3c3c3c"/>
-  <text x="450" y="22" fill="#cccccc" font-size="13" text-anchor="middle">扩展开发宿主 — Hello VSCode 插件 侧边栏（5 个视图）</text>
+  <text x="450" y="22" fill="#cccccc" font-size="13" text-anchor="middle">扩展开发宿主 — Hello VSCode 插件 侧边栏（6 个视图）</text>
 
   <rect y="34" width="52" height="526" fill="#333333"/>
   <rect x="10" y="60" width="32" height="32" rx="4" fill="#094771" stroke="#0098ff"/>
@@ -22,57 +22,69 @@
     <text x="240" y="50" fill="#cccccc" font-size="11">▸ 📄</text>
     <text x="274" y="50" fill="#cccccc" font-size="11">↻</text>
     <g font-size="12">
-      <text x="70" y="76" fill="#c5c5c5">▼ 🕐 最近运行</text>
-      <text x="96" y="96" fill="#e6e6e6">↑ npm: build</text>
-      <text x="70" y="116" fill="#c5c5c5">▼ ★ 收藏</text>
-      <text x="96" y="136" fill="#e6e6e6">— npm: lint</text>
-      <text x="70" y="156" fill="#c5c5c5">▼ 📦 tasks.json</text>
-      <text x="96" y="176" fill="#e6e6e6">— npm: compile</text>
-      <text x="96" y="196" fill="#858585">单击条目 = 运行 · 右键更多操作</text>
+      <text x="70" y="72" fill="#c5c5c5">▼ 🕐 最近运行</text>
+      <text x="96" y="90" fill="#e6e6e6">↑ npm: build</text>
+      <text x="70" y="108" fill="#c5c5c5">▼ 📦 tasks.json</text>
+      <text x="96" y="126" fill="#e6e6e6">— npm: compile</text>
+      <text x="96" y="144" fill="#858585">单击条目 = 运行 · 右键更多操作</text>
     </g>
   </g>
 
   <g>
-    <text x="64" y="220" fill="#bbbbbb" font-size="11" font-weight="bold">环境信息</text>
-    <text x="274" y="220" fill="#cccccc" font-size="11">↻ 📄</text>
-    <text x="70" y="240" fill="#858585" font-size="11">▸ 环境检测 · 正常 · 447ms · 单项可重检</text>
+    <text x="64" y="168" fill="#bbbbbb" font-size="11" font-weight="bold">收藏夹</text>
+    <text x="252" y="168" fill="#cccccc" font-size="11">⭐</text>
+    <text x="274" y="168" fill="#cccccc" font-size="11">↻</text>
+    <g font-size="12">
+      <text x="70" y="188" fill="#e6e6e6">📄 首页</text>
+      <text x="180" y="188" fill="#858585">src/index.ts</text>
+      <text x="70" y="206" fill="#e6e6e6">📁 组件库</text>
+      <text x="180" y="206" fill="#858585">src/components</text>
+      <text x="96" y="224" fill="#858585">单击直达 · 别名右键可改</text>
+    </g>
   </g>
 
   <g>
-    <text x="64" y="264" fill="#bbbbbb" font-size="11" font-weight="bold">环境初始化</text>
-    <text x="274" y="264" fill="#cccccc" font-size="11">▶ ☑</text>
-    <text x="70" y="284" fill="#858585" font-size="11">▸ 3 个步骤 · 单步可重跑 · 失败不阻断</text>
+    <text x="64" y="248" fill="#bbbbbb" font-size="11" font-weight="bold">环境信息</text>
+    <text x="274" y="248" fill="#cccccc" font-size="11">↻ 📄</text>
+    <text x="70" y="266" fill="#858585" font-size="11">▸ 环境检测 · 正常 · 447ms · 单项可重检</text>
   </g>
 
   <g>
-    <text x="64" y="308" fill="#bbbbbb" font-size="11" font-weight="bold">任务管理</text>
-    <text x="274" y="308" fill="#cccccc" font-size="11">↻</text>
-    <text x="70" y="328" fill="#858585" font-size="11">▸ 单击条目打开任务管理面板</text>
+    <text x="64" y="290" fill="#bbbbbb" font-size="11" font-weight="bold">环境初始化</text>
+    <text x="274" y="290" fill="#cccccc" font-size="11">▶ ☑</text>
+    <text x="70" y="308" fill="#858585" font-size="11">▸ 3 个步骤 · 单步可重跑 · 失败不阻断</text>
   </g>
 
   <g>
-    <text x="64" y="352" fill="#bbbbbb" font-size="11" font-weight="bold">串口服务器</text>
-    <text x="252" y="352" fill="#cccccc" font-size="11">＋</text>
-    <text x="274" y="352" fill="#cccccc" font-size="11">↻</text>
-    <text x="70" y="372" fill="#858585" font-size="11">▸ 服务器列表 · 单击连接并打开控制台</text>
+    <text x="64" y="332" fill="#bbbbbb" font-size="11" font-weight="bold">任务管理</text>
+    <text x="274" y="332" fill="#cccccc" font-size="11">↻</text>
+    <text x="70" y="352" fill="#858585" font-size="11">▸ 单击条目打开任务管理面板</text>
+  </g>
+
+  <g>
+    <text x="64" y="376" fill="#bbbbbb" font-size="11" font-weight="bold">串口服务器</text>
+    <text x="252" y="376" fill="#cccccc" font-size="11">＋</text>
+    <text x="274" y="376" fill="#cccccc" font-size="11">↻</text>
+    <text x="70" y="396" fill="#858585" font-size="11">▸ 服务器列表 · 单击连接并打开控制台</text>
   </g>
 
   <rect x="340" y="34" width="560" height="492" fill="#1e1e1e"/>
-  <text x="620" y="120" fill="#dcdcaa" font-size="16" text-anchor="middle" font-weight="bold">五个视图一览</text>
+  <text x="620" y="120" fill="#dcdcaa" font-size="16" text-anchor="middle" font-weight="bold">六个视图一览</text>
   <g font-size="13" fill="#cccccc">
-    <text x="400" y="170">① 任务管理器 —— 工作区 tasks.json 任务树（运行/停止/收藏/定位）</text>
-    <text x="400" y="204">② 环境信息 —— 激活时自动检测 Python / Node / Git 等</text>
-    <text x="400" y="238">③ 环境初始化 —— 步骤清单，单击执行单步或全部</text>
-    <text x="400" y="272">④ 任务管理 —— CRUD 分页表格（HTTP 打桩 / 真实接口）</text>
-    <text x="400" y="306">⑤ 串口服务器 —— 服务器管理 + 串口控制台下发命令</text>
+    <text x="400" y="166">① 任务管理器 —— 工作区 tasks.json 任务树（运行/停止/收藏/定位）</text>
+    <text x="400" y="196">② 收藏夹 —— 文件/文件夹路径收藏：别名、单击直达（v3.4）</text>
+    <text x="400" y="226">③ 环境信息 —— 激活时自动检测 Python / Node / Git 等</text>
+    <text x="400" y="256">④ 环境初始化 —— 步骤清单，单击执行单步或全部</text>
+    <text x="400" y="286">⑤ 任务管理 —— CRUD 分页表格（HTTP 打桩 / 真实接口）</text>
+    <text x="400" y="316">⑥ 串口服务器 —— 服务器管理 + 串口控制台下发命令</text>
   </g>
-  <rect x="380" y="340" width="480" height="150" rx="6" fill="#252526" stroke="#414141"/>
-  <text x="396" y="366" fill="#dcdcaa" font-size="12" font-weight="bold">💡 建议的体验顺序</text>
-  <text x="396" y="388" fill="#cccccc" font-size="12">先看 ② 环境信息、③ 环境初始化（激活即自动执行），</text>
-  <text x="396" y="408" fill="#cccccc" font-size="12">再玩 ① 任务管理器、④ 任务管理（查询 + 表格增删改查），</text>
-  <text x="396" y="428" fill="#cccccc" font-size="12">最后 ⑤ 串口服务器（录入后连接下发命令）。</text>
-  <text x="396" y="456" fill="#858585" font-size="12">另有 3 个 Webview 页面（组件画廊 / 串口控制台 / 任务管理）；</text>
-  <text x="396" y="476" fill="#858585" font-size="12">视图标题栏按钮随视图切换（when 条件门禁已校验）。</text>
+  <rect x="380" y="348" width="480" height="142" rx="6" fill="#252526" stroke="#414141"/>
+  <text x="396" y="374" fill="#dcdcaa" font-size="12" font-weight="bold">💡 建议的体验顺序</text>
+  <text x="396" y="396" fill="#cccccc" font-size="12">先看 ③ 环境信息、④ 环境初始化（激活即自动执行），</text>
+  <text x="396" y="416" fill="#cccccc" font-size="12">再玩 ② 收藏夹（右键添加、单击直达）、① 任务管理器、⑤ 任务管理，</text>
+  <text x="396" y="436" fill="#cccccc" font-size="12">最后 ⑥ 串口服务器（录入后连接下发命令）。</text>
+  <text x="396" y="462" fill="#858585" font-size="12">另有 3 个 Webview 页面（组件画廊 / 串口控制台 / 任务管理）；</text>
+  <text x="396" y="480" fill="#858585" font-size="12">视图标题栏按钮随视图切换（when 条件门禁已校验）。</text>
 
   <rect y="526" width="900" height="34" fill="#007acc"/>
   <text x="16" y="548" fill="#ffffff" font-size="12">⎇ main</text>

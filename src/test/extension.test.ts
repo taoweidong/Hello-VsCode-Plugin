@@ -1020,3 +1020,30 @@ ${fileB.fsPath}`
     })
   })
 })
+
+suite('收藏夹（v3.4 集成冒烟）', () => {
+  test('7 条收藏夹命令全部注册', async () => {
+    const commands = new Set(await vscode.commands.getCommands())
+    for (const id of [
+      'extStarter.addFavorite',
+      'extStarter.quickOpenFavorites',
+      'extStarter.openFavorite',
+      'extStarter.revealFavorite',
+      'extStarter.copyFavoritePath',
+      'extStarter.renameFavorite',
+      'extStarter.removeFavorite',
+    ]) {
+      assert.ok(commands.has(id), `命令未注册：${id}`)
+    }
+  })
+
+  test('收藏夹视图存在且命令可执行（真实宿主出现视图容器分组）', async () => {
+    // 视图存在性以清单一致性与激活无错为前提；此处验证命令面真实可执行
+    await assert.doesNotReject(async () => {
+      await vscode.commands.executeCommand('extStarter.quickOpenFavorites')
+    })
+    await assert.doesNotReject(async () => {
+      await vscode.commands.executeCommand('extStarter.addFavorite')
+    })
+  })
+})

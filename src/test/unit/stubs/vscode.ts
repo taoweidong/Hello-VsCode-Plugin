@@ -645,6 +645,15 @@ export const workspace = {
     return new Disposable(() => workspaceFoldersListeners.delete(listener))
   },
   asRelativePath: (pathOrUri: unknown): string => String(pathOrUri),
+  /** 按路径前缀匹配所属工作区文件夹（多根取最深匹配；v3.4 收藏夹服务用） */
+  getWorkspaceFolder: (uri: Uri): { uri: Uri; name: string; index: number } | undefined =>
+    workspace.workspaceFolders
+      ?.filter((folder) => {
+        const root = folder.uri.fsPath
+        const prefix = root.endsWith(nodePath.sep) ? root : root + nodePath.sep
+        return uri.fsPath === root || uri.fsPath.startsWith(prefix)
+      })
+      .sort((a, b) => b.uri.fsPath.length - a.uri.fsPath.length)[0],
   findFiles: async (): Promise<Uri[]> => [],
   /** 假文本文档：内容经 __setDocument 注入；未注入的 uri 视为文件不存在（FileNotFound） */
   openTextDocument: async (target: Uri | string): Promise<unknown> => {

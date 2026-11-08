@@ -1,11 +1,13 @@
 import * as vscode from 'vscode'
 import type { DraftBoxService } from '../features/drafts/draftBoxService'
+import type { FavoritesService } from '../features/favorites/favoritesService'
 import type { InitService } from '../features/init/initService'
 import type { SerialConsoleController } from '../features/serialConsole/serialConsoleController'
 import type { TaskExplorerController } from '../features/taskExplorer/taskExplorerController'
 import type { TaskRunner } from '../tasks/taskRunner'
 import { registerCopyCommands } from './copyCommands'
 import { registerDraftCommands } from './draftCommands'
+import { registerFavoritesCommands } from './favoritesCommands'
 import { registerPageCommands } from './pageCommands'
 import { registerSerialConsoleCommands } from './serialConsoleCommands'
 import { registerTaskExplorerCommands } from './taskExplorerCommands'
@@ -28,6 +30,8 @@ export interface CommandDeps {
   recheckEnvironmentItem: (label: string) => Promise<void>
   /** 任务管理器（v2.3：工作区 .vscode/tasks.json 任务视图，10 方案） */
   taskExplorer: TaskExplorerController
+  /** 收藏夹（v3.4：文件/文件夹路径收藏 + 别名 + 单击跳转，13 方案） */
+  favorites: FavoritesService
 }
 
 /**
@@ -48,4 +52,5 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
   registerDraftCommands(register, { drafts: deps.drafts })
   registerCopyCommands(register) // v2.2：拷贝示例（无宿主依赖，剪贴板即全部）
   registerTaskExplorerCommands(register, { controller: deps.taskExplorer }) // v2.3：任务管理器
+  registerFavoritesCommands(register, { favorites: deps.favorites }) // v3.4：收藏夹
 }

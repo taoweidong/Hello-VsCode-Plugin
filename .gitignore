@@ -16,6 +16,8 @@ release/
 .crud-starter/
 # 草稿箱数据文件（09 方案 §3.5/B3：右键示例新载体，前缀改名前后均覆盖）
 .vscode/*.drafts.json
+# 收藏夹数据文件（v3.4，13 方案：文件/文件夹路径收藏）
+.vscode/favorites.json
 
 # 测试与覆盖率产物（M6：vitest coverage / Playwright）
 coverage/

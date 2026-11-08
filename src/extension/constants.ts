@@ -49,6 +49,11 @@ export const VIEW = {
   taskExplorerTaskRunningFavoriteContextValue: 'workspaceTaskRunningFavorite',
   /** 任务 label 按 - 分段产生的虚拟文件夹节点（v2.4，仅展示分组，不可运行） */
   taskExplorerTaskFolderContextValue: 'taskExplorerTaskFolder',
+
+  /** 收藏夹树视图 ID（v3.4：文件/文件夹路径收藏，13 方案） */
+  favoritesViewId: 'extStarter.favoritesView',
+  /** 收藏条目的 contextValue */
+  favoriteContextValue: 'favorite',
 } as const
 
 /**
@@ -127,6 +132,23 @@ export const COMMAND = {
   removeTaskFromFavorites: 'extStarter.removeTaskFromFavorites',
   /** 清空最近运行（模态确认；只清 recent，不影响收藏） */
   clearRecentTasks: 'extStarter.clearRecentTasks',
+
+  // 收藏夹（v3.4：文件/文件夹路径收藏 + 别名 + 单击跳转，13 方案；
+  // 与任务管理器的「任务收藏」addTaskToFavorites 正交——那个收藏的是 tasks.json 任务）
+  /** 添加到收藏夹（资源管理器右键文件/文件夹单选多选、编辑器右键/标题栏当前文件） */
+  addFavorite: 'extStarter.addFavorite',
+  /** 快速打开收藏（QuickPick；命令面板 + 收藏夹视图标题栏） */
+  quickOpenFavorites: 'extStarter.quickOpenFavorites',
+  /** 打开收藏项（文件→编辑器；文件夹→资源管理器 reveal；树条目单击路由） */
+  openFavorite: 'extStarter.openFavorite',
+  /** 在资源管理器中显示收藏项（条目右键） */
+  revealFavorite: 'extStarter.revealFavorite',
+  /** 复制收藏项解析后的绝对路径（条目右键） */
+  copyFavoritePath: 'extStarter.copyFavoritePath',
+  /** 重命名收藏别名（条目右键；输入框预填现别名） */
+  renameFavorite: 'extStarter.renameFavorite',
+  /** 移除收藏（条目右键 + inline 悬停删除按钮；无需确认，可重新添加） */
+  removeFavorite: 'extStarter.removeFavorite',
 } as const
 
 /**
@@ -179,4 +201,11 @@ export const STORAGE = {
   draftsFileName: '.vscode/ext-starter.drafts.json',
   /** 任务管理器最近运行/收藏（workspaceState，按工作区隔离；v2.3） */
   taskExplorerUsageKey: 'extStarter.taskExplorer.usage',
+  /**
+   * 收藏夹数据文件（相对工作区根；v3.4，13 方案）。
+   * 已同步进 .gitignore。
+   */
+  favoritesFileName: '.vscode/favorites.json',
+  /** 收藏夹：未打开工作区时，globalState 的存储键 */
+  favoritesMementoKey: 'extStarter.favorites',
 } as const

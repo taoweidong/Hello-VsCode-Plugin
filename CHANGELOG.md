@@ -4,6 +4,34 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.4.0] - 2026-11-08
+
+### 新增（收藏夹）
+
+- **「收藏夹」侧边栏视图**（第 6 视图，设计方案见
+  [需求与优化方案 13](docs/需求与优化方案/13-收藏夹设计方案.md)）：
+  - **任意文件 / 文件夹路径收藏**：资源管理器右键（单选 / 多选批量）、编辑器右键、
+    编辑器标题栏当前文件 → 「添加到收藏夹」；
+  - **别名**：单个添加弹输入框（默认 basename，可留空），批量添加用 basename，
+    条目右键随时重命名；列表 label 显示别名、description 显示存储路径；
+  - **单击直达**：文件 → 编辑器打开；文件夹 → 资源管理器 reveal；
+    另有 `quickOpenFavorites` QuickPick 快速打开（命令面板 + 视图标题栏 ⭐，
+    对齐 Project Manager 的招牌交互）；
+  - 条目右键：在资源管理器中显示 / 复制解析后的绝对路径 / 重命名 / 移除
+    （inline 悬停删除按钮）；移除无需确认（可重新添加）。
+  - **存储**：`.vscode/favorites.json`（信封 + 原子写 + 损坏自动备份 `.bak`，
+    复用 serial-servers 契约；无工作区回退 globalState；上限 200 条丢最旧；
+    已 gitignore）；工作区内存 POSIX 相对路径（仓库可迁移），工作区外存绝对路径；
+    打开时逐工作区文件夹解析存在性，失败如实提示不静默。
+  - 新增 7 命令：`addFavorite` / `quickOpenFavorites` / `openFavorite` /
+    `revealFavorite` / `copyFavoritePath` / `renameFavorite` / `removeFavorite`；
+    与任务管理器的「任务收藏」（`addTaskToFavorites`，收藏 tasks.json 任务）正交。
+- 测试：新增 favorites 单测 28 例（存储契约 / 守卫 / 服务 / 树视图 / 命令壳）+
+  宿主集成冒烟套件（7 命令注册 + 可执行）；测试桩增量扩展
+  `workspace.getWorkspaceFolder`（只增不减）。
+- 文档：设计方案 13 号、功能介绍 08、开发指南 11、公开接口总表与全部视图数
+  计数同步（5 视图 → 6 视图，28 命令 → 35 命令），侧边栏示意图重绘为 6 视图。
+
 ## [3.3.1] - 2026-11-06
 
 ### 修复

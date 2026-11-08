@@ -2,7 +2,7 @@
   "name": "hello-vscode-plugin",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "3.3.1",
+  "version": "3.4.0",
   "publisher": "your-publisher",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -48,6 +48,10 @@
         {
           "id": "extStarter.taskExplorerView",
           "name": "%view.taskExplorer.name%"
+        },
+        {
+          "id": "extStarter.favoritesView",
+          "name": "%view.favorites.name%"
         },
         {
           "id": "extStarter.envView",
@@ -237,6 +241,48 @@
         "title": "%command.clearRecentTasks.title%",
         "category": "%command.category%",
         "icon": "$(clear-all)"
+      },
+      {
+        "command": "extStarter.addFavorite",
+        "title": "%command.addFavorite.title%",
+        "category": "%command.category%",
+        "icon": "$(add)"
+      },
+      {
+        "command": "extStarter.quickOpenFavorites",
+        "title": "%command.quickOpenFavorites.title%",
+        "category": "%command.category%",
+        "icon": "$(star-full)"
+      },
+      {
+        "command": "extStarter.openFavorite",
+        "title": "%command.openFavorite.title%",
+        "category": "%command.category%",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "extStarter.revealFavorite",
+        "title": "%command.revealFavorite.title%",
+        "category": "%command.category%",
+        "icon": "$(folder-active)"
+      },
+      {
+        "command": "extStarter.copyFavoritePath",
+        "title": "%command.copyFavoritePath.title%",
+        "category": "%command.category%",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "extStarter.renameFavorite",
+        "title": "%command.renameFavorite.title%",
+        "category": "%command.category%",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "extStarter.removeFavorite",
+        "title": "%command.removeFavorite.title%",
+        "category": "%command.category%",
+        "icon": "$(close)"
       }
     ],
     "menus": {
@@ -290,6 +336,11 @@
           "command": "extStarter.openTasksJson",
           "when": "view == extStarter.taskExplorerView",
           "group": "navigation@2"
+        },
+        {
+          "command": "extStarter.quickOpenFavorites",
+          "when": "view == extStarter.favoritesView",
+          "group": "navigation@1"
         }
       ],
       "view/item/context": [
@@ -392,6 +443,36 @@
           "command": "extStarter.clearRecentTasks",
           "when": "view == extStarter.taskExplorerView && viewItem == taskExplorerGroupRecent",
           "group": "4_manage@1"
+        },
+        {
+          "command": "extStarter.openFavorite",
+          "when": "view == extStarter.favoritesView && viewItem == favorite",
+          "group": "1_open@1"
+        },
+        {
+          "command": "extStarter.revealFavorite",
+          "when": "view == extStarter.favoritesView && viewItem == favorite",
+          "group": "1_open@2"
+        },
+        {
+          "command": "extStarter.copyFavoritePath",
+          "when": "view == extStarter.favoritesView && viewItem == favorite",
+          "group": "2_manage@1"
+        },
+        {
+          "command": "extStarter.renameFavorite",
+          "when": "view == extStarter.favoritesView && viewItem == favorite",
+          "group": "2_manage@2"
+        },
+        {
+          "command": "extStarter.removeFavorite",
+          "when": "view == extStarter.favoritesView && viewItem == favorite",
+          "group": "2_manage@3"
+        },
+        {
+          "command": "extStarter.removeFavorite",
+          "when": "view == extStarter.favoritesView && viewItem == favorite",
+          "group": "inline@1"
         }
       ],
       "editor/context": [
@@ -419,6 +500,11 @@
           "command": "extStarter.copySelection",
           "when": "editorTextFocus && editorHasSelection",
           "group": "9_starter@5"
+        },
+        {
+          "command": "extStarter.addFavorite",
+          "when": "editorIsOpen",
+          "group": "9_starter@6"
         }
       ],
       "explorer/context": [
@@ -438,6 +524,10 @@
           "group": "9_starter@3"
         },
         {
+          "command": "extStarter.addFavorite",
+          "group": "9_starter@6"
+        },
+        {
           "command": "extStarter.copyFileContent",
           "when": "!explorerResourceIsFolder",
           "group": "9_starter@4"
@@ -453,6 +543,11 @@
           "command": "extStarter.draftFile",
           "when": "editorIsOpen",
           "group": "navigation@5"
+        },
+        {
+          "command": "extStarter.addFavorite",
+          "when": "editorIsOpen",
+          "group": "navigation@6"
         }
       ]
     },
