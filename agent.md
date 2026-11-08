@@ -6,7 +6,7 @@
 ## 项目概述
 
 - **是什么**：Hello VSCode 插件（v1.0.0 起由「CRUD 演示集合」按 09 方案收敛重构）：
-  4 视图（环境信息 / 环境初始化 / 任务管理 / 串口服务器）+ 3 Webview 页面
+  5 视图（环境信息 / 环境初始化 / 任务管理器 / 任务管理 / 串口服务器）+ 3 Webview 页面
   （gallery 组件画廊 / serialConsole 串口控制台 / taskManager 任务管理 CRUD 弹框）+ 草稿箱右键示例（8 条入口）+
   启动任务框架（窗口加载完成自动执行：初始化脚本 + 环境探针）。
 - **技术栈**：TypeScript（strict，tsconfig node / webview 双工程）+ esbuild（宿主构建）+
