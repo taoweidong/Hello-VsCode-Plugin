@@ -5,6 +5,9 @@ import {
   MAX_QUICK_COMMANDS,
   normalizeQuickCommandData,
   QUICK_COMMANDS_SCHEMA_VERSION,
+  QuickCommandsService,
+  type IQuickCommandsStore,
+  type QuickCommandGroup,
   type QuickCommandsData,
 } from '../../../extension/features/quickCommands/quickCommandsService'
 import { __resetStubs } from '../stubs/vscode'
@@ -197,5 +200,254 @@ describe('defaultAlias（默认别名）', () => {
     ['x'.repeat(30), 'x'.repeat(20)],
   ])('%s → %s', (command, expected) => {
     expect(defaultAlias(command)).toBe(expected)
+  })
+})
+
+/** 内存假存储：深拷贝隔离，save 后可断言落盘形态。 */
+class FakeStore implements IQuickCommandsStore {
+  data: QuickCommandsData = { groups: [], commands: [] }
+
+  async load(): Promise<QuickCommandsData> {
+    return JSON.parse(JSON.stringify(this.data)) as QuickCommandsData
+  }
+
+  async save(data: QuickCommandsData): Promise<void> {
+    this.data = JSON.parse(JSON.stringify(data)) as QuickCommandsData
+  }
+}
+
+function makeService(data: Partial<QuickCommandsData> = {}): {
+  service: QuickCommandsService
+  store: FakeStore
+} {
+  const store = new FakeStore()
+  store.data = {
+    groups: (data.groups ?? []).map((group) => ({
+      createdAt: '2026-01-01T00:00:00.000Z',
+      ...group,
+    })),
+    commands: (data.commands ?? []).map((item) => ({
+      addedAt: '2026-01-01T00:00:00.000Z',
+      ...item,
+    })),
+  }
+  return { service: new QuickCommandsService(store), store }
+}
+
+describe('QuickCommandsService（业务服务）', () => {
+  beforeEach(() => {
+    __resetStubs()
+  })
+
+  it('load：成功后 listCommands/listGroups 反映数据并触发变更', async () => {
+    const { service } = makeService({
+      groups: [{ id: 'g1', name: 'git' }],
+      commands: [{ id: 'c1', name: 'push', command: 'git push', groupId: 'g1' }],
+    })
+    await service.load()
+    expect(service.listGroups().map((group) => group.name)).toEqual(['git'])
+    expect(service.listCommands().map((item) => item.name)).toEqual(['push'])
+  })
+
+  it('load：失败置 loadError 并保留空数据（info 节点呈现）', async () => {
+    const failing = new (class implements IQuickCommandsStore {
+      async load(): Promise<QuickCommandsData> {
+        throw new Error('磁盘炸了')
+      }
+      async save(): Promise<void> {}
+    })()
+    const service = new QuickCommandsService(failing)
+    await service.load()
+    expect(service.loadError).toBe('磁盘炸了')
+    expect(service.listCommands()).toEqual([])
+  })
+
+  it('addCommand：新增成功（返回条目并落盘），别名缺省 defaultAlias', async () => {
+    const { service, store } = makeService()
+    await service.load()
+    const result = await service.addCommand({ command: '  git status  ', groupId: null })
+    expect(result.status).toBe('added')
+    if (result.status !== 'added') return
+    expect(result.item.command).toBe('git status')
+    expect(result.item.name).toBe('git')
+    expect(store.data.commands).toHaveLength(1)
+  })
+
+  it('addCommand：插入所在分组顶部（组内既有条目之前）', async () => {
+    const { service } = makeService({
+      groups: [{ id: 'g1', name: 'git' }],
+      commands: [{ id: 'c-old', name: 'old', command: 'git old', groupId: 'g1' }],
+    })
+    await service.load()
+    await service.addCommand({ command: 'git new', name: 'new', groupId: 'g1' })
+    expect(service.listCommands().filter((item) => item.groupId === 'g1').map((i) => i.name)).toEqual([
+      'new',
+      'old',
+    ])
+  })
+
+  it('addCommand：重复命令文本仅提示（既有条目字段不变，Review Focus 5）', async () => {
+    const { service } = makeService({
+      commands: [
+        {
+          id: 'c1',
+          name: 'push',
+          command: 'git push',
+          groupId: null,
+          useCount: 7,
+        },
+      ],
+    })
+    await service.load()
+    const result = await service.addCommand({ command: 'git push', name: '别名覆盖尝试' })
+    expect(result.status).toBe('duplicate')
+    if (result.status !== 'duplicate') return
+    expect(result.existing.id).toBe('c1')
+    expect(result.existing.name).toBe('push')
+    expect(result.existing.useCount).toBe(7)
+  })
+
+  it('addCommand：空/空白命令 → invalid；非法 groupId → invalid', async () => {
+    const { service } = makeService({ groups: [{ id: 'g1', name: 'git' }] })
+    await service.load()
+    expect((await service.addCommand({ command: '   ', groupId: null })).status).toBe('invalid')
+    expect((await service.addCommand({ command: 'ls', groupId: 'gX' })).status).toBe('invalid')
+  })
+
+  it('addCommand：达到命令上限 → cap', async () => {
+    const full = Array.from({ length: MAX_QUICK_COMMANDS }, (_, index) => ({
+      id: `c${index}`,
+      name: `n${index}`,
+      command: `cmd-${index}`,
+      groupId: null,
+    }))
+    const { service } = makeService({ commands: full })
+    await service.load()
+    expect((await service.addCommand({ command: 'another', groupId: null })).status).toBe('cap')
+  })
+
+  it('renameCommand：成功 / 空名 false / 不存在 false', async () => {
+    const { service } = makeService({ commands: [{ id: 'c1', name: 'a', command: 'ls' }] })
+    await service.load()
+    expect(await service.renameCommand('c1', '  新别名  ')).toBe(true)
+    expect(service.get('c1')!.name).toBe('新别名')
+    expect(await service.renameCommand('c1', '   ')).toBe(false)
+    expect(await service.renameCommand('cX', 'x')).toBe(false)
+  })
+
+  it('updateCommandText：updated / duplicate / notfound / empty', async () => {
+    const { service } = makeService({
+      commands: [
+        { id: 'c1', name: 'a', command: 'ls' },
+        { id: 'c2', name: 'b', command: 'pwd' },
+      ],
+    })
+    await service.load()
+    expect(await service.updateCommandText('c1', '  git status  ')).toBe('updated')
+    expect(service.get('c1')!.command).toBe('git status')
+    expect(await service.updateCommandText('c1', 'pwd')).toBe('duplicate')
+    expect(await service.updateCommandText('cX', 'ls')).toBe('notfound')
+    expect(await service.updateCommandText('c1', '  ')).toBe('empty')
+  })
+
+  it('moveCommandToGroup：移入分组 / 回到未分组 / 非法分组或条目 false', async () => {
+    const { service } = makeService({
+      groups: [{ id: 'g1', name: 'git' }],
+      commands: [{ id: 'c1', name: 'a', command: 'ls', groupId: null }],
+    })
+    await service.load()
+    expect(await service.moveCommandToGroup('c1', 'g1')).toBe(true)
+    expect(service.get('c1')!.groupId).toBe('g1')
+    expect(await service.moveCommandToGroup('c1', null)).toBe(true)
+    expect(service.get('c1')!.groupId).toBeNull()
+    expect(await service.moveCommandToGroup('c1', 'gX')).toBe(false)
+    expect(await service.moveCommandToGroup('cX', 'g1')).toBe(false)
+  })
+
+  it('createGroup：created / duplicate（返回既有组）/ cap', async () => {
+    const manyGroups: QuickCommandGroup[] = Array.from(
+      { length: MAX_QUICK_COMMAND_GROUPS },
+      (_, index) => ({ id: `g${index}`, name: `组${index}`, createdAt: 't' })
+    )
+    const { service } = makeService({ groups: manyGroups.slice(0, 1) })
+    await service.load()
+    const created = await service.createGroup(' 构建 ')
+    expect(created.status).toBe('created')
+    if (created.status !== 'created') return
+    expect(created.group.name).toBe('构建')
+    const duplicate = await service.createGroup('构建')
+    expect(duplicate.status).toBe('duplicate')
+
+    const full = new QuickCommandsService(
+      new (class implements IQuickCommandsStore {
+        async load(): Promise<QuickCommandsData> {
+          return { groups: manyGroups, commands: [] }
+        }
+        async save(): Promise<void> {}
+      })()
+    )
+    await full.load()
+    expect((await full.createGroup('新组')).status).toBe('cap')
+  })
+
+  it('renameGroup：renamed / duplicate / notfound', async () => {
+    const { service } = makeService({
+      groups: [
+        { id: 'g1', name: 'git' },
+        { id: 'g2', name: 'build' },
+      ],
+    })
+    await service.load()
+    expect(await service.renameGroup('g1', '  版本控制 ')).toBe('renamed')
+    expect(service.listGroups()[0]!.name).toBe('版本控制')
+    expect(await service.renameGroup('g1', 'build')).toBe('duplicate')
+    expect(await service.renameGroup('gX', 'x')).toBe('notfound')
+  })
+
+  it('removeGroup：组内命令回落未分组；不存在 false', async () => {
+    const { service, store } = makeService({
+      groups: [{ id: 'g1', name: 'git' }],
+      commands: [
+        { id: 'c1', name: 'a', command: 'ls', groupId: 'g1' },
+        { id: 'c2', name: 'b', command: 'pwd', groupId: null },
+      ],
+    })
+    await service.load()
+    expect(await service.removeGroup('g1')).toBe(true)
+    expect(service.listGroups()).toEqual([])
+    expect(service.get('c1')!.groupId).toBeNull()
+    expect(store.data.groups).toEqual([])
+    expect(await service.removeGroup('gX')).toBe(false)
+  })
+
+  it('removeCommand：移除成功 / 不存在 false', async () => {
+    const { service } = makeService({ commands: [{ id: 'c1', name: 'a', command: 'ls' }] })
+    await service.load()
+    expect(await service.removeCommand('c1')).toBe(true)
+    expect(service.listCommands()).toEqual([])
+    expect(await service.removeCommand('c1')).toBe(false)
+  })
+
+  it('recordExecution：回写 lastUsedAt/useCount 并落盘', async () => {
+    const { service, store } = makeService({
+      commands: [{ id: 'c1', name: 'a', command: 'ls', useCount: 2 }],
+    })
+    await service.load()
+    await service.recordExecution('c1')
+    const item = service.get('c1')!
+    expect(item.useCount).toBe(3)
+    expect(typeof item.lastUsedAt).toBe('string')
+    expect(store.data.commands[0]!.useCount).toBe(3)
+  })
+
+  it('每次成功持久化触发 onDidChange', async () => {
+    const { service } = makeService()
+    await service.load()
+    let fired = 0
+    service.onDidChange(() => {
+      fired += 1
+    })
+    await service.addCommand({ command: 'ls', groupId: null })
+    expect(fired).toBeGreaterThan(0)
   })
 })
