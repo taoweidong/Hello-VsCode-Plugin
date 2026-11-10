@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import { STORAGE } from '../../constants'
 import { writeJsonAtomic } from '../../services/stores/atomicWrite'
+import { QueuedStoreMutations } from '../../services/stores/queuedFileStore'
 
 /**
  * 草稿箱服务（09 方案 §3.5：右键示例的新载体）。
@@ -10,12 +11,16 @@ import { writeJsonAtomic } from '../../services/stores/atomicWrite'
  * editor/title 1）全部落到 `.vscode/ext-starter.drafts.json`（B3：该路径须字面量
  * 进 DEFAULT_DIRTY_IGNORES 与 .gitignore）。
  *
- * 数据完整性契约（v2.2.3，代码评审修复）：
+ * 数据完整性契约（v2.2.3，代码评审修复；v3.6.1 读错误语义收紧，17 方案阶段 1）：
  * - **全文落盘**：selection 草稿保存完整选中文本（`content` 字段，64K 字符上限
  *   并显式标记截断），`title` 仅作摘要——此前只存 40 字摘要，大部分内容丢失；
- * - **串行化读-改-写**：所有变更进入队列，每次「重读磁盘 → 变更 → 原子写」，
- *   多窗口 / 手改文件不会互相覆盖，连续快速登记不丢条目；
+ * - **串行化读-改-写**：所有变更进入队列（QueuedStoreMutations 共享契约），每次
+ *   「重读磁盘 → 变更 → 原子写」，多窗口 / 手改文件不会互相覆盖，连续快速登记
+ *   不丢条目；
  * - **加载先行**：首次变更前等待初始加载完成，命令不会抹掉已有数据；
+ * - **读错误 ≠ 空数据（v3.6.1，P1-2）**：文件不存在 → 空数据；其余读盘错误
+ *   （EBUSY/EPERM 等）如实上抛并记入 loadError——变更在重读失败时中止，
+ *   绝不以「仅新条目」覆盖原文件；
  * - **损坏备份**：解析失败先把原文件复制为 `.bak` 再按空数据继续（对齐 serverStore）。
  */
 
@@ -70,11 +75,26 @@ export class DraftBoxService implements vscode.Disposable {
 
   /** 初始加载（幂等）：首次变更与显式 load 共用。 */
   private loadPromise: Promise<number> | undefined
-  /** 变更队列：串行化「重读 → 变更 → 原子写」，防多窗口 / 连续操作互相覆盖。 */
-  private mutationQueue: Promise<void> = Promise.resolve()
+  /** 初始加载失败的原因（v3.6.1：不再把读盘错误静默当空数据；成功后清空）。 */
+  loadError: string | undefined
 
   private readonly _onDidChange = new vscode.EventEmitter<void>()
   readonly onDidChange = this._onDidChange.event
+
+  /**
+   * 变更队列（共享契约，17 方案阶段 1）：加载先行 → 写前重读 → 变更 → 落盘。
+   * 重读失败（非 FileNotFound IO 错误）中止本次变更且不落盘。
+   */
+  private readonly mutations = new QueuedStoreMutations(
+    () => {
+      this.loadPromise ??= this.doLoad()
+      return this.loadPromise
+    },
+    async () => {
+      this.entries = await this.readEntries()
+      this.loadError = undefined
+    }
+  )
 
   constructor(private readonly getWorkspaceRoot: () => vscode.Uri | undefined) {}
 
@@ -85,12 +105,17 @@ export class DraftBoxService implements vscode.Disposable {
   }
 
   /**
-   * 从工作区加载数据（幂等）。文件不存在 / 解析失败一律按空数据继续；
-   * 解析失败会把原文件复制为 `.bak` 备份（原文件保留不动），返回加载条数。
+   * 从工作区加载数据（幂等）。文件不存在 / 解析失败按空数据继续（解析失败先复制
+   * `.bak` 备份，原文件保留不动）；其余读盘错误记入 loadError（不静默吞掉），
+   * 返回加载条数；完成后触发变更事件。
    */
   async load(): Promise<number> {
     this.loadPromise = this.doLoad()
-    return this.loadPromise
+    try {
+      return await this.loadPromise
+    } finally {
+      this._onDidChange.fire()
+    }
   }
 
   /** 当前草稿（最新在前）。 */
@@ -104,7 +129,7 @@ export class DraftBoxService implements vscode.Disposable {
     if (!trimmed) {
       return this.entries.length
     }
-    return this.enqueue(() => {
+    return this.mutations.run(async () => {
       const count = this.insert({
         id: nextDraftId(),
         kind: 'selection',
@@ -113,6 +138,8 @@ export class DraftBoxService implements vscode.Disposable {
         content: clipContent(trimmed),
         createdAt: Date.now(),
       })
+      await this.persist()
+      this._onDidChange.fire()
       return count
     })
   }
@@ -126,7 +153,7 @@ export class DraftBoxService implements vscode.Disposable {
     if (!trimmed) {
       return false
     }
-    return this.enqueue(() => {
+    return this.mutations.run(async () => {
       const latest = this.entries[0]
       if (!latest) {
         this.insert({
@@ -137,10 +164,14 @@ export class DraftBoxService implements vscode.Disposable {
           content: clipContent(trimmed),
           createdAt: Date.now(),
         })
+        await this.persist()
+        this._onDidChange.fire()
         return false
       }
       latest.detail = `${latest.detail}\n${summarizeText(trimmed)}（来自：${source}）`
       latest.content = clipContent(`${latest.content ?? ''}\n${trimmed}`.trim())
+      await this.persist()
+      this._onDidChange.fire()
       return true
     })
   }
@@ -151,15 +182,18 @@ export class DraftBoxService implements vscode.Disposable {
     if (stat.type === vscode.FileType.Directory) {
       throw new Error('请选择文件而非文件夹。')
     }
-    return this.enqueue(() =>
-      this.insert({
+    return this.mutations.run(async () => {
+      const count = this.insert({
         id: nextDraftId(),
         kind: 'file',
         title: uri.path.split('/').pop() || uri.fsPath,
         detail: uri.fsPath,
         createdAt: Date.now(),
       })
-    )
+      await this.persist()
+      this._onDidChange.fire()
+      return count
+    })
   }
 
   /** 批量登记文件（资源管理器多选）。目录项会被跳过。 */
@@ -192,15 +226,18 @@ export class DraftBoxService implements vscode.Disposable {
     }
     const listed = files.slice(0, FOLDER_BATCH_LIMIT)
     const overflow = files.length > FOLDER_BATCH_LIMIT ? ` 等 ${files.length} 个文件` : ''
-    return this.enqueue(() =>
-      this.insert({
+    return this.mutations.run(async () => {
+      const count = this.insert({
         id: nextDraftId(),
         kind: 'folder',
         title: uri.path.split('/').pop() || uri.fsPath,
         detail: `${listed.join('、')}${overflow}`,
         createdAt: Date.now(),
       })
-    )
+      await this.persist()
+      this._onDidChange.fire()
+      return count
+    })
   }
 
   dispose(): void {
@@ -209,13 +246,23 @@ export class DraftBoxService implements vscode.Disposable {
 
   /* ---------------- 内部：加载与串行化写 ---------------- */
 
+  /** 加载实现（不触发事件——变更队列内隐式加载不应多发 onDidChange）。 */
   private async doLoad(): Promise<number> {
-    this.entries = await this.readEntries()
-    this._onDidChange.fire()
+    try {
+      this.entries = await this.readEntries()
+      this.loadError = undefined
+    } catch (err) {
+      this.entries = []
+      this.loadError = err instanceof Error ? err.message : String(err)
+    }
     return this.entries.length
   }
 
-  /** 读取并校验数据文件；损坏时备份 `.bak` 后按空数据继续（幂等：备份失败静默）。 */
+  /**
+   * 读取并校验数据文件（写前重读的数据源，语义即 QueuedStoreMutations 契约）：
+   * 文件不存在 → 空数组；其余读盘错误如实上抛（中止变更，绝不带陈旧状态落盘）；
+   * 损坏时备份 `.bak` 后按空数据继续（幂等：备份失败静默）。
+   */
   private async readEntries(): Promise<DraftEntry[]> {
     const uri = this.fileUri
     if (!uri) {
@@ -224,8 +271,11 @@ export class DraftBoxService implements vscode.Disposable {
     let raw: string
     try {
       raw = Buffer.from(await vscode.workspace.fs.readFile(uri)).toString('utf8')
-    } catch {
-      return [] // 文件不存在：空草稿箱
+    } catch (err) {
+      if (err instanceof vscode.FileSystemError && err.code === 'FileNotFound') {
+        return [] // 首次使用：空草稿箱
+      }
+      throw err // 其余读盘错误如实上抛（P1-2：不再当「文件不存在」吞掉）
     }
     try {
       const parsed = JSON.parse(raw) as { entries?: unknown }
@@ -249,28 +299,6 @@ export class DraftBoxService implements vscode.Disposable {
       }
       return []
     }
-  }
-
-  /** 变更队列：重读磁盘 → 变更 → 原子写；返回本次变更结果。 */
-  private enqueue<T>(mutate: () => T): Promise<T> {
-    const run = this.mutationQueue.then(async () => {
-      if (!this.loadPromise) {
-        this.loadPromise = this.doLoad()
-      }
-      await this.loadPromise
-      // 写前重读：多窗口 / 用户手改后的磁盘状态优先，避免覆盖外部修改
-      this.entries = await this.readEntries()
-      const result = mutate()
-      await this.persist()
-      this._onDidChange.fire()
-      return result
-    })
-    // 队列自身吞错（调用方仍能从 run 收到错误）
-    this.mutationQueue = run.then(
-      () => undefined,
-      () => undefined
-    )
-    return run
   }
 
   /** 头部插入 + 上限裁剪。返回当前条数。 */

@@ -172,3 +172,20 @@ describe('SerialConsoleController.deleteServer', () => {
     controller2.dispose()
   })
 })
+
+describe('deleteSerialServer 错误契约（17 方案阶段 1）', () => {
+  it('落库失败以 showError 呈现（命令不产生 rejected promise）', async () => {
+    __stubs.dialogQueue.push('删除')
+    const deleteSpy = vi
+      .spyOn(controller, 'deleteServer')
+      .mockRejectedValue(new Error('disk full') as never)
+    const { registered, register } = makeRegistrar()
+    registerSerialConsoleCommands(register, { controller })
+    await expect(registered.get(COMMAND.deleteSerialServer)?.(makeNode('srv-7'))).resolves.toBe(
+      undefined
+    )
+    expect(deleteSpy).toHaveBeenCalledWith('srv-7')
+    const error = __stubs.recorded.find((entry) => entry.kind === 'showErrorMessage')
+    expect(error).toBeDefined()
+  })
+})

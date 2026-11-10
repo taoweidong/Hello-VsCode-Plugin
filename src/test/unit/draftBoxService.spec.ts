@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as nodeFs from 'node:fs'
 import * as nodeOs from 'node:os'
 import * as nodePath from 'node:path'
@@ -197,5 +197,40 @@ describe('DraftBoxService：容错', () => {
     expect(noRoot.fileUri).toBeUndefined()
     expect(await noRoot.load()).toBe(0)
     expect(await noRoot.addSelection('仅内存', 'a.ts')).toBe(1)
+  })
+})
+
+describe('DraftBoxService：读错误语义（17 方案阶段 1，P1-2）', () => {
+  it('读盘失败≠文件不存在：变更中止且绝不以「仅新条目」覆盖原文件', async () => {
+    await service.addSelection('第一条', 'a.ts') // 数据文件已含 1 条
+    const readFileSpy = vi
+      .spyOn(vscode.workspace.fs, 'readFile')
+      .mockRejectedValueOnce(Object.assign(new Error('EBUSY: 资源被占用'), { code: 'EBUSY' }))
+    try {
+      await expect(service.addSelection('第二条', 'b.ts')).rejects.toThrow('EBUSY')
+    } finally {
+      readFileSpy.mockRestore()
+    }
+    // 原文件未被覆盖：仍只有既有 1 条（修复前：重读失败被当空数据 → persist 仅写新条目）
+    expect(readPersisted().entries).toHaveLength(1)
+    expect(readPersisted().entries[0]?.title).toBe('第一条')
+    // 队列未被毒化：恢复后重试，写前重读拿到既有 1 条 + 新增 1 条
+    expect(await service.addSelection('第二条', 'b.ts')).toBe(2)
+    expect(readPersisted().entries).toHaveLength(2)
+  })
+
+  it('load：读盘失败置 loadError（不再静默当空数据），且不产生写入', async () => {
+    nodeFs.mkdirSync(draftsFile(), { recursive: true }) // 数据文件位置是目录 → readFile 抛 EISDIR（非 FileNotFound）
+    expect(await service.load()).toBe(0)
+    expect(service.loadError).toBeTruthy()
+    expect(nodeFs.statSync(draftsFile()).isDirectory()).toBe(true)
+    // 变更同样被中止（重读失败），不产生写入
+    await expect(service.addSelection('x', 'a.ts')).rejects.toThrow()
+    expect(nodeFs.statSync(draftsFile()).isDirectory()).toBe(true)
+  })
+
+  it('load：文件不存在仍按空数据（FileNotFound 语义不变）', async () => {
+    expect(await service.load()).toBe(0)
+    expect(service.loadError).toBeUndefined()
   })
 })

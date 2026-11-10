@@ -133,6 +133,10 @@ export type HostMessage =
 /** Webview → 宿主 */
 export type WebviewMessage =
   | { type: 'ready' }
+  /**
+   * 通用表单提交（taskManager 页面）。draft.id 约定（17 方案阶段 1 登记入协议）：
+   * string = 编辑该 id（宿主走 update）；undefined = 新建（宿主走 create）。
+   */
   | { type: 'submit'; draft: Record<string, unknown> }
   /** 请求枚举本机串口 */
   | { type: 'serialPortsRequest' }

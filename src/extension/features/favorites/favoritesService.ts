@@ -3,6 +3,7 @@ import * as path from 'path'
 import * as vscode from 'vscode'
 import { STORAGE } from '../../constants'
 import { writeJsonAtomic } from '../../services/stores/atomicWrite'
+import { QueuedStoreMutations } from '../../services/stores/queuedFileStore'
 
 /**
  * 收藏夹（v3.4，13 方案；v3.6 存储可迁移增强，15 方案）：文件 / 文件夹路径收藏 + 别名 + 单击跳转。
@@ -269,6 +270,24 @@ export class FavoritesService implements vscode.Disposable {
   private readonly _onDidChange = new vscode.EventEmitter<void>()
   readonly onDidChange = this._onDidChange.event
 
+  /**
+   * 数据完整性契约（17 方案阶段 1，P1-1）：所有写操作经串行队列
+   * 「加载先行 → 写前重读 → 变更 → 落盘」，多窗口 / 激活期慢加载场景
+   * 不会用陈旧内存列表整文件覆盖磁盘数据；重读失败中止变更不落盘。
+   */
+  private readonly mutations = new QueuedStoreMutations(
+    () => {
+      this.loadPromise ??= this.doLoad()
+      return this.loadPromise
+    },
+    async () => {
+      this.items = await this.store.load()
+      this.loadError = undefined
+    }
+  )
+  /** 初始加载缓存（幂等；写路径经 mutations.ensureLoaded 复用同一 promise）。 */
+  private loadPromise: Promise<void> | undefined
+
   constructor(
     private readonly store: IFavoritesStore,
     /** 工作区文件夹提供者（可注入，测试友好；默认第一个工作区文件夹）。 */
@@ -276,8 +295,18 @@ export class FavoritesService implements vscode.Disposable {
       vscode.workspace.workspaceFolders?.[0]
   ) {}
 
-  /** 加载持久化数据（激活时调用；失败保留空列表并记录原因）。 */
+  /** 加载持久化数据（激活时调用；失败保留空列表并记录原因；完成后触发变更事件）。 */
   async load(): Promise<void> {
+    this.loadPromise = this.doLoad()
+    try {
+      await this.loadPromise
+    } finally {
+      this._onDidChange.fire()
+    }
+  }
+
+  /** 加载实现（不触发事件——变更队列内隐式加载不应多发 onDidChange）。 */
+  private async doLoad(): Promise<void> {
     try {
       this.items = await this.store.load()
       this.loadError = undefined
@@ -285,7 +314,6 @@ export class FavoritesService implements vscode.Disposable {
       this.items = []
       this.loadError = err instanceof Error ? err.message : String(err)
     }
-    this._onDidChange.fire()
   }
 
   list(): FavoriteItem[] {
@@ -311,59 +339,65 @@ export class FavoritesService implements vscode.Disposable {
   }
 
   /** 批量添加（单选/多选统一入口）；重复路径跳过；别名缺省 basename；保持选择顺序插头部。 */
-  async add(uris: readonly vscode.Uri[], alias?: string): Promise<AddFavoritesResult> {
-    let added = 0
-    let skipped = 0
-    const fresh: FavoriteItem[] = []
-    const seen = new Set<string>()
-    for (const uri of uris) {
-      const item = await this.buildItem(uri, alias)
-      if (!item) {
-        skipped += 1
-        continue
+  add(uris: readonly vscode.Uri[], alias?: string): Promise<AddFavoritesResult> {
+    return this.mutations.run(async () => {
+      let added = 0
+      let skipped = 0
+      const fresh: FavoriteItem[] = []
+      const seen = new Set<string>()
+      for (const uri of uris) {
+        const item = await this.buildItem(uri, alias)
+        if (!item) {
+          skipped += 1
+          continue
+        }
+        const normalized = toPosix(item.path)
+        if (seen.has(normalized) || this.findByResolvedPath(item.path)) {
+          skipped += 1
+          continue
+        }
+        seen.add(normalized)
+        fresh.push(item)
+        added += 1
       }
-      const normalized = toPosix(item.path)
-      if (seen.has(normalized) || this.findByResolvedPath(item.path)) {
-        skipped += 1
-        continue
+      if (fresh.length > 0) {
+        // 新收藏插头部且批量内保持选择顺序（第一批选中项在最前）
+        this.items = [...fresh, ...this.items]
+        this.trimToCap()
+        await this.persist()
       }
-      seen.add(normalized)
-      fresh.push(item)
-      added += 1
-    }
-    if (fresh.length > 0) {
-      // 新收藏插头部且批量内保持选择顺序（第一批选中项在最前）
-      this.items = [...fresh, ...this.items]
-      this.trimToCap()
-      await this.persist()
-    }
-    return { added, skipped }
+      return { added, skipped }
+    })
   }
 
   /** 重命名别名（id 不存在返回 false）。 */
-  async rename(id: string, name: string): Promise<boolean> {
-    const trimmed = name.trim()
-    if (trimmed.length === 0) {
-      return false
-    }
-    const item = this.items.find((entry) => entry.id === id)
-    if (!item) {
-      return false
-    }
-    item.name = trimmed
-    await this.persist()
-    return true
+  rename(id: string, name: string): Promise<boolean> {
+    return this.mutations.run(async () => {
+      const trimmed = name.trim()
+      if (trimmed.length === 0) {
+        return false
+      }
+      const item = this.items.find((entry) => entry.id === id)
+      if (!item) {
+        return false
+      }
+      item.name = trimmed
+      await this.persist()
+      return true
+    })
   }
 
   /** 移除收藏（id 不存在返回 false）。 */
-  async remove(id: string): Promise<boolean> {
-    const before = this.items.length
-    this.items = this.items.filter((entry) => entry.id !== id)
-    if (this.items.length === before) {
-      return false
-    }
-    await this.persist()
-    return true
+  remove(id: string): Promise<boolean> {
+    return this.mutations.run(async () => {
+      const before = this.items.length
+      this.items = this.items.filter((entry) => entry.id !== id)
+      if (this.items.length === before) {
+        return false
+      }
+      await this.persist()
+      return true
+    })
   }
 
   /** 按 id 查条目。 */

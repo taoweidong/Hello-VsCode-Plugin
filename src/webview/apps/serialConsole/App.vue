@@ -53,6 +53,12 @@ const command = ref('')
 let echoSeq = 0
 /** 保存后等待 serialServers 推送时复位表单（区分「自己的保存」与外部列表刷新）。 */
 let awaitingSaveReset = false
+/**
+ * 保存发起时的表单对象引用（P1-4 竞态防护）：表单切换 / 编辑都会替换 formValue
+ * 对象引用——推送到达时引用已变（如用户点了另一服务器「编辑」）则不复位，
+ * 避免把正在编辑的表单清空回新增态。
+ */
+let awaitingSaveFormSnapshot: Record<string, unknown> | undefined
 /** 编辑态重置的两段式布防确认（Esc / 重置按钮共用同一布防态）。 */
 const resetConfirm = useTwoStepConfirm()
 
@@ -94,12 +100,14 @@ const { initialized, post } = useConsolePage({
   },
   onServers(next) {
     servers.value = next
-    // 自己保存成功：复位表单为新增态（密码永不留存）
+    // 自己保存成功：复位表单为新增态（密码永不留存）；表单已被切换（P1-4）则只解在途态
     if (awaitingSaveReset) {
       awaitingSaveReset = false
       saving.value = false
-      editingId.value = undefined
-      formValue.value = { ...schemaDefaults(schema.value) }
+      if (formValue.value === awaitingSaveFormSnapshot) {
+        editingId.value = undefined
+        formValue.value = { ...schemaDefaults(schema.value) }
+      }
     }
     if (selectedServerId.value && !next.some((s) => s.id === selectedServerId.value)) {
       selectedServerId.value = undefined
@@ -208,6 +216,7 @@ function onSave(): void {
   const { password, ...draft } = formValue.value
   saving.value = true
   awaitingSaveReset = true
+  awaitingSaveFormSnapshot = formValue.value
   fieldErrors.value = {}
   post({
     type: 'serialServerSave',

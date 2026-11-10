@@ -6,6 +6,8 @@ import {
   type TaskBuildTypeWire,
   type TaskItemStatusWire,
   type TaskItemWire,
+  type TaskQueryWire,
+  type WebviewMessage,
 } from '../../protocol'
 import type { FormField } from '../../formSchema'
 import SchemaForm from '../../components/SchemaForm.vue'
@@ -43,7 +45,8 @@ const DEFAULT_PAGE_SIZE = 10
 
 const vscode = useVsCodeApi()
 
-function post(message: unknown): void {
+/** 上行消息编译期校验（17 方案阶段 1，P1-3：拼错消息名 / payload 直接过不了类型检查）。 */
+function post(message: WebviewMessage): void {
   vscode.postMessage(message)
 }
 
@@ -86,7 +89,11 @@ const items = ref<TaskItemWire[]>([])
 const page = ref(1)
 const total = ref(0)
 const pageSize = ref(DEFAULT_PAGE_SIZE)
-const query = reactive({ keyword: '', status: '', buildType: '' })
+const query = reactive<{
+  keyword: string
+  status: TaskItemStatusWire | 'all' | ''
+  buildType: TaskBuildTypeWire | 'all' | ''
+}>({ keyword: '', status: '', buildType: '' })
 const feedback = ref<{ kind: 'success' | 'error'; text: string } | null>(null)
 
 /** 编辑弹框状态 */
@@ -103,8 +110,8 @@ const hasActiveTask = computed(() =>
 const canPrev = computed(() => page.value > 1)
 const canNext = computed(() => page.value < totalPages.value)
 
-function currentQuery(): Record<string, unknown> {
-  const q: Record<string, unknown> = { page: page.value, pageSize: pageSize.value }
+function currentQuery(): TaskQueryWire {
+  const q: TaskQueryWire = { page: page.value, pageSize: pageSize.value }
   const keyword = query.keyword.trim()
   if (keyword) q.keyword = keyword
   if (query.status) q.status = query.status

@@ -6,7 +6,6 @@ import {
 import { createCommandHistoryService, type CommandHistoryService } from './commandHistoryService'
 import {
   createSerialConsoleDeps,
-  passwordKey,
   toServerWire,
   type LinkStatusSnapshot,
   type SerialConsoleServices,
@@ -15,6 +14,7 @@ import { createNodeSerialPortFactory, type SerialPortFactory } from './serialPor
 import { createSerialLinkService, type SerialLinkService } from './serialLinkService'
 import { SerialServersTreeProvider } from './serialServersTreeProvider'
 import { createServerStore, type IServerStore } from './serverStore'
+import { removeServerEverywhere } from './serverRemoval'
 
 /**
  * 串口控制台的扩展级组装单元（extension.ts 只与它对接）：
@@ -93,24 +93,28 @@ export class SerialConsoleController implements vscode.Disposable {
   }
 
   /**
-   * 树视图右键删除：落库 + 清理 SecretStorage + 联动断开；
-   * 面板打开时同步推送最新列表（避免页面缓存悬空）。
+   * 树视图右键删除：核心逻辑收敛到 removeServerEverywhere（与面板路径同实现）；
+   * 面板打开时同步推送最新列表（避免页面缓存悬空）。落盘失败向上抛
+   * （命令层统一 showError），密码清理失败以告警呈现、不阻断删除。
    */
   async deleteServer(id: string): Promise<'deleted' | 'missing'> {
-    const servers = await this.store.load()
-    const target = servers.find((server) => server.id === id)
-    if (!target) {
+    const result = await removeServerEverywhere(
+      {
+        store: this.store,
+        secrets: this.context.secrets,
+        link: this.link,
+        logger: (message) => this.logChannel?.appendLine(`[serial] ${message}`),
+      },
+      id
+    )
+    if (result.status === 'missing') {
       return 'missing'
     }
-    const rest = servers.filter((server) => server.id !== id)
-    await this.store.save(rest)
-    await this.context.secrets.delete(passwordKey(id))
-    if (this.link.connectedServerId() === id) {
-      this.link.disconnect()
+    if (result.secretError) {
+      void vscode.window.showWarningMessage(result.secretError)
     }
-    await this.post({ type: 'serialServers', servers: rest.map(toServerWire) })
+    await this.post({ type: 'serialServers', servers: result.rest.map(toServerWire) })
     this.treeProvider.refresh()
-    this.logChannel?.appendLine(`[serial] 串口服务器已删除：${target.name}`)
     return 'deleted'
   }
 

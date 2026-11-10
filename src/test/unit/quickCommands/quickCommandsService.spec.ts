@@ -563,3 +563,79 @@ describe('QuickCommandsService.execute（专用终端，v3.5）', () => {
     expect(options.cwd).toBeUndefined()
   })
 })
+
+describe('写前重读（17 方案阶段 1，P1-1）', () => {
+  it('addCommand：加载后外部新增的命令不被内存旧列表覆盖（另一窗口/手改文件场景）', async () => {
+    const store = new FakeStore()
+    const service = new QuickCommandsService(store)
+    await service.load()
+    // 模拟另一窗口 / 用户手改数据后追加的命令（FakeStore.load 每次深拷贝最新 data）
+    store.data = {
+      groups: [],
+      commands: [
+        { id: 'ext-1', name: '外部', command: 'external-cmd', groupId: null, addedAt: 't' },
+      ],
+    }
+    const result = await service.addCommand({ command: 'local-cmd' })
+    expect(result.status).toBe('added')
+    // 修复前：内存旧列表（空）整文件覆盖 → 外部条目丢失；修复后：写前重读保留外部条目
+    expect(store.data.commands.some((item) => item.id === 'ext-1')).toBe(true)
+    expect(store.data.commands).toHaveLength(2)
+  })
+
+  it('重读失败（非 FileNotFound IO 错误）：变更中止且不落盘，队列可恢复', async () => {
+    let failRead = false
+    const store = new FakeStore()
+    // 让 load 抛错模拟磁盘 IO 故障（非 FileNotFound）
+    failRead = true
+    const failing = new Proxy(store, {
+      get(target, prop, receiver) {
+        if (prop === 'load') {
+          return async () => {
+            if (failRead) {
+              throw new Error('EBUSY')
+            }
+            return target.load()
+          }
+        }
+        return Reflect.get(target, prop, receiver)
+      },
+    })
+    const wrapped = new QuickCommandsService(failing)
+    await wrapped.load()
+    await expect(wrapped.addCommand({ command: 'local-cmd' })).rejects.toThrow('EBUSY')
+    failRead = false
+    expect((await wrapped.addCommand({ command: 'local-cmd' })).status).toBe('added')
+  })
+
+  it('首次变更等待加载完成：激活期 load 未返回时写入不抹掉已有数据（加载先行）', async () => {
+    let releaseLoad: (() => void) | undefined
+    const gate = new Promise<void>((resolve) => {
+      releaseLoad = resolve
+    })
+    const store = new FakeStore()
+    store.data = {
+      groups: [],
+      commands: [{ id: 'seed-1', name: '既有', command: 'seed-cmd', groupId: null, addedAt: 't' }],
+    }
+    const gated = new Proxy(store, {
+      get(target, prop, receiver) {
+        if (prop === 'load') {
+          return async () => {
+            await gate
+            return target.load()
+          }
+        }
+        return Reflect.get(target, prop, receiver)
+      },
+    })
+    const service = new QuickCommandsService(gated)
+    // 模拟激活期后台加载尚未完成（未 await）
+    const loading = service.load()
+    const adding = service.addCommand({ command: 'local-cmd' })
+    releaseLoad?.()
+    await loading
+    expect((await adding).status).toBe('added')
+    expect(store.data.commands.some((item) => item.id === 'seed-1')).toBe(true)
+  })
+})

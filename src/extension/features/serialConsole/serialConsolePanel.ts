@@ -1,5 +1,4 @@
 import * as vscode from 'vscode'
-import { STORAGE } from '../../constants'
 import { deriveFormSchema, toFieldDefs } from '../../../webview/formSchema'
 import type { HostMessage, SerialServerWire, WebviewMessage } from '../../../webview/protocol'
 import {
@@ -8,7 +7,7 @@ import {
 } from '../../../webview/host/webviewController'
 import type { CommandHistoryService } from './commandHistoryService'
 import type { SerialServer } from './models'
-import { createServerId } from './models'
+import { createServerId, passwordKey } from './models'
 import type { SerialPortFactory } from './serialPortFactory'
 import {
   createSerialLinkService,
@@ -17,6 +16,7 @@ import {
 } from './serialLinkService'
 import { coerceServerDraft, SERVER_FIELD_DEFS } from './serverSchema'
 import type { IServerStore } from './serverStore'
+import { removeServerEverywhere, type ServerRemovalResult } from './serverRemoval'
 import { reasonOf } from '../../services/errors'
 
 /**
@@ -69,11 +69,8 @@ export interface LinkStatusSnapshot {
 export const AUTO_LOGIN_USERNAME_DELAY_MS = 800
 export const AUTO_LOGIN_PASSWORD_DELAY_MS = 500
 
+/** 旧键拼接用的后缀（现行键的拼接已统一到 models.passwordKey）。 */
 const PASSWORD_KEY_SUFFIX = '.password'
-
-export function passwordKey(serverId: string): string {
-  return `${STORAGE.serialServerSecretPrefix}${serverId}${PASSWORD_KEY_SUFFIX}`
-}
 
 /**
  * 旧前缀（v0.7.0，09 方案阶段 5 改名前的 SecretStorage 键）。
@@ -245,32 +242,25 @@ export function createSerialConsoleDeps(
   }
 
   async function deleteServer(id: string): Promise<void> {
-    const servers = await loadServersOrPostError()
-    if (!servers) {
-      return
-    }
-    const target = servers.find((server) => server.id === id)
-    if (!target) {
-      await post({ type: 'error', message: '要删除的服务器不存在，可能已被删除，请刷新列表。' })
-      return
-    }
-    const rest = servers.filter((server) => server.id !== id)
+    // 核心逻辑收敛到 removeServerEverywhere（与树右键路径同实现，17 方案阶段 1）
+    let result: ServerRemovalResult
     try {
-      await services.store.save(rest)
+      result = await removeServerEverywhere(
+        { store: services.store, secrets: services.secrets, link, logger: services.logger },
+        id
+      )
     } catch (err) {
       await post({ type: 'error', message: `删除服务器失败：${reasonOf(err)}` })
       return
     }
-    try {
-      await services.secrets.delete(passwordKey(id))
-    } catch (err) {
-      await post({ type: 'error', message: `服务器已删除，但清理保存的密码失败：${reasonOf(err)}` })
+    if (result.status === 'missing') {
+      await post({ type: 'error', message: '要删除的服务器不存在，可能已被删除，请刷新列表。' })
+      return
     }
-    if (link.connectedServerId() === id) {
-      link.disconnect() // 删除当前连接的服务器：同步断开
+    if (result.secretError) {
+      await post({ type: 'error', message: result.secretError })
     }
-    services.logger?.(`串口服务器已删除：${target.name}`)
-    await pushServers(rest)
+    await pushServers(result.rest)
   }
 
   async function connectServer(serverId: string): Promise<void> {

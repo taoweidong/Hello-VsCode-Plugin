@@ -5,6 +5,8 @@
  * （key 见 serialConsoleController），数据文件 / 日志 / 输出通道零明文。
  */
 
+import { STORAGE } from '../../constants'
+
 /** 命令下发换行符。 */
 export type LineEnding = 'lf' | 'crlf' | 'cr'
 
@@ -104,4 +106,18 @@ export function isDataBits(value: unknown): value is 8 | 7 | 6 | 5 {
 
 export function isStopBits(value: unknown): value is 1 | 2 {
   return value === 1 || value === 2
+}
+
+/* ---------------- SecretStorage 键 ---------------- */
+
+/** SecretStorage 密码键的后缀（passwordKey 拼接用）。 */
+const PASSWORD_KEY_SUFFIX = '.password'
+
+/**
+ * 服务器登录密码在 SecretStorage 中的键（v3.6.1 自 serialConsolePanel 迁入：
+ * 控制器与面板两条删除路径共享 serverRemoval 时需要同一来源，避免环依赖）。
+ * 密码绝不入数据文件 / 日志（文件头契约）。
+ */
+export function passwordKey(serverId: string): string {
+  return `${STORAGE.serialServerSecretPrefix}${serverId}${PASSWORD_KEY_SUFFIX}`
 }

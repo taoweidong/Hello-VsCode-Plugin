@@ -118,3 +118,37 @@ describe('coerceServerDraft', () => {
     ])
   })
 })
+
+describe('未知键透传与 secret-like 过滤（17 方案阶段 1，P2-B5）', () => {
+  it('secret-like 键（userPassword / adminPassword 等变体）不透传到 draft，普通未知键保留', () => {
+    const result = coerceServerDraft({
+      ...validDraft,
+      userPassword: 'leak',
+      adminPassword: 'leak2',
+      user_password: 'leak3',
+      customNote: '保留',
+    })
+    expect(result).toMatchObject({ ok: true })
+    if (!result.ok) return
+    // webview 消息是不可信输入：任何 password 变体都不得明文落进数据文件
+    expect(result.draft.userPassword).toBeUndefined()
+    expect(result.draft.adminPassword).toBeUndefined()
+    expect(result.draft.user_password).toBeUndefined()
+    expect(result.draft.customNote).toBe('保留')
+  })
+})
+
+/** 本文件内 describe 局部 valid 的模块级副本（追加分组的独立夹具）。 */
+const validDraft = {
+  name: '服务器甲',
+  serialPath: 'COM3',
+  baudRate: '115200',
+  dataBits: '8',
+  stopBits: '1',
+  parity: 'none',
+  flowControl: 'none',
+  lineEnding: 'lf',
+  autoLogin: 'false',
+  username: '',
+  description: '带外管理口',
+}

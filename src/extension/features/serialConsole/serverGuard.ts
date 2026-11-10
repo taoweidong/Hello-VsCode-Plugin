@@ -97,7 +97,7 @@ function pickUnknownScalars(record: Record<string, unknown>): Record<string, unk
 }
 
 /** 含 password 的键视作敏感字段（password / adminPassword / user_password 等变体）。 */
-function isSecretLikeKey(key: string): boolean {
+export function isSecretLikeKey(key: string): boolean {
   return key.toLowerCase().includes('password')
 }
 

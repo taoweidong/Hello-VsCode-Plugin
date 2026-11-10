@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as vscode from 'vscode'
 import { SerialConsoleController } from '../../../extension/features/serialConsole/serialConsoleController'
-import { __resetStubs, createExtensionContextStub } from '../stubs/vscode'
+import { __resetStubs, __stubs, createExtensionContextStub } from '../stubs/vscode'
 import { makeServer } from './support/serverHelpers'
 
 /**
@@ -138,5 +138,25 @@ describe('SerialConsoleController：dispose', () => {
     // Node 工厂——这里只验证未连接时的 dispose 安全性与状态复位）
     controller.dispose()
     expect(controller.link.state()).toBe('disconnected')
+  })
+})
+
+describe('SerialConsoleController：deleteServer 错误契约（17 方案阶段 1）', () => {
+  it('密码清理失败：删除不被阻断，返回 deleted 并以 showWarningMessage 上报', async () => {
+    const context = makeContext()
+    ;(context.secrets as unknown as { delete: () => Promise<void> }).delete = () =>
+      Promise.reject(new Error('keychain locked'))
+    const failing = new SerialConsoleController(context, makeOutputChannel())
+    await failing.store.save([makeServer({ id: 'srv-1' })])
+    await expect(failing.deleteServer('srv-1')).resolves.toBe('deleted')
+    expect(await failing.store.load()).toHaveLength(0)
+    expect(__stubs.recorded.some((entry) => entry.kind === 'showWarningMessage')).toBe(true)
+  })
+
+  it('落盘失败：错误向上抛（命令层负责 showError），密码未被清理', async () => {
+    const failing = new SerialConsoleController(makeContext(), makeOutputChannel())
+    await failing.store.save([makeServer({ id: 'srv-1' })])
+    vi.spyOn(failing.store, 'save').mockRejectedValue(new Error('disk full'))
+    await expect(failing.deleteServer('srv-1')).rejects.toThrow('disk full')
   })
 })

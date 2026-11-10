@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import { COMMAND, CONFIG } from '../constants'
+import { reasonOf } from '../services/errors'
 import type { SerialConsoleController } from '../features/serialConsole/serialConsoleController'
 import { SerialConsolePanel } from '../features/serialConsole/serialConsolePanel'
 import type { SerialServerNode } from '../features/serialConsole/serialServersTreeProvider'
@@ -82,9 +83,14 @@ export function registerSerialConsoleCommands(
       if (choice !== '删除') {
         return
       }
-      const result = await controller.deleteServer(server.id)
-      if (result === 'missing') {
-        void vscode.window.showWarningMessage('服务器不存在（可能已被删除），列表已刷新。')
+      // store IO 失败以 showError 呈现而非 rejected promise（与本仓其他命令契约一致）
+      try {
+        const result = await controller.deleteServer(server.id)
+        if (result === 'missing') {
+          void vscode.window.showWarningMessage('服务器不存在（可能已被删除），列表已刷新。')
+        }
+      } catch (err) {
+        void vscode.window.showErrorMessage(`删除服务器失败：${reasonOf(err)}`)
       }
     })
   )

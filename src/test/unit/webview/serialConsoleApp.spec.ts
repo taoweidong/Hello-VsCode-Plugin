@@ -386,3 +386,50 @@ describe('serialConsole 页面：历史命令', () => {
     expect(postedTypes()).toContain('commandHistoryClear')
   })
 })
+
+describe('serialConsole 页面：保存竞态（17 方案阶段 1，P1-4）', () => {
+  it('保存推送到达前切换编辑另一服务器：推送不清空新编辑表单', async () => {
+    wrapper = mount(App)
+    sendInit({ servers: [makeServer(), makeServer({ id: 'srv-2', name: '服务器乙' })] })
+    await wrapper.vm.$nextTick()
+    // 编辑 srv-1 并发起保存（在途）
+    const editButtons = () => wrapper!.findAll('.server-list__actions button[title="编辑"]')
+    await editButtons()[0]?.trigger('click')
+    await wrapper.find('input[placeholder="如：服务器甲"]').setValue('甲改名')
+    const saveButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('保存修改'))
+    await saveButton?.trigger('click')
+
+    // 推送到达前：用户切换到编辑 srv-2（表单被替换为新对象）
+    await editButtons()[1]?.trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(inputValue(wrapper.find('input[placeholder="如：服务器甲"]').element)).toBe('服务器乙')
+
+    // 自己的保存推送到达：不得把 srv-2 的编辑表单清空回新增态
+    hostMessage({
+      type: 'serialServers',
+      servers: [makeServer({ name: '甲改名' }), makeServer({ id: 'srv-2', name: '服务器乙' })],
+    })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.text()).toContain('编辑服务器')
+    expect(inputValue(wrapper.find('input[placeholder="如：服务器甲"]').element)).toBe('服务器乙')
+  })
+
+  it('保存推送到达且表单未被切换：仍复位为新增态（既有语义保持）', async () => {
+    wrapper = mount(App)
+    sendInit({ servers: [makeServer()] })
+    await wrapper.vm.$nextTick()
+    const editButtons = wrapper.findAll('.server-list__actions button[title="编辑"]')
+    await editButtons[0]?.trigger('click')
+    await wrapper.find('input[placeholder="如：服务器甲"]').setValue('甲改名')
+    const saveButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('保存修改'))
+    await saveButton?.trigger('click')
+    hostMessage({ type: 'serialServers', servers: [makeServer({ name: '甲改名' })] })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.text()).not.toContain('编辑服务器')
+    expect(inputValue(wrapper.find('input[placeholder="如：服务器甲"]').element)).toBe('')
+  })
+})

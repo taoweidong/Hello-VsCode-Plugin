@@ -443,3 +443,92 @@ describe('resolveBookmarkUri / jump / ensureDataFile（14 方案 §4）', () => 
     )
   })
 })
+
+describe('写前重读（17 方案阶段 1，P1-1）', () => {
+  /** 内存 store：load 返回 saved 的拷贝（模拟内存/磁盘两份状态）、save 覆写 saved。 */
+  function makeMemoryService() {
+    let saved: BookmarkItem[] = []
+    const service = new BookmarksService({
+      async load() {
+        return saved.map((item) => ({ ...item }))
+      },
+      async save(next) {
+        saved = next
+      },
+      dataFileUri: () => vscode.Uri.file('/memory/bookmarks.json'),
+    })
+    return { service, readSaved: () => saved }
+  }
+
+  it('① 加载后外部新增的书签不被内存旧列表覆盖（另一窗口/手改文件场景）', async () => {
+    const { service, readSaved } = makeMemoryService()
+    await service.load()
+    readSaved().push({
+      id: 'ext-1',
+      path: 'ext.ts',
+      line: 9,
+      text: '外部新增',
+      addedAt: '2026-11-11T00:00:00.000Z',
+    })
+    const uri = await writeFile(tmpRoot, 'local.ts')
+    const result = await service.toggle(uri, 3, 'local')
+    expect(result.added).toBeTruthy()
+    // 修复前：内存旧列表（空）整文件覆盖 → 外部条目丢失；修复后：写前重读保留外部条目
+    expect(readSaved().some((item) => item.id === 'ext-1')).toBe(true)
+    expect(readSaved()).toHaveLength(2)
+  })
+
+  it('② 重读失败（非 FileNotFound IO 错误）：变更中止且不落盘，队列可恢复', async () => {
+    let failRead = false
+    let saved: BookmarkItem[] = []
+    const service = new BookmarksService({
+      async load() {
+        if (failRead) {
+          throw new Error('EBUSY')
+        }
+        return saved
+      },
+      async save(next) {
+        saved = next
+      },
+      dataFileUri: () => vscode.Uri.file('/memory/bookmarks.json'),
+    })
+    await service.load()
+    failRead = true
+    const uri = await writeFile(tmpRoot, 'local.ts')
+    await expect(service.toggle(uri, 3, 'local')).rejects.toThrow('EBUSY')
+    expect(saved).toEqual([]) // 未落盘
+    failRead = false
+    expect((await service.toggle(uri, 3, 'local')).added).toBeTruthy() // 队列未毒化
+    expect(service.list()).toHaveLength(1)
+  })
+
+  it('③ 首次变更等待加载完成：激活期 load 未返回时写入不抹掉已有数据（加载先行）', async () => {
+    let releaseLoad: (() => void) | undefined
+    let saved: BookmarkItem[] = [
+      { id: 'seed-1', path: 'seed.ts', line: 1, text: '既有', addedAt: 'x' },
+    ]
+    const gate = new Promise<void>((resolve) => {
+      releaseLoad = resolve
+    })
+    const service = new BookmarksService({
+      async load() {
+        await gate
+        return saved.map((item) => ({ ...item }))
+      },
+      async save(next) {
+        saved = next
+      },
+      dataFileUri: () => vscode.Uri.file('/memory/bookmarks.json'),
+    })
+    // 模拟激活期后台加载尚未完成：50ms 后才放行（toggle 的路径计算同步先就绪）
+    setTimeout(() => releaseLoad?.(), 50)
+    const loading = service.load()
+    const uri = await writeFile(tmpRoot, 'local.ts')
+    const result = await service.toggle(uri, 3, 'local')
+    expect(result.added).toBeTruthy()
+    await loading
+    // 修复前：toggle 不等加载直接以内存空列表覆盖 → seed 丢失；修复后：加载先行保留 seed
+    expect(saved.some((item) => item.id === 'seed-1')).toBe(true)
+  })
+})

@@ -7,6 +7,7 @@ import {
   type Parity,
   type SerialServerDraft,
 } from './models'
+import { isSecretLikeKey } from './serverGuard'
 
 /**
  * 串口服务器领域 Schema（参数化字段表，经 deriveFormSchema 派生表单）：
@@ -193,7 +194,9 @@ export function coerceServerDraft(raw: Record<string, unknown>): CoerceServerDra
   }
 
   for (const [key, value] of Object.entries(source)) {
-    if (key in draft || key === 'password') continue
+    // 未知键透传，但 secret-like 键（adminPassword / userPassword 等变体）一律剔除：
+    // webview 消息是运行时不可信输入，与加载侧 serverGuard 同一防线（数据文件零明文）
+    if (key in draft || isSecretLikeKey(key)) continue
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
       draft[key] = value
     }

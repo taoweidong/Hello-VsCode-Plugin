@@ -3,6 +3,7 @@ import * as path from 'path'
 import * as vscode from 'vscode'
 import { CONFIG, STORAGE } from '../../constants'
 import { writeJsonAtomic } from '../../services/stores/atomicWrite'
+import { QueuedStoreMutations } from '../../services/stores/queuedFileStore'
 
 /**
  * 快捷命令（v3.5，16 方案）：终端命令收藏 + 别名 + 显式分组 + 单击在终端执行。
@@ -344,6 +345,26 @@ export class QuickCommandsService implements vscode.Disposable {
   private readonly _onDidChange = new vscode.EventEmitter<void>()
   readonly onDidChange = this._onDidChange.event
 
+  /**
+   * 数据完整性契约（17 方案阶段 1，P1-1）：所有写操作经串行队列
+   * 「加载先行 → 写前重读 → 变更 → 落盘」，多窗口 / 激活期慢加载场景
+   * 不会用陈旧内存数据整文件覆盖磁盘数据；重读失败中止变更不落盘。
+   */
+  private readonly mutations = new QueuedStoreMutations(
+    () => {
+      this.loadPromise ??= this.doLoad()
+      return this.loadPromise
+    },
+    async () => {
+      const data = await this.store.load()
+      this.groups = data.groups
+      this.commands = data.commands
+      this.loadError = undefined
+    }
+  )
+  /** 初始加载缓存（幂等；写路径经 mutations.ensureLoaded 复用同一 promise）。 */
+  private loadPromise: Promise<void> | undefined
+
   constructor(
     private readonly store: IQuickCommandsStore,
     private readonly options: {
@@ -354,8 +375,18 @@ export class QuickCommandsService implements vscode.Disposable {
     } = {}
   ) {}
 
-  /** 加载持久化数据（激活时调用；失败保留空列表并记录原因）。 */
+  /** 加载持久化数据（激活时调用；失败保留空列表并记录原因；完成后触发变更事件）。 */
   async load(): Promise<void> {
+    this.loadPromise = this.doLoad()
+    try {
+      await this.loadPromise
+    } finally {
+      this._onDidChange.fire()
+    }
+  }
+
+  /** 加载实现（不触发事件——变更队列内隐式加载不应多发 onDidChange）。 */
+  private async doLoad(): Promise<void> {
     try {
       const data = await this.store.load()
       this.groups = data.groups
@@ -366,7 +397,6 @@ export class QuickCommandsService implements vscode.Disposable {
       this.commands = []
       this.loadError = err instanceof Error ? err.message : String(err)
     }
-    this._onDidChange.fire()
   }
 
   listCommands(): QuickCommandItem[] {
@@ -391,154 +421,173 @@ export class QuickCommandsService implements vscode.Disposable {
    * 新增快捷命令：command trim 后全文精确去重（重复仅提示不覆盖，16 方案 §3.2）；
    * 新条目插入所在分组顶部（同 groupId 首个条目之前）。
    */
-  async addCommand(input: {
+  addCommand(input: {
     command: string
     name?: string
     groupId?: string | null
   }): Promise<AddCommandStatus> {
-    const command = input.command.trim()
-    const groupId = input.groupId ?? null
-    if (command.length === 0 || (groupId !== null && !this.getGroup(groupId))) {
-      return { status: 'invalid' }
-    }
-    const existing = this.commands.find((entry) => entry.command === command)
-    if (existing) {
-      return { status: 'duplicate', existing }
-    }
-    if (this.commands.length >= MAX_QUICK_COMMANDS) {
-      return { status: 'cap' }
-    }
-    const item: QuickCommandItem = {
-      id: randomUUID(),
-      name: input.name && input.name.trim().length > 0 ? input.name.trim() : defaultAlias(command),
-      command,
-      groupId,
-      addedAt: new Date().toISOString(),
-    }
-    const insertAt = this.commands.findIndex((entry) => entry.groupId === groupId)
-    if (insertAt >= 0) {
-      this.commands.splice(insertAt, 0, item)
-    } else {
-      this.commands.push(item)
-    }
-    await this.persist()
-    return { status: 'added', item }
+    return this.mutations.run(async () => {
+      const command = input.command.trim()
+      const groupId = input.groupId ?? null
+      if (command.length === 0 || (groupId !== null && !this.getGroup(groupId))) {
+        return { status: 'invalid' }
+      }
+      const existing = this.commands.find((entry) => entry.command === command)
+      if (existing) {
+        return { status: 'duplicate', existing }
+      }
+      if (this.commands.length >= MAX_QUICK_COMMANDS) {
+        return { status: 'cap' }
+      }
+      const item: QuickCommandItem = {
+        id: randomUUID(),
+        name:
+          input.name && input.name.trim().length > 0 ? input.name.trim() : defaultAlias(command),
+        command,
+        groupId,
+        addedAt: new Date().toISOString(),
+      }
+      const insertAt = this.commands.findIndex((entry) => entry.groupId === groupId)
+      if (insertAt >= 0) {
+        this.commands.splice(insertAt, 0, item)
+      } else {
+        this.commands.push(item)
+      }
+      await this.persist()
+      return { status: 'added', item }
+    })
   }
 
   /** 重命名别名（id 不存在或名字空白返回 false）。 */
-  async renameCommand(id: string, name: string): Promise<boolean> {
-    const trimmed = name.trim()
-    const item = this.get(id)
-    if (!item || trimmed.length === 0) {
-      return false
-    }
-    item.name = trimmed
-    await this.persist()
-    return true
+  renameCommand(id: string, name: string): Promise<boolean> {
+    return this.mutations.run(async () => {
+      const trimmed = name.trim()
+      const item = this.get(id)
+      if (!item || trimmed.length === 0) {
+        return false
+      }
+      item.name = trimmed
+      await this.persist()
+      return true
+    })
   }
 
   /** 修改命令文本：trim 后与其他条目冲突 → 'duplicate'。 */
-  async updateCommandText(id: string, command: string): Promise<UpdateTextStatus> {
-    const trimmed = command.trim()
-    if (trimmed.length === 0) {
-      return 'empty'
-    }
-    const item = this.get(id)
-    if (!item) {
-      return 'notfound'
-    }
-    if (this.commands.some((entry) => entry.id !== id && entry.command === trimmed)) {
-      return 'duplicate'
-    }
-    item.command = trimmed
-    await this.persist()
-    return 'updated'
+  updateCommandText(id: string, command: string): Promise<UpdateTextStatus> {
+    return this.mutations.run(async () => {
+      const trimmed = command.trim()
+      if (trimmed.length === 0) {
+        return 'empty'
+      }
+      const item = this.get(id)
+      if (!item) {
+        return 'notfound'
+      }
+      if (this.commands.some((entry) => entry.id !== id && entry.command === trimmed)) {
+        return 'duplicate'
+      }
+      item.command = trimmed
+      await this.persist()
+      return 'updated'
+    })
   }
 
   /** 移除快捷命令（id 不存在返回 false）。 */
-  async removeCommand(id: string): Promise<boolean> {
-    const before = this.commands.length
-    this.commands = this.commands.filter((entry) => entry.id !== id)
-    if (this.commands.length === before) {
-      return false
-    }
-    await this.persist()
-    return true
+  removeCommand(id: string): Promise<boolean> {
+    return this.mutations.run(async () => {
+      const before = this.commands.length
+      this.commands = this.commands.filter((entry) => entry.id !== id)
+      if (this.commands.length === before) {
+        return false
+      }
+      await this.persist()
+      return true
+    })
   }
 
   /** 移动到分组（groupId=null 回到未分组；分组不存在或条目不存在返回 false）。 */
-  async moveCommandToGroup(id: string, groupId: string | null): Promise<boolean> {
-    const item = this.get(id)
-    if (!item || (groupId !== null && !this.getGroup(groupId))) {
-      return false
-    }
-    item.groupId = groupId
-    await this.persist()
-    return true
+  moveCommandToGroup(id: string, groupId: string | null): Promise<boolean> {
+    return this.mutations.run(async () => {
+      const item = this.get(id)
+      if (!item || (groupId !== null && !this.getGroup(groupId))) {
+        return false
+      }
+      item.groupId = groupId
+      await this.persist()
+      return true
+    })
   }
 
   /** 新建分组：trim 后唯一；超出上限返回 cap。 */
-  async createGroup(name: string): Promise<GroupOp> {
-    const trimmed = name.trim()
-    if (trimmed.length === 0) {
-      return { status: 'cap' } // 调用方（壳层）保证非空；此分支仅防御
-    }
-    const existing = this.groups.find((group) => group.name === trimmed)
-    if (existing) {
-      return { status: 'duplicate', existing }
-    }
-    if (this.groups.length >= MAX_QUICK_COMMAND_GROUPS) {
-      return { status: 'cap' }
-    }
-    const group: QuickCommandGroup = {
-      id: randomUUID(),
-      name: trimmed,
-      createdAt: new Date().toISOString(),
-    }
-    this.groups.push(group)
-    await this.persist()
-    return { status: 'created', group }
+  createGroup(name: string): Promise<GroupOp> {
+    return this.mutations.run(async () => {
+      const trimmed = name.trim()
+      if (trimmed.length === 0) {
+        return { status: 'cap' } // 调用方（壳层）保证非空；此分支仅防御
+      }
+      const existing = this.groups.find((group) => group.name === trimmed)
+      if (existing) {
+        return { status: 'duplicate', existing }
+      }
+      if (this.groups.length >= MAX_QUICK_COMMAND_GROUPS) {
+        return { status: 'cap' }
+      }
+      const group: QuickCommandGroup = {
+        id: randomUUID(),
+        name: trimmed,
+        createdAt: new Date().toISOString(),
+      }
+      this.groups.push(group)
+      await this.persist()
+      return { status: 'created', group }
+    })
   }
 
   /** 重命名分组：重名冲突 → 'duplicate'。 */
-  async renameGroup(id: string, name: string): Promise<RenameGroupStatus> {
-    const trimmed = name.trim()
-    const group = this.getGroup(id)
-    if (!group || trimmed.length === 0) {
-      return 'notfound'
-    }
-    if (this.groups.some((entry) => entry.id !== id && entry.name === trimmed)) {
-      return 'duplicate'
-    }
-    group.name = trimmed
-    await this.persist()
-    return 'renamed'
+  renameGroup(id: string, name: string): Promise<RenameGroupStatus> {
+    return this.mutations.run(async () => {
+      const trimmed = name.trim()
+      const group = this.getGroup(id)
+      if (!group || trimmed.length === 0) {
+        return 'notfound'
+      }
+      if (this.groups.some((entry) => entry.id !== id && entry.name === trimmed)) {
+        return 'duplicate'
+      }
+      group.name = trimmed
+      await this.persist()
+      return 'renamed'
+    })
   }
 
   /** 删除分组：组内命令回落未分组（16 方案 §3.3）；id 不存在返回 false。 */
-  async removeGroup(id: string): Promise<boolean> {
-    if (!this.getGroup(id)) {
-      return false
-    }
-    this.groups = this.groups.filter((group) => group.id !== id)
-    for (const item of this.commands) {
-      if (item.groupId === id) {
-        item.groupId = null
+  removeGroup(id: string): Promise<boolean> {
+    return this.mutations.run(async () => {
+      if (!this.getGroup(id)) {
+        return false
       }
-    }
-    await this.persist()
-    return true
+      this.groups = this.groups.filter((group) => group.id !== id)
+      for (const item of this.commands) {
+        if (item.groupId === id) {
+          item.groupId = null
+        }
+      }
+      await this.persist()
+      return true
+    })
   }
 
   /** 使用记录回写：lastUsedAt = now，useCount + 1（QuickPick MRU 留数据）。 */
-  async recordExecution(id: string): Promise<void> {
-    const item = this.get(id)
-    if (!item) {
-      return
-    }
-    item.lastUsedAt = new Date().toISOString()
-    item.useCount = (item.useCount ?? 0) + 1
-    await this.persist()
+  recordExecution(id: string): Promise<void> {
+    return this.mutations.run(async () => {
+      const item = this.get(id)
+      if (!item) {
+        return
+      }
+      item.lastUsedAt = new Date().toISOString()
+      item.useCount = (item.useCount ?? 0) + 1
+      await this.persist()
+    })
   }
 
   /**

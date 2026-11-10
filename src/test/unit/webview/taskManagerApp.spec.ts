@@ -493,3 +493,40 @@ describe('taskManager 页面：协议守卫', () => {
     expect(w.text()).toContain('任务管理')
   })
 })
+
+describe('taskManager 页面：上行消息契约（17 方案阶段 1，P1-3）', () => {
+  it('全部上行消息（ready/taskListRequest/submit/taskDelete）通过 isWebviewMessage 守卫', async () => {
+    const w = openAndInit()
+    await w.vm.$nextTick()
+    // 新建 → 保存：submit
+    await w
+      .findAll('button')
+      .find((b) => b.text().includes('新建任务'))
+      ?.trigger('click')
+    await w.find('input[placeholder^="如 主干每日构建"]').setValue('任务丙')
+    await w.find('input[placeholder^="如 release"]').setValue('dev')
+    await w
+      .findAll('button')
+      .find((b) => b.text().includes('保存'))
+      ?.trigger('click')
+    await w.vm.$nextTick()
+    // 行内删除两段式：taskDelete
+    hostMessage({ type: 'taskList', page: { items: [task()], total: 1, page: 1, pageSize: 10 } })
+    await w.vm.$nextTick()
+    await w
+      .findAll('button')
+      .find((b) => b.attributes('title') === '删除任务')
+      ?.trigger('click')
+    await w
+      .findAll('button')
+      .find((b) => b.attributes('title') === '再次点击确认删除')
+      ?.trigger('click')
+    await w.vm.$nextTick()
+
+    expect(postedTypes()).toEqual(['ready', 'taskListRequest', 'submit', 'taskDelete'])
+    const { isWebviewMessage } = await import('../../../webview/protocol')
+    for (const message of api.posted) {
+      expect(isWebviewMessage(message), `消息未过守卫：${JSON.stringify(message)}`).toBe(true)
+    }
+  })
+})

@@ -3,6 +3,7 @@ import * as path from 'path'
 import * as vscode from 'vscode'
 import { STORAGE } from '../../constants'
 import { writeJsonAtomic } from '../../services/stores/atomicWrite'
+import { QueuedStoreMutations } from '../../services/stores/queuedFileStore'
 
 /**
  * 代码书签（v3.6，14 方案）：行级书签 + `Ctrl+Alt+K` 打/取消 + 树视图 / QuickPick /
@@ -224,6 +225,24 @@ export class BookmarksService implements vscode.Disposable {
   private readonly _onDidChange = new vscode.EventEmitter<void>()
   readonly onDidChange = this._onDidChange.event
 
+  /**
+   * 数据完整性契约（17 方案阶段 1，P1-1）：所有写操作经串行队列
+   * 「加载先行 → 写前重读 → 变更 → 落盘」，多窗口 / 激活期慢加载场景
+   * 不会用陈旧内存列表整文件覆盖磁盘数据；重读失败中止变更不落盘。
+   */
+  private readonly mutations = new QueuedStoreMutations(
+    () => {
+      this.loadPromise ??= this.doLoad()
+      return this.loadPromise
+    },
+    async () => {
+      this.items = await this.store.load()
+      this.loadError = undefined
+    }
+  )
+  /** 初始加载缓存（幂等；写路径经 mutations.ensureLoaded 复用同一 promise）。 */
+  private loadPromise: Promise<void> | undefined
+
   constructor(
     private readonly store: IBookmarksStore,
     /** 工作区文件夹提供者（可注入，测试友好；默认第一个工作区文件夹；resolveBookmarkUri 回退用）。 */
@@ -231,8 +250,18 @@ export class BookmarksService implements vscode.Disposable {
       vscode.workspace.workspaceFolders?.[0]
   ) {}
 
-  /** 加载持久化数据（激活时调用；失败保留空列表并记录原因）。 */
+  /** 加载持久化数据（激活时调用；失败保留空列表并记录原因；完成后触发变更事件）。 */
   async load(): Promise<void> {
+    this.loadPromise = this.doLoad()
+    try {
+      await this.loadPromise
+    } finally {
+      this._onDidChange.fire()
+    }
+  }
+
+  /** 加载实现（不触发事件——变更队列内隐式加载不应多发 onDidChange）。 */
+  private async doLoad(): Promise<void> {
     try {
       this.items = await this.store.load()
       this.loadError = undefined
@@ -240,7 +269,6 @@ export class BookmarksService implements vscode.Disposable {
       this.items = []
       this.loadError = err instanceof Error ? err.message : String(err)
     }
-    this._onDidChange.fire()
   }
 
   list(): BookmarkItem[] {
@@ -332,50 +360,56 @@ export class BookmarksService implements vscode.Disposable {
    * toggle：同文件同 line 已存在 → 移除并返回 removed；否则插头部返回 added
    * （上限裁剪丢最旧）。line 为 0-based。
    */
-  async toggle(
+  toggle(
     uri: vscode.Uri,
     line: number,
     text: string
   ): Promise<{ added?: BookmarkItem; removed?: BookmarkItem }> {
-    const key = toPosix(this.storagePathFor(uri))
-    const existing = this.items.find((item) => toPosix(item.path) === key && item.line === line)
-    if (existing) {
-      this.items = this.items.filter((item) => item !== existing)
+    return this.mutations.run(async () => {
+      const key = toPosix(this.storagePathFor(uri))
+      const existing = this.items.find((item) => toPosix(item.path) === key && item.line === line)
+      if (existing) {
+        this.items = this.items.filter((item) => item !== existing)
+        await this.persist()
+        return { removed: existing }
+      }
+      const item: BookmarkItem = {
+        id: randomUUID(),
+        path: this.storagePathFor(uri),
+        line,
+        text: this.snapshotText(text),
+        addedAt: new Date().toISOString(),
+      }
+      this.items = [item, ...this.items]
+      this.trimToCap()
       await this.persist()
-      return { removed: existing }
-    }
-    const item: BookmarkItem = {
-      id: randomUUID(),
-      path: this.storagePathFor(uri),
-      line,
-      text: this.snapshotText(text),
-      addedAt: new Date().toISOString(),
-    }
-    this.items = [item, ...this.items]
-    this.trimToCap()
-    await this.persist()
-    return { added: item }
+      return { added: item }
+    })
   }
 
   /** 移除书签（id 不存在返回 false）。 */
-  async remove(id: string): Promise<boolean> {
-    const before = this.items.length
-    this.items = this.items.filter((item) => item.id !== id)
-    if (this.items.length === before) {
-      return false
-    }
-    await this.persist()
-    return true
+  remove(id: string): Promise<boolean> {
+    return this.mutations.run(async () => {
+      const before = this.items.length
+      this.items = this.items.filter((item) => item.id !== id)
+      if (this.items.length === before) {
+        return false
+      }
+      await this.persist()
+      return true
+    })
   }
 
   /** 清空全部书签，返回清除条数（空数据不触发持久化）。 */
-  async clear(): Promise<number> {
-    const count = this.items.length
-    if (count > 0) {
-      this.items = []
-      await this.persist()
-    }
-    return count
+  clear(): Promise<number> {
+    return this.mutations.run(async () => {
+      const count = this.items.length
+      if (count > 0) {
+        this.items = []
+        await this.persist()
+      }
+      return count
+    })
   }
 
   /** 循环导航顺序：按 (toPosix(path), line) 升序的排序副本（空间顺序即导航顺序）。 */

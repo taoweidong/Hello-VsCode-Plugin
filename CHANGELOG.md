@@ -4,6 +4,28 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### 修复（17 方案阶段 1：P1 正确性，评估报告见
+
+[需求与优化方案 17](docs/需求与优化方案/17-代码质量评估报告与分阶段优化方案.md)）
+
+- **P1-1 收藏夹 / 书签 / 快捷命令写路径补「加载先行 + 写前重读」**：新增共享
+  `QueuedStoreMutations` 队列（行为蓝本 draftBoxService），三个存储服务的全部写操作
+  串行化「加载 → 重读磁盘 → 变更 → 落盘」——多窗口 / 激活期慢加载场景不再用陈旧
+  内存列表整文件覆盖磁盘数据；重读失败（非 FileNotFound IO 错误）中止变更不落盘；
+- **P1-2 草稿箱读错误语义收紧**：文件不存在仍按空数据；其余读盘错误（EBUSY/EPERM 等）
+  记入 loadError 并中止变更——不再把「读盘失败」当「空草稿箱」后无备份覆盖原文件；
+- **P1-3 任务管理页上行消息类型化**：`post(unknown)` → `post(WebviewMessage)`，
+  拼错消息名 / payload 从编译期即报错（协议登记 `submit.draft.id` 编辑/新建判别约定）；
+- **P1-4 串口页保存竞态**：保存推送到达前若用户已切换编辑另一服务器，推送不再把
+  正在编辑的表单清空回新增态；
+- **P2-B5 保存路径 secret-like 键过滤**：`coerceServerDraft` 未知键透传时复用
+  `isSecretLikeKey` 防线——webview 不可信输入中 `userPassword` 等变体不再明文落盘；
+- **P2-B2 串口服务器删除收敛单实现**：树右键与 webview 两条路径共用
+  `removeServerEverywhere`（落盘失败抛错由命令层 showError 呈现；密码清理失败
+  不阻断删除并如实上报），`passwordKey` 迁至 models 单一来源。
+
 ## [3.6.0] - 2026-11-10
 
 ### 新增（代码书签）
