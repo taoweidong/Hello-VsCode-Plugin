@@ -15,6 +15,8 @@
 
 > **⚠ 恢复指引（2026-11-10 暂停）**：因并行会话实施 quick-commands 且已占用 v3.5.0，本计划暂停，恢复前必读 `.superpowers/sdd/2026-11-10-bookmarks-and-favorites-portability/progress.md` 的 Rulings 与恢复指引。要点：目标版本改为 **v3.6.0**（文中 v3.5.0 字样按此理解）；Task 7/8 的视图数/命令数以恢复时实际 HEAD 重算（quick-commands 落地后为 7 视图 / 47 命令基线，书签是第 8 视图、终态 56 命令）。
 
+> **✅ 实施完成（2026-11-11）**：Task 1–8 全部落地（提交 3ba08af…45d7a62），终态版本 **v3.6.0**（8 视图 / 56 命令）。验证记录：单测 78 文件 / 864 例全绿；`npm run gate` 9 步全绿；宿主集成冒烟 26 例全绿（含「书签（v3.6 集成冒烟）」套件）。Task 8 的文档编号以实际 HEAD 为准：功能介绍为 `10-代码书签.md`、开发指南为 `13-代码书签.md`（快捷命令顺延占用了 09/12）。
+
 ## Global Constraints
 
 - 命令 / 视图 / 存储 ID 单一来源 `src/extension/constants.ts`，package.json contributes 必须与之同步（门禁第 ⑥ 步双向闭合校验，含 keybindings）。
@@ -49,7 +51,7 @@
 - Produces: `IFavoritesStore.dataFileUri(): vscode.Uri`；`class GlobalJsonFavoritesStore extends JsonFavoritesStore`（仅构造转发 fileUri=globalStorageUri/favorites.json）；`createFavoritesStore(context, options)` 无工作区分支返回 `GlobalJsonFavoritesStore`；`async function migrateFavoritesMementoToFile(context, options?: { onWarning?: (m: string) => void; onMigrated?: (fileUri: vscode.Uri) => void }): Promise<boolean>`；`FavoritesService.dataFileUri(): vscode.Uri` 与 `FavoritesService.ensureDataFile(): Promise<void>`（stat FileNotFound → `store.save([])` 写空信封；其他错误原样抛）。
 - 删除：`MementoFavoritesStore` 类与 `IFavoritesStore` 之外的 Memento 依赖（迁移函数除外）。
 
-- [ ] **Step 1: 写失败测试**（追加到 favoritesService.spec.ts，复用现有 fake fs / 临时目录样板）
+- [x] **Step 1: 写失败测试**（追加到 favoritesService.spec.ts，复用现有 fake fs / 临时目录样板）
 
 ```ts
 // 1) createFavoritesStore 无工作区 → instanceof GlobalJsonFavoritesStore，dataFileUri 以 favorites.json 结尾
@@ -64,11 +66,11 @@
 // 6) FavoritesService.ensureDataFile：文件不存在 → store.save([]) 后文件存在且为空信封；已存在 → 不改写（mtime/内容不变）
 ```
 
-- [ ] **Step 2: 跑测试确认失败** — `npm run test:unit -- favorites`（vitest 过滤 favorites）。Expected: FAIL（GlobalJsonFavoritesStore / migrateFavoritesMementoToFile 未定义）。
-- [ ] **Step 3: 实现** — 按 Interfaces 逐项落地；`migrateFavoritesMementoToFile` 主体：读 `STORAGE.favoritesMementoKey` → 无数据 return false；stat 全局文件 → 存在则 `globalState.update(key, undefined)` 后 return false；不存在则 `normalizeFavoriteList(legacy, onWarning)` → `writeJsonAtomic(fileUri, { schemaVersion: FAVORITES_SCHEMA_VERSION, items })` → 清旧键 → `onMigrated?.(fileUri)` → return true；全程 try/catch：写失败**先于**清键，错误向上抛。
-- [ ] **Step 4: index.ts 装配** — `migrateLegacyKeys` 调用旁新增：`void migrateFavoritesMementoToFile(context, { onWarning: (m) => outputChannel.appendLine(`[收藏夹] ${m}`), onMigrated: (fileUri) => { outputChannel.appendLine(...); void vscode.window.showInformationMessage(\`无工作区收藏数据已迁移到文件：${fileUri.fsPath}\`) } }).catch(...)`——catch 内`showErrorMessage`（如实报错，旧数据保留）+ outputChannel 记录。
-- [ ] **Step 5: 全量单测 + lint** — `npm run test:unit` && `npm run lint`。Expected: PASS（现有 favorites 用例不回归）。
-- [ ] **Step 6: Commit** — `feat(favorites): 无工作区收藏数据落明文 JSON（globalStorage）+ 激活期一次性迁移`
+- [x] **Step 2: 跑测试确认失败** — `npm run test:unit -- favorites`（vitest 过滤 favorites）。Expected: FAIL（GlobalJsonFavoritesStore / migrateFavoritesMementoToFile 未定义）。
+- [x] **Step 3: 实现** — 按 Interfaces 逐项落地；`migrateFavoritesMementoToFile` 主体：读 `STORAGE.favoritesMementoKey` → 无数据 return false；stat 全局文件 → 存在则 `globalState.update(key, undefined)` 后 return false；不存在则 `normalizeFavoriteList(legacy, onWarning)` → `writeJsonAtomic(fileUri, { schemaVersion: FAVORITES_SCHEMA_VERSION, items })` → 清旧键 → `onMigrated?.(fileUri)` → return true；全程 try/catch：写失败**先于**清键，错误向上抛。
+- [x] **Step 4: index.ts 装配** — `migrateLegacyKeys` 调用旁新增：`void migrateFavoritesMementoToFile(context, { onWarning: (m) => outputChannel.appendLine(`[收藏夹] ${m}`), onMigrated: (fileUri) => { outputChannel.appendLine(...); void vscode.window.showInformationMessage(\`无工作区收藏数据已迁移到文件：${fileUri.fsPath}\`) } }).catch(...)`——catch 内`showErrorMessage`（如实报错，旧数据保留）+ outputChannel 记录。
+- [x] **Step 5: 全量单测 + lint** — `npm run test:unit` && `npm run lint`。Expected: PASS（现有 favorites 用例不回归）。
+- [x] **Step 6: Commit** — `feat(favorites): 无工作区收藏数据落明文 JSON（globalStorage）+ 激活期一次性迁移`
 
 ### Task 2: `openFavoritesDataFile` 命令（15 §4 前半）
 
@@ -84,9 +86,9 @@
 - Consumes: Task 1 的 `favorites.ensureDataFile()` / `favorites.dataFileUri()`。
 - Produces: 命令 `extStarter.openFavoritesDataFile`（无参；图标 `$(json)`）。
 
-- [ ] **Step 1: 写失败测试** — 命令壳 spec：注册断言；执行后 `executeCommand` 录制含 `('vscode.open', dataFileUri)`；文件缺失时先触发一次 store 写入（空信封落盘）。extension.test.ts：收藏夹冒烟清单（`extension.test.ts:1024` 起）追加该 id。
-- [ ] **Step 2: 跑测试确认失败** — `npm run test:unit -- favorites`。Expected: FAIL。
-- [ ] **Step 3: 实现命令壳** —
+- [x] **Step 1: 写失败测试** — 命令壳 spec：注册断言；执行后 `executeCommand` 录制含 `('vscode.open', dataFileUri)`；文件缺失时先触发一次 store 写入（空信封落盘）。extension.test.ts：收藏夹冒烟清单（`extension.test.ts:1024` 起）追加该 id。
+- [x] **Step 2: 跑测试确认失败** — `npm run test:unit -- favorites`。Expected: FAIL。
+- [x] **Step 3: 实现命令壳** —
 
 ```ts
 register(COMMAND.openFavoritesDataFile, async () => {
@@ -99,9 +101,9 @@ register(COMMAND.openFavoritesDataFile, async () => {
 })
 ```
 
-- [ ] **Step 4: 清单与 nls** — package.json commands 区追加（category `%command.category%`、icon `$(json)`）；menus `view/title` 追加 `{ command, when: view == extStarter.favoritesView, group: navigation@2 }`；两个 nls 文件成对补键。
-- [ ] **Step 5: 验证** — `npm run gate`。Expected: 全绿（manifest 闭合校验通过）。
-- [ ] **Step 6: Commit** — `feat(favorites): 新增「打开收藏数据文件」入口——手动备份不用记路径`
+- [x] **Step 4: 清单与 nls** — package.json commands 区追加（category `%command.category%`、icon `$(json)`）；menus `view/title` 追加 `{ command, when: view == extStarter.favoritesView, group: navigation@2 }`；两个 nls 文件成对补键。
+- [x] **Step 5: 验证** — `npm run gate`。Expected: 全绿（manifest 闭合校验通过）。
+- [x] **Step 6: Commit** — `feat(favorites): 新增「打开收藏数据文件」入口——手动备份不用记路径`
 
 ### Task 3: 书签领域模型 + store + 服务核心（14 §3，纯数据层）
 
@@ -145,7 +147,7 @@ export class BookmarksService implements vscode.Disposable {
 
 - `next` 语义（14 §5 定死口径）：`ordered()` 为空 → undefined；`uri/line` 缺省 → next=首条 / prev=末条；否则以 `(toPosix(storagePathFor(uri)), line)` 为当前键做元组序严格比较，next=严格晚于的第一条（尾后回绕到首）、prev=严格早于的第一条倒序扫描（首前回绕到尾）。路径比较用普通字符串 `<`/`>`（不用 localeCompare，保证确定性）。
 
-- [ ] **Step 1: 写失败测试** —
+- [x] **Step 1: 写失败测试** —
   1. store 往返 / 信封 schemaVersion 不匹配警告 / 顶层数组宽容读取 / 损坏 `.corrupt-*.bak` 备份 + 空数据继续（照 favoritesService.spec 对应用例改名复刻）；
   2. `normalizeBookmarkList`：缺 path / line 非整数 / line<0 逐条丢弃并警告；上限 500 裁剪保留头部（新插头部语义）；
   3. `snapshotText`：`'  '`→EMPTY_LINE_TEXT、`' a b '`→`'a b'`、101 字符截到 100；
@@ -153,10 +155,10 @@ export class BookmarksService implements vscode.Disposable {
   5. `toggle`：新增插头部 + `{added}`；同行再 toggle → `{removed}` 且条目消失；第 501 条 → 最旧被丢；
   6. `ordered` / `next`：同文件跨行、跨文件、回绕（next 从最后一条回首条）、无编辑器兜底、严格性（当前位置是书签时 next 跳过它）；
   7. `remove` / `clear` 返回值与 onDidChange 触发断言。
-- [ ] **Step 2: 跑测试确认失败** — `npm run test:unit -- bookmarks`。Expected: FAIL（模块不存在）。
-- [ ] **Step 3: 实现** — 照 Interfaces；`JsonBookmarksStore` 从 `JsonFavoritesStore` 复刻（仅守卫函数与信封常量不同，这是 14 §0 拍板的「第三套同构实现」）；`index.ts` 装配段加在收藏夹之后，`onWarning` 前缀 `[书签]`。
-- [ ] **Step 4: 跑测试确认通过** — `npm run test:unit`。Expected: PASS。
-- [ ] **Step 5: Commit** — `feat(bookmarks): 书签领域模型与存储——信封契约复刻 + toggle/循环序/守卫`
+- [x] **Step 2: 跑测试确认失败** — `npm run test:unit -- bookmarks`。Expected: FAIL（模块不存在）。
+- [x] **Step 3: 实现** — 照 Interfaces；`JsonBookmarksStore` 从 `JsonFavoritesStore` 复刻（仅守卫函数与信封常量不同，这是 14 §0 拍板的「第三套同构实现」）；`index.ts` 装配段加在收藏夹之后，`onWarning` 前缀 `[书签]`。
+- [x] **Step 4: 跑测试确认通过** — `npm run test:unit`。Expected: PASS。
+- [x] **Step 5: Commit** — `feat(bookmarks): 书签领域模型与存储——信封契约复刻 + toggle/循环序/守卫`
 
 ### Task 4: 书签解析与跳转（14 §4）
 
@@ -184,15 +186,15 @@ dataFileUri(): vscode.Uri       // 透传 store
 async ensureDataFile(): Promise<void>  // 与 FavoritesService 同语义
 ```
 
-- [ ] **Step 1: 写失败测试** —
+- [x] **Step 1: 写失败测试** —
   1. 相对路径多根解析命中第二文件夹（stub `workspace.fs.stat` 布阵）；全未命中回退第一文件夹；绝对路径直接 `Uri.file`；
   2. `jump`：stub 假文档（stubs `openTextDocument` 按 uri 内容匹配）→ 录制断言 `showTextDocument` 被调、selection 行号正确；
   3. 越界钳制：item.line=99、文档 10 行 → 定位第 10 行（index 9）且 `showInformationMessage` 记录含「越界」；
   4. 文件不存在 → openTextDocument 抛错向上传播（命令壳负责呈现）。
-- [ ] **Step 2: 跑测试确认失败** — `npm run test:unit -- bookmarks`。Expected: FAIL。
-- [ ] **Step 3: 实现** — 按 Interfaces。
-- [ ] **Step 4: 跑测试确认通过** — `npm run test:unit`。Expected: PASS。
-- [ ] **Step 5: Commit** — `feat(bookmarks): 书签路径解析与跳转——多根回退 / 行号越界钳制如实提示`
+- [x] **Step 2: 跑测试确认失败** — `npm run test:unit -- bookmarks`。Expected: FAIL。
+- [x] **Step 3: 实现** — 按 Interfaces。
+- [x] **Step 4: 跑测试确认通过** — `npm run test:unit`。Expected: PASS。
+- [x] **Step 5: Commit** — `feat(bookmarks): 书签路径解析与跳转——多根回退 / 行号越界钳制如实提示`
 
 ### Task 5: 书签命令薄壳（14 §5 + 实施期修正 jumpToBookmark）
 
@@ -228,11 +230,11 @@ clearBookmarks:        // showWarningMessage('确定清空全部书签？此操�
 openBookmarksDataFile: // 与 Task 2 openFavoritesDataFile 同构（ensureDataFile + vscode.open + showError）
 ```
 
-- [ ] **Step 1: 写失败测试** — 每条命令：注册断言 + 无参/空态提示录制断言 + 正常路径 `executeCommand`/服务方法调用录制断言；toggle 的 scheme 守卫、clearBookmarks 模态取消不执行 clear。
-- [ ] **Step 2: 跑测试确认失败** — `npm run test:unit -- bookmarks`。Expected: FAIL。
-- [ ] **Step 3: 实现命令壳 + 常量 + 接线** — 照 Interfaces；`commands/index.ts` 依赖接口补 `bookmarks` 字段（import type）。
-- [ ] **Step 4: 跑测试确认通过** — `npm run test:unit` && `npm run lint`。Expected: PASS。
-- [ ] **Step 5: Commit** — `feat(bookmarks): 8 条命令薄壳——toggle/循环跳转/QuickPick/清空模态/数据文件入口`
+- [x] **Step 1: 写失败测试** — 每条命令：注册断言 + 无参/空态提示录制断言 + 正常路径 `executeCommand`/服务方法调用录制断言；toggle 的 scheme 守卫、clearBookmarks 模态取消不执行 clear。
+- [x] **Step 2: 跑测试确认失败** — `npm run test:unit -- bookmarks`。Expected: FAIL。
+- [x] **Step 3: 实现命令壳 + 常量 + 接线** — 照 Interfaces；`commands/index.ts` 依赖接口补 `bookmarks` 字段（import type）。
+- [x] **Step 4: 跑测试确认通过** — `npm run test:unit` && `npm run lint`。Expected: PASS。
+- [x] **Step 5: Commit** — `feat(bookmarks): 8 条命令薄壳——toggle/循环跳转/QuickPick/清空模态/数据文件入口`
 
 ### Task 6: 书签树视图（14 §6）
 
@@ -267,11 +269,11 @@ export class BookmarksTreeProvider implements vscode.TreeDataProvider<BookmarkTr
 // onDidChangeTreeData 由 service.onDidChange 驱动（构造订阅，dispose 释放——照 FavoritesTreeProvider）
 ```
 
-- [ ] **Step 1: 写失败测试** — 分组保序（两文件交错添加 → 按 path 升序分组）；file 节点 label/description/command.arguments[0] = 组内第一条；bookmark 节点 label/description/contextValue/command；空态与 loadError info 节点；service.onDidChange 触发刷新。
-- [ ] **Step 2: 跑测试确认失败** — `npm run test:unit -- bookmarks`。Expected: FAIL。
-- [ ] **Step 3: 实现 + index.ts 装配** — 照 Interfaces；视图注册在收藏夹 treeView 之后。
-- [ ] **Step 4: 跑测试确认通过** — `npm run test:unit` && `npm run lint`。Expected: PASS。
-- [ ] **Step 5: Commit** — `feat(bookmarks): 「书签」树视图——文件分组两级树 / 空态引导 / 单击跳转路由`
+- [x] **Step 1: 写失败测试** — 分组保序（两文件交错添加 → 按 path 升序分组）；file 节点 label/description/command.arguments[0] = 组内第一条；bookmark 节点 label/description/contextValue/command；空态与 loadError info 节点；service.onDidChange 触发刷新。
+- [x] **Step 2: 跑测试确认失败** — `npm run test:unit -- bookmarks`。Expected: FAIL。
+- [x] **Step 3: 实现 + index.ts 装配** — 照 Interfaces；视图注册在收藏夹 treeView 之后。
+- [x] **Step 4: 跑测试确认通过** — `npm run test:unit` && `npm run lint`。Expected: PASS。
+- [x] **Step 5: Commit** — `feat(bookmarks): 「书签」树视图——文件分组两级树 / 空态引导 / 单击跳转路由`
 
 ### Task 7: manifest / 快捷键 / 集成冒烟 / 设计文档回写
 
@@ -313,7 +315,7 @@ export class BookmarksTreeProvider implements vscode.TreeDataProvider<BookmarkTr
 - `menus.editor/context`：toggleBookmark `9_starter@7`（`when: editorTextFocus`）；
 - nls 补键（成对）：`view.bookmarks.name`（en "Bookmarks" / zh「书签」）；8 条 `command.*.title`（en：Toggle Bookmark / Jump to Next Bookmark / Jump to Previous Bookmark / Quick Open Bookmarks / Jump to Bookmark / Remove Bookmark / Clear All Bookmarks / Open Bookmarks Data File；zh：切换书签 / 跳到下一个书签 / 跳到上一个书签 / 快速打开书签 / 跳转到书签 / 移除书签 / 清空全部书签 / 打开书签数据文件）。
 
-- [ ] **Step 1: 写失败测试** — extension.test.ts 新增套件（照 `收藏夹（v3.4 集成冒烟）` 样式，`extension.test.ts:1024` 起）：
+- [x] **Step 1: 写失败测试** — extension.test.ts 新增套件（照 `收藏夹（v3.4 集成冒烟）` 样式，`extension.test.ts:1024` 起）：
 
 ```ts
 suite('书签（v3.5 集成冒烟）', () => {
@@ -326,11 +328,11 @@ suite('书签（v3.5 集成冒烟）', () => {
 })
 ```
 
-- [ ] **Step 2: 跑集成测试确认失败** — `npm test`（宿主集成；若本机无 VSCode 二进制缓存则记录跳过原因，以 `npm run test:unit` + gate 为准）。Expected: FAIL（命令未注册）。
-- [ ] **Step 3: 落 manifest / nls / .gitignore** — 按上方精确值。
-- [ ] **Step 4: 回写设计文档 14** — §5 表格与计数、状态行、§3 注记。
-- [ ] **Step 5: 验证** — `npm run gate`。Expected: 全绿（manifest 双向闭合含 keybindings、覆盖率、lint、打包内容校验）。
-- [ ] **Step 6: Commit** — `feat(bookmarks): 书签公开面——第 7 视图 + 8 命令 + Ctrl+Alt+K/J/L 快捷键（首个 keybindings 贡献）`
+- [x] **Step 2: 跑集成测试确认失败** — `npm test`（宿主集成；若本机无 VSCode 二进制缓存则记录跳过原因，以 `npm run test:unit` + gate 为准）。Expected: FAIL（命令未注册）。
+- [x] **Step 3: 落 manifest / nls / .gitignore** — 按上方精确值。
+- [x] **Step 4: 回写设计文档 14** — §5 表格与计数、状态行、§3 注记。
+- [x] **Step 5: 验证** — `npm run gate`。Expected: 全绿（manifest 双向闭合含 keybindings、覆盖率、lint、打包内容校验）。
+- [x] **Step 6: Commit** — `feat(bookmarks): 书签公开面——第 7 视图 + 8 命令 + Ctrl+Alt+K/J/L 快捷键（首个 keybindings 贡献）`
 
 ### Task 8: 文档同步 + 版本 v3.5.0 + CHANGELOG + 收尾门禁
 
@@ -346,11 +348,11 @@ suite('书签（v3.5 集成冒烟）', () => {
 - Modify: `docs/开发指南/README.md`（路由表加 12）+ Create `docs/开发指南/12-代码书签.md`（代码地图 / 存储 / 测试，对照 11-收藏夹.md 结构）；`docs/开发指南/11-收藏夹.md`（补 GlobalJson store 与迁移小节）
 - Modify: `docs/操作指导/02-开发与调试步骤.md`（「六个视图」→「七个视图」两处 + 列表加书签）、`docs/操作指导/README.md`（02 行描述）、`docs/操作指导/images/04-sidebar-views.svg`（重绘为 7 视图，照现 SVG 结构追加一个视图块）
 
-- [ ] **Step 1: 全仓一致性自查** — `grep -rn "六个视图\|6 视图\|35 命令\|6 个视图" docs README.md agent.md`，逐一改齐为 7 视图 / 44 命令（设计历史文档 13 号等中的历史计数**不改**，只改「现状描述」类文本）。
-- [ ] **Step 2: 版本与 CHANGELOG** — package.json version、CHANGELOG 新条目（含设计文档链接，对照 3.4.0 条目结构）。
-- [ ] **Step 3: 文档落地** — 按清单逐文件修改 / 新建；功能介绍 09 与开发指南 12 的命令/键位/存储值以本文档 Task 5/7 为准。
-- [ ] **Step 4: 终验** — `npm run gate` 全绿；`npm run package:vsix` 产出 .vsix（发布物冒烟）。
-- [ ] **Step 5: Commit** — `docs+chore(v3.5.0): 代码书签与收藏夹数据可迁移——文档同步、视图数 6→7、命令数 35→44、CHANGELOG`
+- [x] **Step 1: 全仓一致性自查** — `grep -rn "六个视图\|6 视图\|35 命令\|6 个视图" docs README.md agent.md`，逐一改齐为 7 视图 / 44 命令（设计历史文档 13 号等中的历史计数**不改**，只改「现状描述」类文本）。
+- [x] **Step 2: 版本与 CHANGELOG** — package.json version、CHANGELOG 新条目（含设计文档链接，对照 3.4.0 条目结构）。
+- [x] **Step 3: 文档落地** — 按清单逐文件修改 / 新建；功能介绍 09 与开发指南 12 的命令/键位/存储值以本文档 Task 5/7 为准。
+- [x] **Step 4: 终验** — `npm run gate` 全绿；`npm run package:vsix` 产出 .vsix（发布物冒烟）。
+- [x] **Step 5: Commit** — `docs+chore(v3.5.0): 代码书签与收藏夹数据可迁移——文档同步、视图数 6→7、命令数 35→44、CHANGELOG`
 
 ## Self-Review 结论
 
