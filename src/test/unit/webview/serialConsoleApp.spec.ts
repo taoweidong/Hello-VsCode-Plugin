@@ -129,6 +129,21 @@ describe('serialConsole 页面：命令下发与输出', () => {
     expect(blocks[1].element.textContent).toContain('$ ')
   })
 
+  it('输出超上限裁剪最旧块（MAX_OUTPUT_BLOCKS，防长会话内存膨胀）', async () => {
+    wrapper = mount(App)
+    await connect()
+    const total = 2001 // 上限 2000 + 1：恰好触发一次最旧块裁剪
+    for (let index = 0; index < total; index += 1) {
+      hostMessage({ type: 'serialData', seq: index + 1, text: `block-${index}\n` })
+    }
+    await wrapper.vm.$nextTick()
+    const blocks = wrapper.findAll('.console-output__block')
+    expect(blocks).toHaveLength(2000)
+    expect(blocks[0].text()).toContain('block-1') // block-0 最旧，已被裁掉
+    expect(blocks[1999].text()).toContain('block-2000')
+    expect(wrapper.find('.console-output__scroll').text()).not.toContain('block-0\n')
+  })
+
   it('Enter 发送：post serialSend + 本地回显 > 命令', async () => {
     wrapper = mount(App)
     await connect()

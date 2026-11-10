@@ -1,7 +1,7 @@
 import * as nodeFs from 'node:fs'
 import * as nodeOs from 'node:os'
 import * as nodePath from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as vscode from 'vscode'
 import { STORAGE } from '../../../extension/constants'
 import {
@@ -13,6 +13,7 @@ import {
   MAX_FAVORITES,
   migrateFavoritesMementoToFile,
   normalizeFavoriteList,
+  type FavoriteItem,
 } from '../../../extension/features/favorites/favoritesService'
 import { __resetStubs, __stubs, createMementoStub } from '../stubs/vscode'
 
@@ -269,6 +270,32 @@ describe('FavoritesService（业务服务）', () => {
       vscode.Uri.joinPath(context.globalStorageUri, STORAGE.favoritesGlobalFileName).fsPath
     )
   })
+
+  it('⑯ 超上限 200：新收藏插头部，超出丢最旧（服务层，13 方案 §7）', async () => {
+    // 内存 store：上限裁剪是纯服务逻辑，200+ 次落盘徒增 Windows 清理竞态（ENOTEMPTY）
+    let saved: FavoriteItem[] = []
+    const service = new FavoritesService({
+      async load() {
+        return saved
+      },
+      async save(next) {
+        saved = next
+      },
+      dataFileUri: () => vscode.Uri.file('/memory/favorites.json'),
+    })
+    await service.load()
+    const firstUri = await writeFile(tmpRoot, 'first.txt')
+    await service.add([firstUri])
+    for (let index = 0; index < MAX_FAVORITES; index += 1) {
+      const uri = await writeFile(tmpRoot, `f${index}.txt`)
+      await service.add([uri])
+    }
+    expect(service.list()).toHaveLength(MAX_FAVORITES)
+    // f199 最新在头部；first.txt 最早，已在尾部被裁掉
+    expect(service.list()[0]?.path).toBe(toPosixRel('f199.txt'))
+    expect(service.list().some((item) => item.path === toPosixRel('first.txt'))).toBe(false)
+    expect(saved).toHaveLength(MAX_FAVORITES)
+  })
 })
 
 describe('GlobalJsonFavoritesStore（无工作区回退，15 方案）', () => {
@@ -276,24 +303,33 @@ describe('GlobalJsonFavoritesStore（无工作区回退，15 方案）', () => {
     return vscode.Uri.joinPath(vscode.Uri.file(root), STORAGE.favoritesGlobalFileName)
   }
 
-  it('⑯ save → load 往返；dataFileUri 透传传入文件', async () => {
+  it('⑰ save → load 往返；dataFileUri 透传传入文件；缺失目录自动创建（15 方案 §8）', async () => {
     const globalRoot = nodePath.join(tmpRoot, 'global-storage')
-    const store = new GlobalJsonFavoritesStore(globalFileUri(globalRoot))
-    const items = [
-      {
-        id: 'g1',
-        name: '全局',
-        path: 'C:/out.txt',
-        isFolder: false,
-        addedAt: '2026-11-08T00:00:00Z',
-      },
-    ]
-    await store.save(items)
-    await expect(store.load()).resolves.toEqual(items)
-    expect(store.dataFileUri().fsPath).toBe(globalFileUri(globalRoot).fsPath)
+    // 15 方案 §8：显式断言 save 链路调用 createDirectory（原子写先建目录再落盘）
+    const createDirectorySpy = vi.spyOn(vscode.workspace.fs, 'createDirectory')
+    try {
+      const store = new GlobalJsonFavoritesStore(globalFileUri(globalRoot))
+      const items = [
+        {
+          id: 'g1',
+          name: '全局',
+          path: 'C:/out.txt',
+          isFolder: false,
+          addedAt: '2026-11-08T00:00:00Z',
+        },
+      ]
+      await store.save(items)
+      expect(createDirectorySpy).toHaveBeenCalledTimes(1)
+      expect(createDirectorySpy.mock.calls[0]?.[0].fsPath).toBe(globalRoot)
+      expect(nodeFs.existsSync(globalRoot)).toBe(true)
+      await expect(store.load()).resolves.toEqual(items)
+      expect(store.dataFileUri().fsPath).toBe(globalFileUri(globalRoot).fsPath)
+    } finally {
+      createDirectorySpy.mockRestore()
+    }
   })
 
-  it('⑰ 损坏全局文件：复制 .bak 备份后按空数据继续，原文件保留', async () => {
+  it('⑱ 损坏全局文件：复制 .bak 备份后按空数据继续，原文件保留', async () => {
     const globalRoot = nodePath.join(tmpRoot, 'global-storage')
     await nodeFs.promises.mkdir(globalRoot, { recursive: true })
     await nodeFs.promises.writeFile(globalFileUri(globalRoot).fsPath, '{broken json')
@@ -307,7 +343,7 @@ describe('GlobalJsonFavoritesStore（无工作区回退，15 方案）', () => {
     expect(warnings.some((message) => message.includes('损坏'))).toBe(true)
   })
 
-  it('⑱ 信封格式与顶层数组宽容读取同工作区文件口径', async () => {
+  it('⑲ 信封格式与顶层数组宽容读取同工作区文件口径', async () => {
     const globalRoot = nodePath.join(tmpRoot, 'global-storage')
     await nodeFs.promises.mkdir(globalRoot, { recursive: true })
     await nodeFs.promises.writeFile(
@@ -339,13 +375,13 @@ describe('migrateFavoritesMementoToFile（激活期一次性迁移，15 方案�
     return vscode.Uri.joinPath(context.globalStorageUri, STORAGE.favoritesGlobalFileName)
   }
 
-  it('⑲ Memento 无数据 → 静默跳过，不写文件', async () => {
+  it('⑳ Memento 无数据 → 静默跳过，不写文件', async () => {
     const { context } = makeContext()
     await expect(migrateFavoritesMementoToFile(context)).resolves.toBe(false)
     expect(nodeFs.existsSync(globalFileUri(context).fsPath)).toBe(false)
   })
 
-  it('⑳ 全局文件已存在 → 旧键清除（旧数据作废不合并），文件内容不变', async () => {
+  it('㉑ 全局文件已存在 → 旧键清除（旧数据作废不合并），文件内容不变', async () => {
     const { context, memento } = makeContext({ [STORAGE.favoritesMementoKey]: [legacyItem] })
     await vscode.workspace.fs.createDirectory(context.globalStorageUri)
     await nodeFs.promises.writeFile(globalFileUri(context).fsPath, 'PRESERVED')
@@ -356,7 +392,7 @@ describe('migrateFavoritesMementoToFile（激活期一次性迁移，15 方案�
     )
   })
 
-  it('㉑ 文件不存在 → 归一化写入信封 + 清旧键 + onMigrated 回调一次', async () => {
+  it('㉒ 文件不存在 → 归一化写入信封 + 清旧键 + onMigrated 回调一次', async () => {
     const { context, memento } = makeContext({
       [STORAGE.favoritesMementoKey]: [legacyItem, { 非法: true }],
     })
@@ -380,7 +416,7 @@ describe('migrateFavoritesMementoToFile（激活期一次性迁移，15 方案�
     await expect(migrateFavoritesMementoToFile(context)).resolves.toBe(false)
   })
 
-  it('㉒ 写入失败 → 抛错且旧键保留（宁可留旧数据，不可丢）', async () => {
+  it('㉓ 写入失败 → 抛错且旧键保留（宁可留旧数据，不可丢）', async () => {
     const blocker = nodePath.join(tmpRoot, 'blocker')
     await nodeFs.promises.writeFile(blocker, 'x')
     const { context, memento } = makeContext(

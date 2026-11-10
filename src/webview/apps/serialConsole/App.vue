@@ -26,7 +26,11 @@ import ServerList from './components/ServerList.vue'
  * 与宿主互通；表单草稿与选中服务器经 webview state 持久化。
  */
 
-/** 输出缓冲上限：超出裁剪最旧块（防长会话内存膨胀）。 */
+/**
+ * 输出缓冲上限：超出裁剪最旧块（防长会话内存膨胀）。
+ * 设计草图（serial-console spec 布局/风险节）按「5000 行」估算；实现以 40ms
+ * 批处理块为单位裁剪（块可跨多行，行数不固定），取 2000 块同量级防洪泛。
+ */
 const MAX_OUTPUT_BLOCKS = 2_000
 
 const schema = ref<FormField[]>([])
