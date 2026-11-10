@@ -4,6 +4,47 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.6.0] - 2026-11-10
+
+### 新增（代码书签）
+
+- **「书签」侧边栏视图**（第 8 视图，设计方案见
+  [需求与优化方案 14](docs/需求与优化方案/14-代码书签设计方案.md)）：
+  - **行级代码书签**：`Ctrl+Alt+K`（mac `Cmd+Alt+K`）在当前行打/取消书签——
+    本插件**首个快捷键贡献**（另 `Ctrl+Alt+L` 下一个 / `Ctrl+Alt+J` 上一个，
+    键位对齐 Bookmarks 原版默认，`when: editorTextFocus`）；
+  - **三种跳转方式**：侧边栏两级树（文件分组 → 书签条目，单击跳转到行）、
+    QuickPick 快速跳转（`quickOpenBookmarks`，命令面板 + 视图标题栏）、
+    上一个/下一个跨文件循环跳转（文件+行号升序，尾首回绕，当前位置严格跳过）；
+  - **简单版口径**：只存行号（0-based）+ 打点时行文本快照（仅展示，可能过期）——
+    不做 gutter 图标与编辑追踪，文件编辑致行号漂移需重新打点（跳转越界时
+    钳制到文件末尾并如实提示）；
+  - **存储**：`.vscode/bookmarks.json`（信封 + 原子写 + 损坏自动备份 `.bak`，
+    复用收藏夹契约；无工作区回退 globalStorage 明文 JSON；上限 500 条丢最旧；
+    已 gitignore）。
+  - 新增 8 命令：`toggleBookmark` / `jumpToNextBookmark` / `jumpToPreviousBookmark` /
+    `quickOpenBookmarks` / `jumpToBookmark` / `removeBookmark` / `clearBookmarks` /
+    `openBookmarksDataFile`；与收藏夹（路径级收藏）正交。
+- 测试：新增 bookmarks 单测 41 例（存储契约 / 守卫 / toggle / 循环序 / 解析 /
+  跳转 / 命令壳 / 树视图）+ 宿主集成冒烟套件（8 命令注册 + 空态安全路径）；
+  测试桩增量扩展 `createFakeTextDocument.lineCount`（只增不减）。
+
+### 变更（收藏夹数据可迁移，15 方案）
+
+- **无工作区回退明文 JSON 化**：`MementoFavoritesStore` → `GlobalJsonFavoritesStore`
+  （globalStorage 目录下明文 `favorites.json`，信封契约与工作区文件完全一致）——
+  所有场景下收藏数据都是可手动拷贝的 JSON 文件，手动拷文件即备份/迁移；
+- **激活期一次性迁移**：旧 globalState（`extStarter.favorites`）数据自动搬到
+  globalStorage 文件（与有无工作区无关地执行、幂等、写成功才清旧键、
+  失败保留旧数据如实上报）；
+- **「打开数据文件」入口**：收藏夹视图标题栏新增 `openFavoritesDataFile`
+  （书签视图为 `openBookmarksDataFile`）——一键定位存储 JSON，手动备份不用记路径；
+  文件缺失时先写空信封再打开（所见即存储格式）。
+- 文档：三件套（[功能介绍 10](docs/功能介绍/10-代码书签.md) /
+  [开发指南 13](docs/开发指南/13-代码书签.md) /
+  [设计方案 14/15](docs/需求与优化方案/README.md)）；
+  全库口径同步 8 视图 / 56 命令 / 10 配置。
+
 ## [3.5.0] - 2026-11-10
 
 ### 新增（快捷命令）
