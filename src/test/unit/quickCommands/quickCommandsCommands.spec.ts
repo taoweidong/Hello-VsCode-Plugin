@@ -148,18 +148,21 @@ describe('快捷命令命令壳（v3.5）', () => {
   })
 
   describe('captureTerminalSelection（选区捕获）', () => {
-    it('无活动终端 → 提示且不弹输入框（Review Focus 3）', async () => {
+    it('无活动终端 → 提示后降级粘贴输入框（Review Focus 3，评审修正）', async () => {
       const { service, run } = makeHost()
       await service.load()
       __stubs.activeTerminal = undefined
+      // 首个应答被「无活动终端」toast 消费（桩的提示框同样读队列），随后进入降级流程
+      __stubs.dialogQueue.push(undefined, 'ls -la', 'ls', groupPick(null))
 
       await run('extStarter.captureTerminalSelection')
 
-      expect(recordedOf('showInputBox')).toHaveLength(0)
-      expect(service.listCommands()).toEqual([])
       expect(recordedOf('showInformationMessage')[0]!.args[0]).toMatchObject({
         message: expect.stringContaining('终端'),
       })
+      // 降级粘贴框 + 别名输入框共 2 次
+      expect(recordedOf('showInputBox')).toHaveLength(2)
+      expect(service.listCommands()[0]!.command).toBe('ls -la')
     })
 
     it('有终端 + 桥接成功 → 直接进入别名/分组流程入库', async () => {

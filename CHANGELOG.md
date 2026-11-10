@@ -29,7 +29,7 @@
     `moveQuickCommandToGroup` / `copyQuickCommand` / `removeQuickCommand` /
     `createQuickCommandGroup` / `renameQuickCommandGroup` / `removeQuickCommandGroup`；
     与收藏夹（收藏路径）、任务收藏（收藏 tasks.json 任务）正交。
-- 测试：新增 quickCommands 单测 60 例（守卫 / 双存储 / 服务 / 树视图 / 命令壳 /
+- 测试：新增 quickCommands 单测 83 例（守卫 / 双存储 / 服务 / 树视图 / 命令壳 /
   剪贴板桥接）+ 宿主集成冒烟套件（12 命令注册 + 空态安全路径）；测试桩增量扩展
   `Terminal` / `createTerminal` / `activeTerminal`（录制式）。
 - 文档：三件套（[功能介绍 09](docs/功能介绍/09-快捷命令.md) /

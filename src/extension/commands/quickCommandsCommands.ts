@@ -195,24 +195,24 @@ export function registerQuickCommandsCommands(
   register(COMMAND.captureTerminalSelection, async () => {
     if (!vscode.window.activeTerminal) {
       void vscode.window.showInformationMessage(
-        '没有活动的终端：请先打开终端并选中要收藏的命令，或直接手动新增。'
+        '没有活动的终端：请打开终端选中命令后重试，或直接粘贴命令。'
       )
-      return
     }
-    const selection = await readTerminalSelectionViaClipboard()
-    if (selection === undefined) {
-      // 降级：粘贴输入框（16 方案 §4.2——不抛错，给可操作出路）
-      const pasted = await vscode.window.showInputBox({
+    // 降级链（16 方案 §4.2 / 评审修正）：无终端或桥接读不到选区 → 统一走粘贴输入框
+    let commandText: string | undefined
+    if (vscode.window.activeTerminal) {
+      commandText = await readTerminalSelectionViaClipboard()
+    }
+    if (commandText === undefined) {
+      commandText = await vscode.window.showInputBox({
         prompt: '收藏终端选中命令',
         placeHolder: '未读到终端选区：请在终端选中命令后重试，或直接粘贴命令',
       })
-      if (pasted === undefined || pasted.trim().length === 0) {
+      if (commandText === undefined || commandText.trim().length === 0) {
         return
       }
-      await promptAndAdd(quickCommands, pasted)
-      return
     }
-    await promptAndAdd(quickCommands, selection)
+    await promptAndAdd(quickCommands, commandText)
   })
 
   register(COMMAND.quickRunCommands, async () => {

@@ -1022,7 +1022,7 @@ ${fileB.fsPath}`
 })
 
 suite('收藏夹（v3.4 集成冒烟）', () => {
-  test('7 条收藏夹命令全部注册', async () => {
+  test('8 条收藏夹命令全部注册', async () => {
     const commands = new Set(await vscode.commands.getCommands())
     for (const id of [
       'extStarter.addFavorite',
@@ -1032,6 +1032,7 @@ suite('收藏夹（v3.4 集成冒烟）', () => {
       'extStarter.copyFavoritePath',
       'extStarter.renameFavorite',
       'extStarter.removeFavorite',
+      'extStarter.openFavoritesDataFile',
     ]) {
       assert.ok(commands.has(id), `命令未注册：${id}`)
     }
@@ -1069,13 +1070,11 @@ suite('快捷命令（v3.5 集成冒烟）', () => {
     }
   })
 
-  test('快捷命令空态安全路径可执行（quickRunCommands / captureTerminalSelection）', async () => {
-    // 只走空态信息提示路径，不执行 addQuickCommand（其会在真实宿主阻塞等待输入）
+  test('快捷命令空态安全路径可执行（quickRunCommands）', async () => {
+    // 只执行空态即返回的命令；addQuickCommand / captureTerminalSelection 均会在
+    // 真实宿主弹出输入框阻塞等待，不入冒烟（注册完整性由上一用例覆盖）
     await assert.doesNotReject(async () => {
       await vscode.commands.executeCommand('extStarter.quickRunCommands')
-    })
-    await assert.doesNotReject(async () => {
-      await vscode.commands.executeCommand('extStarter.captureTerminalSelection')
     })
   })
 })
