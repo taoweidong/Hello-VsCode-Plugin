@@ -160,8 +160,7 @@ describe('registerBookmarksCommands（书签命令）', () => {
     expect(
       __stubs.recorded.some(
         (entry) =>
-          entry.kind === 'showInformationMessage' &&
-          JSON.stringify(entry.args).includes('暂无书签')
+          entry.kind === 'showInformationMessage' && JSON.stringify(entry.args).includes('暂无书签')
       )
     ).toBe(true)
 
@@ -180,8 +179,7 @@ describe('registerBookmarksCommands（书签命令）', () => {
     expect(
       __stubs.recorded.some(
         (entry) =>
-          entry.kind === 'showInformationMessage' &&
-          JSON.stringify(entry.args).includes('暂无书签')
+          entry.kind === 'showInformationMessage' && JSON.stringify(entry.args).includes('暂无书签')
       )
     ).toBe(true)
 

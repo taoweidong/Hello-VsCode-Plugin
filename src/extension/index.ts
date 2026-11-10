@@ -8,10 +8,7 @@ import {
 } from './features/taskManager/taskManagerPanel'
 import { TaskManagerTreeProvider } from './features/taskManager/taskManagerTreeProvider'
 import { DraftBoxService } from './features/drafts/draftBoxService'
-import {
-  BookmarksService,
-  createBookmarksStore,
-} from './features/bookmarks/bookmarksService'
+import { BookmarksService, createBookmarksStore } from './features/bookmarks/bookmarksService'
 import { BookmarksTreeProvider } from './features/bookmarks/bookmarksTreeProvider'
 import { FavoritesService } from './features/favorites/favoritesService'
 import { FavoritesTreeProvider } from './features/favorites/favoritesTreeProvider'

@@ -177,9 +177,7 @@ describe('文本快照与路径形态', () => {
     )
     const outside = nodePath.join(nodeOs.tmpdir(), 'outside-书签.ts')
     // 工作区外存原始 fsPath（与收藏夹 buildItem 同口径，不做分隔符归一）
-    expect(service.storagePathFor(vscode.Uri.file(outside))).toBe(
-      vscode.Uri.file(outside).fsPath
-    )
+    expect(service.storagePathFor(vscode.Uri.file(outside))).toBe(vscode.Uri.file(outside).fsPath)
   })
 })
 
@@ -214,7 +212,17 @@ describe('BookmarksService（业务服务）', () => {
   })
 
   it('⑪ 上限 500：新书签插头部，超出丢最旧（尾部）', async () => {
-    const service = makeService()
+    // 内存 store：上限裁剪是纯服务逻辑，500 次落盘徒增 Windows 清理竞态（ENOTEMPTY）
+    let saved: BookmarkItem[] = []
+    const service = new BookmarksService({
+      async load() {
+        return saved
+      },
+      async save(next) {
+        saved = next
+      },
+      dataFileUri: () => vscode.Uri.file('/memory/bookmarks.json'),
+    })
     const firstUri = vscode.Uri.file(nodePath.join(tmpRoot, 'first.ts'))
     await service.toggle(firstUri, 0, 'first')
     for (let index = 0; index < MAX_BOOKMARKS; index += 1) {
@@ -248,7 +256,6 @@ describe('BookmarksService（业务服务）', () => {
     await service.toggle(aUri, 10, 'a10')
     await service.toggle(aUri, 20, 'a20')
     await service.toggle(bUri, 2, 'b2')
-    const aPath = service.ordered()[0]?.path ?? ''
     expect(service.next(vscode.Uri.file(nodePath.join(tmpRoot, 'a.ts')), 10, 'next')?.text).toBe(
       'a20'
     )
@@ -259,7 +266,6 @@ describe('BookmarksService（业务服务）', () => {
     expect(service.next(vscode.Uri.file(nodePath.join(tmpRoot, 'b.ts')), 2, 'next')?.text).toBe(
       'a10'
     )
-    void aPath
   })
 
   it('⑭ next/prev 回绕：尾后回首条、首前回末条', async () => {
@@ -271,9 +277,9 @@ describe('BookmarksService（业务服务）', () => {
       'a10'
     )
     // 从 a.ts:10 之前无书签 → 回绕到末条 b.ts:2
-    expect(
-      service.next(vscode.Uri.file(nodePath.join(tmpRoot, 'a.ts')), 10, 'prev')?.text
-    ).toBe('b2')
+    expect(service.next(vscode.Uri.file(nodePath.join(tmpRoot, 'a.ts')), 10, 'prev')?.text).toBe(
+      'b2'
+    )
   })
 
   it('⑮ 无活动编辑器兜底：next 首条 / prev 末条；全局无书签 → undefined', async () => {

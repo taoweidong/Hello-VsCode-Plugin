@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import * as vscode from 'vscode'
 import { COMMAND } from '../../../extension/constants'
-import type { BookmarkItem, IBookmarksStore } from '../../../extension/features/bookmarks/bookmarksService'
+import type {
+  BookmarkItem,
+  IBookmarksStore,
+} from '../../../extension/features/bookmarks/bookmarksService'
 import { BookmarksService } from '../../../extension/features/bookmarks/bookmarksService'
 import { BookmarksTreeProvider } from '../../../extension/features/bookmarks/bookmarksTreeProvider'
 import { __resetStubs, TreeItemCollapsibleState } from '../stubs/vscode'

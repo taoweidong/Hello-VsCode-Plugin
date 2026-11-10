@@ -58,7 +58,11 @@ export function registerBookmarksCommands(
     }
     const line = editor.selection.active.line
     try {
-      const result = await bookmarks.toggle(editor.document.uri, line, editor.document.lineAt(line).text)
+      const result = await bookmarks.toggle(
+        editor.document.uri,
+        line,
+        editor.document.lineAt(line).text
+      )
       const message = result.added
         ? `已添加书签（第 ${line + 1} 行）。`
         : `已移除书签（第 ${line + 1} 行）。`

@@ -50,7 +50,10 @@ export class BookmarksTreeProvider
       return info
     }
     if (node.kind === 'file') {
-      const treeItem = new vscode.TreeItem(basenamePosix(node.path), vscode.TreeItemCollapsibleState.Expanded)
+      const treeItem = new vscode.TreeItem(
+        basenamePosix(node.path),
+        vscode.TreeItemCollapsibleState.Expanded
+      )
       treeItem.description = dirnamePosix(node.path)
       treeItem.iconPath = new vscode.ThemeIcon('file')
       // 单击文件组 = 跳转其第一个书签（组内按 line 升序，children[0] 即最近顶端）

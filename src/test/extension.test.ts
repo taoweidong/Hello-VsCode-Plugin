@@ -1078,3 +1078,29 @@ suite('快捷命令（v3.5 集成冒烟）', () => {
     })
   })
 })
+
+suite('书签（v3.6 集成冒烟）', () => {
+  test('8 条书签命令全部注册', async () => {
+    const commands = new Set(await vscode.commands.getCommands())
+    for (const id of [
+      'extStarter.toggleBookmark',
+      'extStarter.jumpToNextBookmark',
+      'extStarter.jumpToPreviousBookmark',
+      'extStarter.quickOpenBookmarks',
+      'extStarter.jumpToBookmark',
+      'extStarter.removeBookmark',
+      'extStarter.clearBookmarks',
+      'extStarter.openBookmarksDataFile',
+    ]) {
+      assert.ok(commands.has(id), `命令未注册：${id}`)
+    }
+  })
+
+  test('书签空态安全路径可执行（quickOpenBookmarks）', async () => {
+    // 只执行空态即返回的命令；toggleBookmark 需要活动编辑器、clearBookmarks 会弹
+    // 模态确认，均不入冒烟（注册完整性由上一用例覆盖）
+    await assert.doesNotReject(async () => {
+      await vscode.commands.executeCommand('extStarter.quickOpenBookmarks')
+    })
+  })
+})
