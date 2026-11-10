@@ -226,6 +226,7 @@ export function activate(context: vscode.ExtensionContext): void {
     taskExplorer,
     favorites,
     quickCommands,
+    bookmarks,
   })
 }
 
