@@ -2,6 +2,7 @@ import * as vscode from 'vscode'
 import type { DraftBoxService } from '../features/drafts/draftBoxService'
 import type { FavoritesService } from '../features/favorites/favoritesService'
 import type { InitService } from '../features/init/initService'
+import type { QuickCommandsService } from '../features/quickCommands/quickCommandsService'
 import type { SerialConsoleController } from '../features/serialConsole/serialConsoleController'
 import type { TaskExplorerController } from '../features/taskExplorer/taskExplorerController'
 import type { TaskRunner } from '../tasks/taskRunner'
@@ -9,6 +10,7 @@ import { registerCopyCommands } from './copyCommands'
 import { registerDraftCommands } from './draftCommands'
 import { registerFavoritesCommands } from './favoritesCommands'
 import { registerPageCommands } from './pageCommands'
+import { registerQuickCommandsCommands } from './quickCommandsCommands'
 import { registerSerialConsoleCommands } from './serialConsoleCommands'
 import { registerTaskExplorerCommands } from './taskExplorerCommands'
 import type { CommandRegistrar } from './shared'
@@ -32,6 +34,8 @@ export interface CommandDeps {
   taskExplorer: TaskExplorerController
   /** 收藏夹（v3.4：文件/文件夹路径收藏 + 别名 + 单击跳转，13 方案） */
   favorites: FavoritesService
+  /** 快捷命令（v3.5：终端命令收藏 + 别名 + 分组 + 单击执行，16 方案） */
+  quickCommands: QuickCommandsService
 }
 
 /**
@@ -53,4 +57,5 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
   registerCopyCommands(register) // v2.2：拷贝示例（无宿主依赖，剪贴板即全部）
   registerTaskExplorerCommands(register, { controller: deps.taskExplorer }) // v2.3：任务管理器
   registerFavoritesCommands(register, { favorites: deps.favorites }) // v3.4：收藏夹
+  registerQuickCommandsCommands(register, { quickCommands: deps.quickCommands }) // v3.5：快捷命令
 }

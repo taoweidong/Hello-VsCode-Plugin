@@ -3,7 +3,6 @@ import * as vscode from 'vscode'
 import {
   QuickCommandsService,
   type IQuickCommandsStore,
-  type QuickCommandGroup,
   type QuickCommandsData,
   type QuickCommandItem,
 } from '../../../extension/features/quickCommands/quickCommandsService'
@@ -28,23 +27,49 @@ class FakeStore implements IQuickCommandsStore {
   }
 }
 
+/** 种子宽松形态：只填用例关心的字段，其余由辅助函数补默认值。 */
+type GroupSeed = { id: string; name: string; createdAt?: string }
+type ItemSeed = {
+  id?: string
+  name?: string
+  command: string
+  groupId?: string | null
+  addedAt?: string
+  useCount?: number
+}
+
 interface Host {
   service: QuickCommandsService
   registered: Map<string, (...args: unknown[]) => unknown>
   run: (id: string, ...args: unknown[]) => Promise<unknown>
 }
 
-function makeHost(data: Partial<QuickCommandsData> = {}): Host {
+function makeHost(data: { groups?: GroupSeed[]; commands?: ItemSeed[] } = {}): Host {
   const store = new FakeStore()
   store.data = {
-    groups: (data.groups ?? []).map((group) => ({ createdAt: '2026-01-01T00:00:00.000Z', ...group })),
-    commands: (data.commands ?? []).map((item) => ({ addedAt: '2026-01-01T00:00:00.000Z', ...item })),
+    groups: (data.groups ?? []).map((group) => ({
+      id: group.id,
+      name: group.name,
+      createdAt: group.createdAt ?? '2026-01-01T00:00:00.000Z',
+    })),
+    commands: (data.commands ?? []).map((item, index) => ({
+      id: item.id ?? `seed-${index}`,
+      name: item.name ?? item.command,
+      command: item.command,
+      groupId: item.groupId ?? null,
+      addedAt: item.addedAt ?? '2026-01-01T00:00:00.000Z',
+      ...(item.useCount !== undefined ? { useCount: item.useCount } : {}),
+    })),
   }
   const service = new QuickCommandsService(store)
   const registered = new Map<string, (...args: unknown[]) => unknown>()
   const register: CommandRegistrar = (id, callback) => registered.set(id, callback)
   registerQuickCommandsCommands(register, { quickCommands: service })
-  return { service, registered, run: (id, ...args) => registered.get(id)!(...args) }
+  return {
+    service,
+    registered,
+    run: (id, ...args) => Promise.resolve(registered.get(id)!(...args)),
+  }
 }
 
 function recordedOf(kind: string): { kind: string; args: unknown[] }[] {
@@ -207,7 +232,6 @@ describe('快捷命令命令壳（v3.5）', () => {
       groupId: null,
       addedAt: '2026-01-01T00:00:00.000Z',
     }
-    const group: QuickCommandGroup = { id: 'g1', name: 'git', createdAt: 't' }
 
     it('executeQuickCommand 无参 → 提示不抛错；带参 → 执行', async () => {
       const { service, run } = makeHost({ commands: [item] })

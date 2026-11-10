@@ -217,19 +217,37 @@ class FakeStore implements IQuickCommandsStore {
   }
 }
 
-function makeService(data: Partial<QuickCommandsData> = {}): {
+/** 种子宽松形态：只填用例关心的字段，其余由辅助函数补默认值。 */
+type GroupSeed = { id: string; name: string; createdAt?: string }
+type ItemSeed = {
+  id?: string
+  name?: string
+  command: string
+  groupId?: string | null
+  addedAt?: string
+  lastUsedAt?: string
+  useCount?: number
+}
+
+function makeService(data: { groups?: GroupSeed[]; commands?: ItemSeed[] } = {}): {
   service: QuickCommandsService
   store: FakeStore
 } {
   const store = new FakeStore()
   store.data = {
     groups: (data.groups ?? []).map((group) => ({
-      createdAt: '2026-01-01T00:00:00.000Z',
-      ...group,
+      id: group.id,
+      name: group.name,
+      createdAt: group.createdAt ?? '2026-01-01T00:00:00.000Z',
     })),
-    commands: (data.commands ?? []).map((item) => ({
-      addedAt: '2026-01-01T00:00:00.000Z',
-      ...item,
+    commands: (data.commands ?? []).map((item, index) => ({
+      id: item.id ?? `seed-${index}`,
+      name: item.name ?? item.command,
+      command: item.command,
+      groupId: item.groupId ?? null,
+      addedAt: item.addedAt ?? '2026-01-01T00:00:00.000Z',
+      ...(item.lastUsedAt !== undefined ? { lastUsedAt: item.lastUsedAt } : {}),
+      ...(item.useCount !== undefined ? { useCount: item.useCount } : {}),
     })),
   }
   return { service: new QuickCommandsService(store), store }
@@ -523,7 +541,10 @@ describe('QuickCommandsService.execute（专用终端，v3.5）', () => {
 
   it('getReuseTerminal 注入 false → 每次新建（不读配置）', async () => {
     const store = new FakeStore()
-    store.data = { groups: [], commands: [{ id: 'c1', name: 'a', command: 'ls', addedAt: 't' }] }
+    store.data = {
+      groups: [],
+      commands: [{ id: 'c1', name: 'a', command: 'ls', groupId: null, addedAt: 't' }],
+    }
     const service = new QuickCommandsService(store, { getReuseTerminal: () => false })
     await service.load()
     await service.execute(service.get('c1')!)

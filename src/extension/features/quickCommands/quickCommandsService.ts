@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import * as path from 'path'
 import * as vscode from 'vscode'
+import { CONFIG, STORAGE } from '../../constants'
 import { writeJsonAtomic } from '../../services/stores/atomicWrite'
 
 /**
@@ -52,13 +53,10 @@ export const QUICK_COMMANDS_SCHEMA_VERSION = 1
 export const MAX_QUICK_COMMANDS = 200
 /** 分组上限：超出拒绝新增（读取侧保留前 N 个）。 */
 export const MAX_QUICK_COMMAND_GROUPS = 50
-/**
- * 快捷命令数据文件（相对工作区根；v3.5，16 方案）。
- * T8（constants 收敛）前暂居本文件，收敛后改引 STORAGE.quickCommandsFileName。
- */
-export const QUICK_COMMANDS_FILE_NAME = '.vscode/quick-commands.json'
-/** 无工作区时 globalState 的存储键（同上，T8 收敛进 constants）。 */
-export const QUICK_COMMANDS_MEMENTO_KEY = 'extStarter.quickCommands'
+/** 快捷命令数据文件（相对工作区根；单一来源 STORAGE.quickCommandsFileName，导出别名供测试）。 */
+export const QUICK_COMMANDS_FILE_NAME = STORAGE.quickCommandsFileName
+/** 无工作区时 globalState 的存储键（同上）。 */
+export const QUICK_COMMANDS_MEMENTO_KEY = STORAGE.quickCommandsMementoKey
 
 /** 默认别名：trim 后首个空白分段，截 20 字符。 */
 export function defaultAlias(command: string): string {
@@ -328,10 +326,6 @@ export type RenameGroupStatus = 'renamed' | 'duplicate' | 'notfound'
 
 /** 专用复用终端名（16 方案 §5：避免每次执行刷屏新建）。 */
 export const QUICK_COMMAND_TERMINAL_NAME = 'QuickCommand'
-/** 复用终端配置键（T8 收敛进 constants 前暂居本文件）。 */
-export const QUICK_COMMAND_REUSE_TERMINAL_KEY = 'quickCommandReuseTerminal'
-/** 配置段名（= CONFIG.section，T8 收敛前暂居本文件）。 */
-export const QUICK_COMMANDS_CONFIG_SECTION = 'extStarter'
 
 /** 快捷命令业务服务：命令与树视图的唯一数据入口。 */
 export class QuickCommandsService implements vscode.Disposable {
@@ -395,7 +389,7 @@ export class QuickCommandsService implements vscode.Disposable {
   async addCommand(input: {
     command: string
     name?: string
-    groupId: string | null
+    groupId?: string | null
   }): Promise<AddCommandStatus> {
     const command = input.command.trim()
     const groupId = input.groupId ?? null
@@ -550,8 +544,8 @@ export class QuickCommandsService implements vscode.Disposable {
     const reuse = this.options.getReuseTerminal
       ? this.options.getReuseTerminal()
       : vscode.workspace
-          .getConfiguration(QUICK_COMMANDS_CONFIG_SECTION)
-          .get<boolean>(QUICK_COMMAND_REUSE_TERMINAL_KEY, true)
+          .getConfiguration(CONFIG.section)
+          .get<boolean>(CONFIG.quickCommandReuseTerminal, true)
     if (!reuse || !this.terminal || this.terminal.exitStatus !== undefined) {
       this.terminal = vscode.window.createTerminal({
         name: QUICK_COMMAND_TERMINAL_NAME,

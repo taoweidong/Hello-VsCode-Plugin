@@ -4,9 +4,11 @@ import {
   QuickCommandsService,
   type IQuickCommandsStore,
   type QuickCommandsData,
-  type QuickCommandTreeNode,
 } from '../../../extension/features/quickCommands/quickCommandsService'
-import { QuickCommandsTreeProvider } from '../../../extension/features/quickCommands/quickCommandsTreeProvider'
+import {
+  QuickCommandsTreeProvider,
+  type QuickCommandTreeNode,
+} from '../../../extension/features/quickCommands/quickCommandsTreeProvider'
 import { __resetStubs } from '../stubs/vscode'
 
 /**
@@ -26,21 +28,45 @@ class FakeStore implements IQuickCommandsStore {
   }
 }
 
-function makeHost(data: Partial<QuickCommandsData> = {}): {
+/** 种子宽松形态：只填用例关心的字段，其余由辅助函数补默认值。 */
+type GroupSeed = { id: string; name: string; createdAt?: string }
+type ItemSeed = {
+  id?: string
+  name?: string
+  command: string
+  groupId?: string | null
+  addedAt?: string
+  useCount?: number
+}
+
+function makeHost(data: { groups?: GroupSeed[]; commands?: ItemSeed[] } = {}): {
   service: QuickCommandsService
   provider: QuickCommandsTreeProvider
 } {
   const store = new FakeStore()
   store.data = {
-    groups: (data.groups ?? []).map((group) => ({ createdAt: '2026-01-01T00:00:00.000Z', ...group })),
-    commands: (data.commands ?? []).map((item) => ({ addedAt: '2026-01-01T00:00:00.000Z', ...item })),
+    groups: (data.groups ?? []).map((group) => ({
+      id: group.id,
+      name: group.name,
+      createdAt: group.createdAt ?? '2026-01-01T00:00:00.000Z',
+    })),
+    commands: (data.commands ?? []).map((item, index) => ({
+      id: item.id ?? `seed-${index}`,
+      name: item.name ?? item.command,
+      command: item.command,
+      groupId: item.groupId ?? null,
+      addedAt: item.addedAt ?? '2026-01-01T00:00:00.000Z',
+      ...(item.useCount !== undefined ? { useCount: item.useCount } : {}),
+    })),
   }
   const service = new QuickCommandsService(store)
   const provider = new QuickCommandsTreeProvider(service)
   return { service, provider }
 }
 
-async function loaded(data: Partial<QuickCommandsData> = {}): Promise<QuickCommandsTreeProvider> {
+async function loaded(
+  data: { groups?: GroupSeed[]; commands?: ItemSeed[] } = {}
+): Promise<QuickCommandsTreeProvider> {
   const { service, provider } = makeHost(data)
   await service.load()
   return provider

@@ -5,6 +5,7 @@ import type {
   QuickCommandsService,
 } from '../features/quickCommands/quickCommandsService'
 import { readTerminalSelectionViaClipboard } from '../features/quickCommands/terminalSelection'
+import { COMMAND } from '../constants'
 import { type CommandRegistrar, showError } from './shared'
 
 /**
@@ -16,22 +17,6 @@ import { type CommandRegistrar, showError } from './shared'
  * - quickRunCommands：QuickPick 全量命令（分组 Separator 分节），回车即在终端执行；
  * - 带参命令（execute/edit/rename/move/copy/remove + 分组两个）无参调用只提示不抛错。
  */
-
-/** 命令 ID（T8 收敛前暂居本文件，值与 constants.COMMAND 即将新增的键一致）。 */
-const CMD = {
-  addQuickCommand: 'extStarter.addQuickCommand',
-  captureTerminalSelection: 'extStarter.captureTerminalSelection',
-  quickRunCommands: 'extStarter.quickRunCommands',
-  executeQuickCommand: 'extStarter.executeQuickCommand',
-  editQuickCommand: 'extStarter.editQuickCommand',
-  renameQuickCommand: 'extStarter.renameQuickCommand',
-  moveQuickCommandToGroup: 'extStarter.moveQuickCommandToGroup',
-  copyQuickCommand: 'extStarter.copyQuickCommand',
-  removeQuickCommand: 'extStarter.removeQuickCommand',
-  createQuickCommandGroup: 'extStarter.createQuickCommandGroup',
-  renameQuickCommandGroup: 'extStarter.renameQuickCommandGroup',
-  removeQuickCommandGroup: 'extStarter.removeQuickCommandGroup',
-} as const
 
 export interface QuickCommandsCommandDeps {
   quickCommands: QuickCommandsService
@@ -195,7 +180,7 @@ export function registerQuickCommandsCommands(
 ): void {
   const { quickCommands } = deps
 
-  register(CMD.addQuickCommand, async () => {
+  register(COMMAND.addQuickCommand, async () => {
     const command = await vscode.window.showInputBox({
       prompt: '要收藏的命令（支持多行）',
       placeHolder: '例如：git push origin main',
@@ -210,7 +195,7 @@ export function registerQuickCommandsCommands(
     await promptAndAdd(quickCommands, command)
   })
 
-  register(CMD.captureTerminalSelection, async () => {
+  register(COMMAND.captureTerminalSelection, async () => {
     if (!vscode.window.activeTerminal) {
       void vscode.window.showInformationMessage(
         '没有活动的终端：请先打开终端并选中要收藏的命令，或直接手动新增。'
@@ -233,7 +218,7 @@ export function registerQuickCommandsCommands(
     await promptAndAdd(quickCommands, selection)
   })
 
-  register(CMD.quickRunCommands, async () => {
+  register(COMMAND.quickRunCommands, async () => {
     if (quickCommands.listCommands().length === 0) {
       void vscode.window.showInformationMessage('快捷命令为空：先新增或从终端收藏一条命令。')
       return
@@ -252,7 +237,7 @@ export function registerQuickCommandsCommands(
     }
   })
 
-  register(CMD.executeQuickCommand, async (arg?: unknown) => {
+  register(COMMAND.executeQuickCommand, async (arg?: unknown) => {
     const item = requireItem(arg, '执行快捷命令')
     if (!item) {
       return
@@ -264,7 +249,7 @@ export function registerQuickCommandsCommands(
     }
   })
 
-  register(CMD.editQuickCommand, async (arg?: unknown) => {
+  register(COMMAND.editQuickCommand, async (arg?: unknown) => {
     const item = requireItem(arg, '编辑命令文本')
     if (!item) {
       return
@@ -290,7 +275,7 @@ export function registerQuickCommandsCommands(
     }
   })
 
-  register(CMD.renameQuickCommand, async (arg?: unknown) => {
+  register(COMMAND.renameQuickCommand, async (arg?: unknown) => {
     const item = requireItem(arg, '重命名别名')
     if (!item) {
       return
@@ -312,7 +297,7 @@ export function registerQuickCommandsCommands(
     }
   })
 
-  register(CMD.moveQuickCommandToGroup, async (arg?: unknown) => {
+  register(COMMAND.moveQuickCommandToGroup, async (arg?: unknown) => {
     const item = requireItem(arg, '移动到分组')
     if (!item) {
       return
@@ -331,7 +316,7 @@ export function registerQuickCommandsCommands(
     }
   })
 
-  register(CMD.copyQuickCommand, async (arg?: unknown) => {
+  register(COMMAND.copyQuickCommand, async (arg?: unknown) => {
     const item = requireItem(arg, '复制命令文本')
     if (!item) {
       return
@@ -344,7 +329,7 @@ export function registerQuickCommandsCommands(
     }
   })
 
-  register(CMD.removeQuickCommand, async (arg?: unknown) => {
+  register(COMMAND.removeQuickCommand, async (arg?: unknown) => {
     const item = requireItem(arg, '删除快捷命令')
     if (!item) {
       return
@@ -359,7 +344,7 @@ export function registerQuickCommandsCommands(
     }
   })
 
-  register(CMD.createQuickCommandGroup, async () => {
+  register(COMMAND.createQuickCommandGroup, async () => {
     const name = await vscode.window.showInputBox({ prompt: '新分组名称' })
     if (name === undefined || name.trim().length === 0) {
       return
@@ -378,7 +363,7 @@ export function registerQuickCommandsCommands(
     }
   })
 
-  register(CMD.renameQuickCommandGroup, async (arg?: unknown) => {
+  register(COMMAND.renameQuickCommandGroup, async (arg?: unknown) => {
     const group = requireGroup(arg, '重命名分组')
     if (!group) {
       return
@@ -402,7 +387,7 @@ export function registerQuickCommandsCommands(
     }
   })
 
-  register(CMD.removeQuickCommandGroup, async (arg?: unknown) => {
+  register(COMMAND.removeQuickCommandGroup, async (arg?: unknown) => {
     const group = requireGroup(arg, '删除分组')
     if (!group) {
       return

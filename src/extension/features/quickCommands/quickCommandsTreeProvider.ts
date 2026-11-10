@@ -1,4 +1,5 @@
 import * as vscode from 'vscode'
+import { COMMAND, VIEW } from '../../constants'
 import type {
   QuickCommandGroup,
   QuickCommandItem,
@@ -53,7 +54,7 @@ export class QuickCommandsTreeProvider
         vscode.TreeItemCollapsibleState.Collapsed
       )
       treeItem.iconPath = new vscode.ThemeIcon(node.group ? 'folder' : 'inbox')
-      treeItem.contextValue = 'quickCommandGroup'
+      treeItem.contextValue = VIEW.quickCommandGroupContextValue
       return treeItem
     }
     const item = node.item
@@ -62,11 +63,11 @@ export class QuickCommandsTreeProvider
     treeItem.iconPath = new vscode.ThemeIcon('terminal')
     // 单击直达：在专用终端执行（带参路由同一命令）
     treeItem.command = {
-      command: 'extStarter.executeQuickCommand',
+      command: COMMAND.executeQuickCommand,
       title: '执行快捷命令',
       arguments: [item],
     }
-    treeItem.contextValue = 'quickCommand'
+    treeItem.contextValue = VIEW.quickCommandContextValue
     treeItem.tooltip = new vscode.MarkdownString(
       [
         `**${item.name}**`,

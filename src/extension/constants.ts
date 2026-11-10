@@ -54,6 +54,13 @@ export const VIEW = {
   favoritesViewId: 'extStarter.favoritesView',
   /** 收藏条目的 contextValue */
   favoriteContextValue: 'favorite',
+
+  /** 快捷命令树视图 ID（v3.5：终端命令收藏 + 别名 + 分组 + 单击执行，16 方案） */
+  quickCommandsViewId: 'extStarter.quickCommandsView',
+  /** 快捷命令条目的 contextValue */
+  quickCommandContextValue: 'quickCommand',
+  /** 快捷命令分组节点的 contextValue */
+  quickCommandGroupContextValue: 'quickCommandGroup',
 } as const
 
 /**
@@ -149,6 +156,33 @@ export const COMMAND = {
   renameFavorite: 'extStarter.renameFavorite',
   /** 移除收藏（条目右键 + inline 悬停删除按钮；无需确认，可重新添加） */
   removeFavorite: 'extStarter.removeFavorite',
+
+  // 快捷命令（v3.5：终端命令收藏 + 别名 + 显式分组 + 单击终端执行，16 方案；
+  // 与收藏夹 favorites（收藏路径）、任务收藏 addTaskToFavorites（收藏 tasks.json 任务）正交）
+  /** 新增快捷命令（手动输入命令文本 + 别名 + 分组；视图标题栏 + 命令面板） */
+  addQuickCommand: 'extStarter.addQuickCommand',
+  /** 收藏终端选中命令（剪贴板桥接读选区，无选区降级粘贴输入框；命令面板 + 终端右键） */
+  captureTerminalSelection: 'extStarter.captureTerminalSelection',
+  /** 快速执行快捷命令（QuickPick 模糊搜索，回车即在专用终端执行） */
+  quickRunCommands: 'extStarter.quickRunCommands',
+  /** 执行快捷命令（树节点单击 / inline ▶ / 右键路由；专用终端 sendText） */
+  executeQuickCommand: 'extStarter.executeQuickCommand',
+  /** 编辑命令文本（条目右键；输入框预填现文本） */
+  editQuickCommand: 'extStarter.editQuickCommand',
+  /** 重命名快捷命令别名（条目右键） */
+  renameQuickCommand: 'extStarter.renameQuickCommand',
+  /** 移动到分组（条目右键；QuickPick 列分组 + 未分组 + 新建分组） */
+  moveQuickCommandToGroup: 'extStarter.moveQuickCommandToGroup',
+  /** 复制命令文本到剪贴板（条目右键） */
+  copyQuickCommand: 'extStarter.copyQuickCommand',
+  /** 删除快捷命令（条目右键 + inline 悬停删除按钮） */
+  removeQuickCommand: 'extStarter.removeQuickCommand',
+  /** 新建命令分组（视图标题栏 + 命令面板） */
+  createQuickCommandGroup: 'extStarter.createQuickCommandGroup',
+  /** 重命名命令分组（分组节点右键） */
+  renameQuickCommandGroup: 'extStarter.renameQuickCommandGroup',
+  /** 删除命令分组（分组节点右键；模态确认，组内命令回落未分组） */
+  removeQuickCommandGroup: 'extStarter.removeQuickCommandGroup',
 } as const
 
 /**
@@ -181,6 +215,9 @@ export const CONFIG = {
   taskNumLastTasks: 'taskNumLastTasks',
   /** 最近运行/收藏分组的默认展开状态 */
   taskExpanded: 'taskExpanded',
+
+  /** 快捷命令执行时是否复用专用终端 QuickCommand（v3.5，16 方案；false = 每次新建） */
+  quickCommandReuseTerminal: 'quickCommandReuseTerminal',
 } as const
 
 /**
@@ -208,4 +245,11 @@ export const STORAGE = {
   favoritesFileName: '.vscode/favorites.json',
   /** 收藏夹：未打开工作区时，globalState 的存储键 */
   favoritesMementoKey: 'extStarter.favorites',
+  /**
+   * 快捷命令数据文件（相对工作区根；v3.5，16 方案）。
+   * 已同步进 .gitignore。
+   */
+  quickCommandsFileName: '.vscode/quick-commands.json',
+  /** 快捷命令：未打开工作区时，globalState 的存储键 */
+  quickCommandsMementoKey: 'extStarter.quickCommands',
 } as const

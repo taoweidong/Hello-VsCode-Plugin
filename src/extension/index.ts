@@ -11,6 +11,11 @@ import { DraftBoxService } from './features/drafts/draftBoxService'
 import { FavoritesService } from './features/favorites/favoritesService'
 import { FavoritesTreeProvider } from './features/favorites/favoritesTreeProvider'
 import { createFavoritesStore } from './features/favorites/favoritesService'
+import {
+  createQuickCommandsStore,
+  QuickCommandsService,
+} from './features/quickCommands/quickCommandsService'
+import { QuickCommandsTreeProvider } from './features/quickCommands/quickCommandsTreeProvider'
 import { InitService } from './features/init/initService'
 import { InitTreeProvider } from './features/init/initTreeProvider'
 import { createInitSteps } from './features/init/initSteps'
@@ -151,6 +156,20 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.createTreeView(VIEW.favoritesViewId, { treeDataProvider: favoritesProvider })
   )
 
+  // ---------- 快捷命令（v3.5：终端命令收藏 + 别名 + 分组 + 单击执行，16 方案） ----------
+  const quickCommands = new QuickCommandsService(
+    createQuickCommandsStore(context, {
+      onWarning: (message) => outputChannel.appendLine(`[快捷命令] ${message}`),
+    })
+  )
+  context.subscriptions.push(quickCommands)
+  void quickCommands.load()
+  const quickCommandsProvider = new QuickCommandsTreeProvider(quickCommands)
+  context.subscriptions.push(
+    quickCommandsProvider,
+    vscode.window.createTreeView(VIEW.quickCommandsViewId, { treeDataProvider: quickCommandsProvider })
+  )
+
   // ---------- Webview 页面装配（M4）：面板上下文 + 序列化器（窗口重载恢复） ----------
   SerialConsolePanel.configure(context)
   WebviewController.registerSerializer(context, (pageId: WebviewPageId): WebviewControllerDeps => {
@@ -177,6 +196,7 @@ export function activate(context: vscode.ExtensionContext): void {
     recheckEnvironmentItem,
     taskExplorer,
     favorites,
+    quickCommands,
   })
 }
 
