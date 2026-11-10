@@ -5,11 +5,14 @@ import { STORAGE } from '../../constants'
 import { writeJsonAtomic } from '../../services/stores/atomicWrite'
 
 /**
- * 收藏夹（v3.4，13 方案）：文件 / 文件夹路径收藏 + 别名 + 单击跳转。
+ * 收藏夹（v3.4，13 方案；v3.6 存储可迁移增强，15 方案）：文件 / 文件夹路径收藏 + 别名 + 单击跳转。
  *
  * - 存储契约与 serial-servers 同口径：信封 { schemaVersion, items } + 原子写，
  *   损坏复制 .bak 后按空数据继续（绝无备份不覆盖）；顶层旧数组宽容读取；
- *   无工作区回退 globalState（双实现）；
+ * - 数据落点（15 方案：所有场景都是可手动拷贝的明文 JSON）：
+ *   有工作区 → `.vscode/favorites.json`；无工作区 → globalStorage 目录下明文 JSON
+ *   （GlobalJsonFavoritesStore）；旧 globalState 数据由激活期 migrateFavoritesMementoToFile
+ *   一次性迁移（幂等，迁移成功才清旧键）；
  * - 路径：工作区内存 POSIX 相对路径（仓库可迁移），工作区外存绝对 fsPath；
  *   解析时逐工作区文件夹尝试存在性，全未命中回退第一个文件夹；
  * - 去重按解析后的绝对路径；上限 200 条，新收藏插头部，超出丢最旧。
@@ -82,10 +85,12 @@ function normalizeFavoriteItem(entry: unknown): FavoriteItem | undefined {
   }
 }
 
-/** 收藏数据源抽象（双实现：工作区文件 + Memento）。 */
+/** 收藏数据源抽象（双实现：工作区文件 + globalStorage 明文文件）。 */
 export interface IFavoritesStore {
   load(): Promise<FavoriteItem[]>
   save(items: FavoriteItem[]): Promise<void>
+  /** 数据文件落点（「打开数据文件」命令与备份迁移口径依赖；15 方案）。 */
+  dataFileUri(): vscode.Uri
 }
 
 /** 默认数据源：工作区 `.vscode/favorites.json`（损坏契约与 serial-servers 一致）。 */
@@ -148,6 +153,10 @@ export class JsonFavoritesStore implements IFavoritesStore {
     await writeJsonAtomic(this.fileUri, { schemaVersion: FAVORITES_SCHEMA_VERSION, items })
   }
 
+  dataFileUri(): vscode.Uri {
+    return this.fileUri
+  }
+
   /** 损坏恢复：复制备份（原文件不动）→ 警告上报 → 按空数据继续；备份失败抛错。 */
   private async recoverFromCorruption(reason: string): Promise<FavoriteItem[]> {
     const dirUri = vscode.Uri.joinPath(this.fileUri, '..')
@@ -171,24 +180,58 @@ export class JsonFavoritesStore implements IFavoritesStore {
   }
 }
 
-/** 备用数据源：无工作区时经 globalState 持久化。 */
-export class MementoFavoritesStore implements IFavoritesStore {
-  constructor(
-    private readonly memento: vscode.Memento,
-    private readonly key: string,
-    private readonly options: { onWarning?: (message: string) => void } = {}
-  ) {}
+/**
+ * 备用数据源：无工作区时落到 globalStorage 目录下的明文 JSON（v3.6，15 方案——
+ * 手动拷贝该文件即可备份/迁移；writeJsonAtomic 自带 createDirectory，无需预建目录）。
+ */
+export class GlobalJsonFavoritesStore extends JsonFavoritesStore {}
 
-  async load(): Promise<FavoriteItem[]> {
-    return normalizeFavoriteList(this.memento.get<unknown>(this.key, []), this.options.onWarning)
+/**
+ * 激活期一次性迁移（15 方案 §3）：把旧 globalState（`extStarter.favorites`）数据
+ * 搬到 globalStorage 明文 JSON——与当前有无工作区无关地无条件执行，消除
+ * 「无工作区攒数据、之后打开工作区无人迁移」的孤儿窗口；对齐 migrateLegacyKeys
+ * 激活迁移先例；幂等（旧键清除后永不再触发）。
+ *
+ * 分支：① 无数据 → 静默跳过；② 全局文件已存在 → 旧键直接作废清除（不合并、
+ * 不覆盖，对齐 legacyMigration「旧键都清掉」口径）；③ 文件不存在 → 归一化写入
+ * 信封，写成功才清旧键，onMigrated 回调一次；④ 写失败 → 错误向上抛，旧键保留。
+ *
+ * 返回是否有数据真正搬迁（② 分支返回 false）。
+ */
+export async function migrateFavoritesMementoToFile(
+  context: vscode.ExtensionContext,
+  options: {
+    onWarning?: (message: string) => void
+    onMigrated?: (fileUri: vscode.Uri) => void
+  } = {}
+): Promise<boolean> {
+  const legacy = context.globalState.get<unknown>(STORAGE.favoritesMementoKey)
+  if (legacy === undefined) {
+    return false
   }
-
-  async save(items: FavoriteItem[]): Promise<void> {
-    await this.memento.update(this.key, items)
+  const fileUri = vscode.Uri.joinPath(context.globalStorageUri, STORAGE.favoritesGlobalFileName)
+  let exists = true
+  try {
+    await vscode.workspace.fs.stat(fileUri)
+  } catch (err) {
+    if (err instanceof vscode.FileSystemError && err.code === 'FileNotFound') {
+      exists = false
+    } else {
+      throw err // stat 因别的原因失败：如实上抛（旧键保留），不做任何写入
+    }
   }
+  if (exists) {
+    await context.globalState.update(STORAGE.favoritesMementoKey, undefined)
+    return false
+  }
+  const items = normalizeFavoriteList(legacy, options.onWarning)
+  await writeJsonAtomic(fileUri, { schemaVersion: FAVORITES_SCHEMA_VERSION, items })
+  await context.globalState.update(STORAGE.favoritesMementoKey, undefined)
+  options.onMigrated?.(fileUri)
+  return true
 }
 
-/** 装配：有工作区 → 工作区文件；无工作区 → globalState。 */
+/** 装配：有工作区 → 工作区文件；无工作区 → globalStorage 明文 JSON。 */
 export function createFavoritesStore(
   context: vscode.ExtensionContext,
   options: { onWarning?: (message: string) => void } = {}
@@ -200,7 +243,10 @@ export function createFavoritesStore(
       options
     )
   }
-  return new MementoFavoritesStore(context.globalState, STORAGE.favoritesMementoKey, options)
+  return new GlobalJsonFavoritesStore(
+    vscode.Uri.joinPath(context.globalStorageUri, STORAGE.favoritesGlobalFileName),
+    options
+  )
 }
 
 /** 相对路径转 POSIX 分隔（存储形态统一，跨平台可迁移）。 */
@@ -244,6 +290,24 @@ export class FavoritesService implements vscode.Disposable {
 
   list(): FavoriteItem[] {
     return [...this.items]
+  }
+
+  /** 数据文件落点（透传当前 store；「打开数据文件」命令依赖）。 */
+  dataFileUri(): vscode.Uri {
+    return this.store.dataFileUri()
+  }
+
+  /** 确保数据文件存在：缺失时写空信封（「打开数据文件」所见即存储格式）。 */
+  async ensureDataFile(): Promise<void> {
+    try {
+      await vscode.workspace.fs.stat(this.store.dataFileUri())
+    } catch (err) {
+      if (err instanceof vscode.FileSystemError && err.code === 'FileNotFound') {
+        await this.store.save([])
+        return
+      }
+      throw err
+    }
   }
 
   /** 批量添加（单选/多选统一入口）；重复路径跳过；别名缺省 basename；保持选择顺序插头部。 */

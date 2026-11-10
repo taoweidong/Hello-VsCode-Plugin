@@ -10,7 +10,7 @@ import { TaskManagerTreeProvider } from './features/taskManager/taskManagerTreeP
 import { DraftBoxService } from './features/drafts/draftBoxService'
 import { FavoritesService } from './features/favorites/favoritesService'
 import { FavoritesTreeProvider } from './features/favorites/favoritesTreeProvider'
-import { createFavoritesStore } from './features/favorites/favoritesService'
+import { createFavoritesStore, migrateFavoritesMementoToFile } from './features/favorites/favoritesService'
 import {
   createQuickCommandsStore,
   QuickCommandsService,
@@ -59,6 +59,20 @@ export function activate(context: vscode.ExtensionContext): void {
     .catch((err: unknown) => {
       outputChannel.appendLine(`[迁移] 旧键迁移失败（不影响使用）：${String(err)}`)
     })
+
+  // 15 方案（v3.6）：无工作区收藏数据从 globalState 一次性迁移到 globalStorage 明文 JSON
+  // （与有无工作区无关地无条件执行，幂等；写成功才清旧键，失败保留旧数据如实上报）
+  void migrateFavoritesMementoToFile(context, {
+    onWarning: (message) => outputChannel.appendLine(`[收藏夹] ${message}`),
+    onMigrated: (fileUri) => {
+      outputChannel.appendLine(`[收藏夹] 无工作区收藏数据已迁移到：${fileUri.fsPath}`)
+      void vscode.window.showInformationMessage(`无工作区收藏数据已迁移到文件：${fileUri.fsPath}`)
+    },
+  }).catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err)
+    outputChannel.appendLine(`[收藏夹] 旧数据迁移失败（旧数据保留在 globalState）：${message}`)
+    void vscode.window.showErrorMessage(`收藏数据迁移失败（旧数据已保留）：${message}`)
+  })
 
   // ---------- 启动任务（环境信息） ----------
   const taskRunner = new TaskRunner(TASKS, outputChannel)

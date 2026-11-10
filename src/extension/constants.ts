@@ -243,7 +243,12 @@ export const STORAGE = {
    * 已同步进 .gitignore。
    */
   favoritesFileName: '.vscode/favorites.json',
-  /** 收藏夹：未打开工作区时，globalState 的存储键 */
+  /**
+   * 收藏夹：未打开工作区时，globalStorage 目录下的明文 JSON 文件名（v3.6，15 方案——
+   * 手动拷贝即备份迁移）。
+   */
+  favoritesGlobalFileName: 'favorites.json',
+  /** 收藏夹旧 globalState 存储键：仅供激活期一次性迁移读取旧数据（15 方案，迁移后清除） */
   favoritesMementoKey: 'extStarter.favorites',
   /**
    * 快捷命令数据文件（相对工作区根；v3.5，16 方案）。
