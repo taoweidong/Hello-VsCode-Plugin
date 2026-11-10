@@ -253,6 +253,13 @@ export const STORAGE = {
   /** 收藏夹旧 globalState 存储键：仅供激活期一次性迁移读取旧数据（15 方案，迁移后清除） */
   favoritesMementoKey: 'extStarter.favorites',
   /**
+   * 书签数据文件（相对工作区根；v3.6，14 方案）。
+   * 已同步进 .gitignore。
+   */
+  bookmarksFileName: '.vscode/bookmarks.json',
+  /** 书签：未打开工作区时，globalStorage 目录下的明文 JSON 文件名（15 方案口径） */
+  bookmarksGlobalFileName: 'bookmarks.json',
+  /**
    * 快捷命令数据文件（相对工作区根；v3.5，16 方案）。
    * 已同步进 .gitignore。
    */

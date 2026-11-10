@@ -8,6 +8,7 @@ import {
 } from './features/taskManager/taskManagerPanel'
 import { TaskManagerTreeProvider } from './features/taskManager/taskManagerTreeProvider'
 import { DraftBoxService } from './features/drafts/draftBoxService'
+import { BookmarksService, createBookmarksStore } from './features/bookmarks/bookmarksService'
 import { FavoritesService } from './features/favorites/favoritesService'
 import { FavoritesTreeProvider } from './features/favorites/favoritesTreeProvider'
 import {
@@ -172,6 +173,15 @@ export function activate(context: vscode.ExtensionContext): void {
     favoritesProvider,
     vscode.window.createTreeView(VIEW.favoritesViewId, { treeDataProvider: favoritesProvider })
   )
+
+  // ---------- 代码书签（v3.6：行级书签 + Ctrl+Alt+K，14 方案） ----------
+  const bookmarks = new BookmarksService(
+    createBookmarksStore(context, {
+      onWarning: (message) => outputChannel.appendLine(`[书签] ${message}`),
+    })
+  )
+  context.subscriptions.push(bookmarks)
+  void bookmarks.load()
 
   // ---------- 快捷命令（v3.5：终端命令收藏 + 别名 + 分组 + 单击执行，16 方案） ----------
   const quickCommands = new QuickCommandsService(
