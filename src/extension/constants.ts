@@ -55,6 +55,13 @@ export const VIEW = {
   /** 收藏条目的 contextValue */
   favoriteContextValue: 'favorite',
 
+  /** 书签树视图 ID（v3.6：行级代码书签，14 方案） */
+  bookmarksViewId: 'extStarter.bookmarksView',
+  /** 书签文件分组节点的 contextValue */
+  bookmarkFileContextValue: 'bookmarkFile',
+  /** 书签条目的 contextValue */
+  bookmarkContextValue: 'bookmark',
+
   /** 快捷命令树视图 ID（v3.5：终端命令收藏 + 别名 + 分组 + 单击执行，16 方案） */
   quickCommandsViewId: 'extStarter.quickCommandsView',
   /** 快捷命令条目的 contextValue */

@@ -8,7 +8,11 @@ import {
 } from './features/taskManager/taskManagerPanel'
 import { TaskManagerTreeProvider } from './features/taskManager/taskManagerTreeProvider'
 import { DraftBoxService } from './features/drafts/draftBoxService'
-import { BookmarksService, createBookmarksStore } from './features/bookmarks/bookmarksService'
+import {
+  BookmarksService,
+  createBookmarksStore,
+} from './features/bookmarks/bookmarksService'
+import { BookmarksTreeProvider } from './features/bookmarks/bookmarksTreeProvider'
 import { FavoritesService } from './features/favorites/favoritesService'
 import { FavoritesTreeProvider } from './features/favorites/favoritesTreeProvider'
 import {
@@ -182,6 +186,11 @@ export function activate(context: vscode.ExtensionContext): void {
   )
   context.subscriptions.push(bookmarks)
   void bookmarks.load()
+  const bookmarksProvider = new BookmarksTreeProvider(bookmarks)
+  context.subscriptions.push(
+    bookmarksProvider,
+    vscode.window.createTreeView(VIEW.bookmarksViewId, { treeDataProvider: bookmarksProvider })
+  )
 
   // ---------- 快捷命令（v3.5：终端命令收藏 + 别名 + 分组 + 单击执行，16 方案） ----------
   const quickCommands = new QuickCommandsService(
