@@ -1,6 +1,8 @@
 import * as vscode from 'vscode'
 import { STORAGE } from '../../constants'
+import { reasonOf } from '../../services/errors'
 import { writeJsonAtomic } from '../../services/stores/atomicWrite'
+import { copyCorruptBackup } from '../../services/stores/jsonEnvelopeStore'
 import { QueuedStoreMutations } from '../../services/stores/queuedFileStore'
 
 /**
@@ -21,7 +23,8 @@ import { QueuedStoreMutations } from '../../services/stores/queuedFileStore'
  * - **读错误 ≠ 空数据（v3.6.1，P1-2）**：文件不存在 → 空数据；其余读盘错误
  *   （EBUSY/EPERM 等）如实上抛并记入 loadError——变更在重读失败时中止，
  *   绝不以「仅新条目」覆盖原文件；
- * - **损坏备份**：解析失败先把原文件复制为 `.bak` 再按空数据继续（对齐 serverStore）。
+ * - **损坏备份**：解析失败 / 根节点形态不符先把原文件复制为 `.corrupt-*.bak`
+ *   再按空数据继续（copy 型，与收藏夹等数据文件统一机制，17 方案阶段 2）。
  */
 
 export type DraftKind = 'selection' | 'file' | 'folder'
@@ -68,6 +71,17 @@ function clipContent(text: string): string {
     return text
   }
   return `${text.slice(0, MAX_CONTENT_CHARS)}\n…（内容超过 ${MAX_CONTENT_CHARS / 1024}K 字符，已截断）`
+}
+
+/** 条目守卫：仅收 id + title 均为字符串的对象形态（宽松口径，12 号文档 P3-E2 维持）。 */
+function filterDraftEntries(raw: readonly unknown[]): DraftEntry[] {
+  return raw.filter(
+    (entry): entry is DraftEntry =>
+      typeof entry === 'object' &&
+      entry !== null &&
+      typeof (entry as DraftEntry).id === 'string' &&
+      typeof (entry as DraftEntry).title === 'string'
+  )
 }
 
 export class DraftBoxService implements vscode.Disposable {
@@ -253,7 +267,7 @@ export class DraftBoxService implements vscode.Disposable {
       this.loadError = undefined
     } catch (err) {
       this.entries = []
-      this.loadError = err instanceof Error ? err.message : String(err)
+      this.loadError = reasonOf(err)
     }
     return this.entries.length
   }
@@ -261,7 +275,9 @@ export class DraftBoxService implements vscode.Disposable {
   /**
    * 读取并校验数据文件（写前重读的数据源，语义即 QueuedStoreMutations 契约）：
    * 文件不存在 → 空数组；其余读盘错误如实上抛（中止变更，绝不带陈旧状态落盘）；
-   * 损坏时备份 `.bak` 后按空数据继续（幂等：备份失败静默）。
+   * 顶层数组宽容读取（手写常见形态，下次保存自动迁移为信封）；解析失败 /
+   * 根节点形态不符 → 复制 `.corrupt-*.bak` 备份（与其他数据文件统一机制，
+   * 17 方案阶段 2）后按空数据继续，备份失败抛错（绝无备份不覆盖）。
    */
   private async readEntries(): Promise<DraftEntry[]> {
     const uri = this.fileUri
@@ -277,28 +293,31 @@ export class DraftBoxService implements vscode.Disposable {
       }
       throw err // 其余读盘错误如实上抛（P1-2：不再当「文件不存在」吞掉）
     }
+    if (raw.charCodeAt(0) === 0xfeff) {
+      raw = raw.slice(1)
+    }
+    let parsed: unknown
     try {
-      const parsed = JSON.parse(raw) as { entries?: unknown }
-      if (!Array.isArray(parsed.entries)) {
-        return []
-      }
-      return parsed.entries.filter(
-        (entry): entry is DraftEntry =>
-          typeof entry === 'object' &&
-          entry !== null &&
-          typeof (entry as DraftEntry).id === 'string' &&
-          typeof (entry as DraftEntry).title === 'string'
-      )
+      parsed = JSON.parse(raw)
     } catch {
-      // 损坏：备份原文件（保留原样），按空数据继续
-      try {
-        const backup = vscode.Uri.file(`${uri.fsPath}.bak`)
-        await vscode.workspace.fs.writeFile(backup, Buffer.from(raw, 'utf8'))
-      } catch {
-        // 备份失败不阻断（原文件本就未被改动）
-      }
+      // 损坏：复制备份（保留原样）后按空数据继续；备份失败向上抛
+      await copyCorruptBackup(uri, '草稿')
       return []
     }
+    if (Array.isArray(parsed)) {
+      // 顶层数组（手写常见形态）：宽容读取
+      return filterDraftEntries(parsed)
+    }
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      Array.isArray((parsed as { entries?: unknown }).entries)
+    ) {
+      return filterDraftEntries((parsed as { entries: unknown[] }).entries)
+    }
+    // 根节点形态不符：与解析失败同走备份恢复
+    await copyCorruptBackup(uri, '草稿')
+    return []
   }
 
   /** 头部插入 + 上限裁剪。返回当前条数。 */

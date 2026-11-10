@@ -1,4 +1,5 @@
 import * as vscode from 'vscode'
+import { reasonOf } from '../../services/errors'
 import { taskKey } from './taskSource'
 
 /**
@@ -45,7 +46,7 @@ export class TaskStatusTracker implements vscode.Disposable {
       try {
         execution.terminate()
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
+        const message = reasonOf(error)
         this.output.appendLine(`[taskExplorer] 停止任务「${execution.task.name}」失败：${message}`)
       }
     }

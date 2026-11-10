@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import { COMMAND } from '../../constants'
+import { reasonOf } from '../../services/errors'
 import type { TaskApiClient, TaskItem } from './taskApiClient'
 
 /**
@@ -84,7 +85,7 @@ export class TaskManagerTreeProvider
       this.tasks = page.items
       this.loadError = undefined
     } catch (err) {
-      this.loadError = err instanceof Error ? err.message : String(err)
+      this.loadError = reasonOf(err)
     }
     this._onDidChangeTreeData.fire()
   }

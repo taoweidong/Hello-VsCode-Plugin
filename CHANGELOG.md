@@ -6,6 +6,22 @@
 
 ## [Unreleased]
 
+### 重构（17 方案阶段 2：存储层与共享工具统一，行为保持）
+
+- **JSON 信封存储四合一口**：新增共享 `JsonEnvelopeFileStore` + `copyCorruptBackup`
+  （load 的 BOM 剥离 / FileNotFound / IO 错误上抛 / 损坏复制 `.corrupt-*.bak` 备份 +
+  原子写），favorites / bookmarks / quickCommands / serial-servers 四份逐行复制的
+  store 收敛为单一实现（各 feature 只保留内容解析回调），净删 300+ 行；
+- **草稿箱备份机制统一**：`.bak`（非原子 writeFile）→ `.corrupt-*.bak`（copy 型，
+  与其他数据文件同口径），并补顶层数组宽容读取；快捷命令信封因 groups+commands
+  双集合语义歧义，明确保持严格校验（裸数组判损坏并备份，不猜测解释）；
+- **错误提取统一走 `reasonOf`**：替换 21 处内联 `instanceof Error ? message : String()`
+  三套语义并存（showError 内部同步复用）；
+- **命令层入参守卫收敛**：shared 新增 `requireTreeItem` / `toUri` /
+  `currentFileUri` / `resolveExplorerTargets`，favorites/bookmarks/quickCommands
+  三份 requireItem 复制与 favorites/draft 的批量归一化收敛（copyCommands 因
+  无编辑器回退语义保持独立实现并加注释说明）。
+
 ### 修复（17 方案阶段 1：P1 正确性，评估报告见
 
 [需求与优化方案 17](docs/需求与优化方案/17-代码质量评估报告与分阶段优化方案.md)）

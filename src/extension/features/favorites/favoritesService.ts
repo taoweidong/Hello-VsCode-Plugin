@@ -3,7 +3,12 @@ import * as path from 'path'
 import * as vscode from 'vscode'
 import { STORAGE } from '../../constants'
 import { writeJsonAtomic } from '../../services/stores/atomicWrite'
+import {
+  JsonEnvelopeFileStore,
+  type EnvelopeParseResult,
+} from '../../services/stores/jsonEnvelopeStore'
 import { QueuedStoreMutations } from '../../services/stores/queuedFileStore'
+import { reasonOf } from '../../services/errors'
 
 /**
  * 收藏夹（v3.4，13 方案；v3.6 存储可迁移增强，15 方案）：文件 / 文件夹路径收藏 + 别名 + 单击跳转。
@@ -94,90 +99,62 @@ export interface IFavoritesStore {
   dataFileUri(): vscode.Uri
 }
 
+/** 收藏数据内容解析（信封 + 顶层宽容读取，17 方案阶段 2 收敛到共享信封存储）。 */
+function parseFavoritesContent(
+  data: unknown,
+  warn: (message: string) => void
+): EnvelopeParseResult<FavoriteItem[]> {
+  if (Array.isArray(data)) {
+    // 顶层数组（手写常见形态）：宽容读取，下次保存自动迁移为信封
+    warn('收藏数据文件为顶层数组格式，已兼容读取，下次保存自动迁移为信封格式。')
+    return { ok: true, value: normalizeFavoriteList(data, warn) }
+  }
+  if (
+    typeof data === 'object' &&
+    data !== null &&
+    Array.isArray((data as { items?: unknown }).items)
+  ) {
+    const envelope = data as { schemaVersion?: unknown; items: unknown[] }
+    if (
+      envelope.schemaVersion !== undefined &&
+      envelope.schemaVersion !== FAVORITES_SCHEMA_VERSION
+    ) {
+      warn(
+        `收藏数据 schemaVersion=${String(envelope.schemaVersion)} 与当前版本 ${FAVORITES_SCHEMA_VERSION} 不一致，已尽力按 items 读取。`
+      )
+    }
+    return { ok: true, value: normalizeFavoriteList(envelope.items, warn) }
+  }
+  return { ok: false, reason: '根节点既不是数组，也不是含 items 数组的对象' }
+}
+
 /** 默认数据源：工作区 `.vscode/favorites.json`（损坏契约与 serial-servers 一致）。 */
 export class JsonFavoritesStore implements IFavoritesStore {
+  private readonly inner: JsonEnvelopeFileStore<FavoriteItem[]>
+
   constructor(
     public readonly fileUri: vscode.Uri,
-    private readonly options: { onWarning?: (message: string) => void } = {}
-  ) {}
+    options: { onWarning?: (message: string) => void } = {}
+  ) {
+    this.inner = new JsonEnvelopeFileStore<FavoriteItem[]>(fileUri, {
+      label: '收藏',
+      empty: () => [],
+      parse: parseFavoritesContent,
+      serialize: (items) => ({ schemaVersion: FAVORITES_SCHEMA_VERSION, items }),
+      onWarning: options.onWarning,
+    })
+  }
 
-  async load(): Promise<FavoriteItem[]> {
-    let text: string
-    try {
-      const raw = await vscode.workspace.fs.readFile(this.fileUri)
-      text = Buffer.from(raw).toString('utf8')
-    } catch (err) {
-      if (err instanceof vscode.FileSystemError && err.code === 'FileNotFound') {
-        return [] // 首次使用：视为空数据
-      }
-      this.options.onWarning?.(
-        `读取收藏数据失败（${this.fileUri.fsPath}）：${err instanceof Error ? err.message : String(err)}`
-      )
-      throw err
-    }
-    if (text.charCodeAt(0) === 0xfeff) {
-      text = text.slice(1)
-    }
-    let data: unknown
-    try {
-      data = JSON.parse(text)
-    } catch (err) {
-      return this.recoverFromCorruption(err instanceof Error ? err.message : String(err))
-    }
-    if (Array.isArray(data)) {
-      // 顶层数组（手写常见形态）：宽容读取，下次保存自动迁移为信封
-      this.options.onWarning?.(
-        '收藏数据文件为顶层数组格式，已兼容读取，下次保存自动迁移为信封格式。'
-      )
-      return normalizeFavoriteList(data, this.options.onWarning)
-    }
-    if (
-      typeof data === 'object' &&
-      data !== null &&
-      Array.isArray((data as { items?: unknown }).items)
-    ) {
-      const envelope = data as { schemaVersion?: unknown; items: unknown[] }
-      if (
-        envelope.schemaVersion !== undefined &&
-        envelope.schemaVersion !== FAVORITES_SCHEMA_VERSION
-      ) {
-        this.options.onWarning?.(
-          `收藏数据 schemaVersion=${String(envelope.schemaVersion)} 与当前版本 ${FAVORITES_SCHEMA_VERSION} 不一致，已尽力按 items 读取。`
-        )
-      }
-      return normalizeFavoriteList(envelope.items, this.options.onWarning)
-    }
-    return this.recoverFromCorruption('根节点既不是数组，也不是含 items 数组的对象')
+  load(): Promise<FavoriteItem[]> {
+    return this.inner.load()
   }
 
   async save(items: FavoriteItem[]): Promise<void> {
-    await writeJsonAtomic(this.fileUri, { schemaVersion: FAVORITES_SCHEMA_VERSION, items })
+    await this.inner.save(items)
   }
 
   dataFileUri(): vscode.Uri {
     return this.fileUri
-  }
-
-  /** 损坏恢复：复制备份（原文件不动）→ 警告上报 → 按空数据继续；备份失败抛错。 */
-  private async recoverFromCorruption(reason: string): Promise<FavoriteItem[]> {
-    const dirUri = vscode.Uri.joinPath(this.fileUri, '..')
-    const backupUri = vscode.Uri.joinPath(
-      dirUri,
-      `${path.basename(this.fileUri.fsPath)}.corrupt-${Date.now()}-${randomUUID().slice(0, 8)}.bak`
-    )
-    try {
-      await vscode.workspace.fs.copy(this.fileUri, backupUri)
-    } catch (err) {
-      throw new Error(
-        `收藏数据文件损坏且备份失败：无法将 ${this.fileUri.fsPath} 复制为 ${backupUri.fsPath}` +
-          `（${err instanceof Error ? err.message : String(err)}）。原文件保留在原位，请手动处理。`,
-        { cause: err }
-      )
-    }
-    this.options.onWarning?.(
-      `收藏数据文件损坏（${reason}）。原文件保留在原位，已复制备份到 ${path.basename(backupUri.fsPath)}，本次按空数据继续。`
-    )
-    return []
   }
 }
 
@@ -312,7 +289,7 @@ export class FavoritesService implements vscode.Disposable {
       this.loadError = undefined
     } catch (err) {
       this.items = []
-      this.loadError = err instanceof Error ? err.message : String(err)
+      this.loadError = reasonOf(err)
     }
   }
 

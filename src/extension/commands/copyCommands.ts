@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import { COMMAND } from '../constants'
+import { reasonOf } from '../services/errors'
 import { notifySuccess, showError } from './shared'
 import type { CommandRegistrar } from './shared'
 
@@ -94,7 +95,7 @@ export function registerCopyCommands(register: CommandRegistrar): void {
           failures.push(`${target.path.split('/').pop() ?? target.fsPath}（${result.reason}）`)
         }
       } catch (err) {
-        const reason = err instanceof Error ? err.message : String(err)
+        const reason = reasonOf(err)
         failures.push(`${target.path.split('/').pop() ?? target.fsPath}（${reason}）`)
       }
     }

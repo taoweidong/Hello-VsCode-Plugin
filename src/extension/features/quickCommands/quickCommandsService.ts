@@ -1,9 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import * as path from 'path'
 import * as vscode from 'vscode'
 import { CONFIG, STORAGE } from '../../constants'
-import { writeJsonAtomic } from '../../services/stores/atomicWrite'
+import {
+  JsonEnvelopeFileStore,
+  type EnvelopeParseResult,
+} from '../../services/stores/jsonEnvelopeStore'
 import { QueuedStoreMutations } from '../../services/stores/queuedFileStore'
+import { reasonOf } from '../../services/errors'
 
 /**
  * 快捷命令（v3.5，16 方案）：终端命令收藏 + 别名 + 显式分组 + 单击在终端执行。
@@ -204,75 +207,55 @@ export interface IQuickCommandsStore {
   save(data: QuickCommandsData): Promise<void>
 }
 
+/**
+ * 快捷命令数据内容解析（17 方案阶段 2 收敛到共享信封存储）。
+ * 顶层**不做**裸数组宽容读取：本信封是 groups + commands 双集合，裸数组语义
+ * 存在歧义（按 commands 解释可能静默丢掉手写的 groups）——判损坏并复制备份
+ * 更安全（原文件可从备份恢复）；单一集合的 favorites / bookmarks / servers
+ * 才有明确的宽容读取口径。
+ */
+function parseQuickCommandsContent(
+  data: unknown,
+  warn: (message: string) => void
+): EnvelopeParseResult<QuickCommandsData> {
+  if (
+    typeof data === 'object' &&
+    data !== null &&
+    (Array.isArray((data as { groups?: unknown }).groups) ||
+      Array.isArray((data as { commands?: unknown }).commands))
+  ) {
+    return { ok: true, value: normalizeQuickCommandData(data, warn) }
+  }
+  return { ok: false, reason: '根节点不是含 groups/commands 数组的信封对象' }
+}
+
 /** 默认数据源：工作区 `.vscode/quick-commands.json`（损坏契约与收藏夹一致）。 */
 export class JsonQuickCommandsStore implements IQuickCommandsStore {
+  private readonly inner: JsonEnvelopeFileStore<QuickCommandsData>
+
   constructor(
     public readonly fileUri: vscode.Uri,
-    private readonly options: { onWarning?: (message: string) => void } = {}
-  ) {}
-
-  async load(): Promise<QuickCommandsData> {
-    let text: string
-    try {
-      const raw = await vscode.workspace.fs.readFile(this.fileUri)
-      text = Buffer.from(raw).toString('utf8')
-    } catch (err) {
-      if (err instanceof vscode.FileSystemError && err.code === 'FileNotFound') {
-        return { groups: [], commands: [] } // 首次使用：视为空数据
-      }
-      this.options.onWarning?.(
-        `读取快捷命令数据失败（${this.fileUri.fsPath}）：${err instanceof Error ? err.message : String(err)}`
-      )
-      throw err
-    }
-    if (text.charCodeAt(0) === 0xfeff) {
-      text = text.slice(1)
-    }
-    let data: unknown
-    try {
-      data = JSON.parse(text)
-    } catch (err) {
-      return this.recoverFromCorruption(err instanceof Error ? err.message : String(err))
-    }
-    if (
-      typeof data === 'object' &&
-      data !== null &&
-      (Array.isArray((data as { groups?: unknown }).groups) ||
-        Array.isArray((data as { commands?: unknown }).commands))
-    ) {
-      return normalizeQuickCommandData(data, this.options.onWarning)
-    }
-    return this.recoverFromCorruption('根节点不是含 groups/commands 数组的信封对象')
-  }
-
-  async save(data: QuickCommandsData): Promise<void> {
-    await writeJsonAtomic(this.fileUri, {
-      schemaVersion: QUICK_COMMANDS_SCHEMA_VERSION,
-      groups: data.groups,
-      commands: data.commands,
+    options: { onWarning?: (message: string) => void } = {}
+  ) {
+    this.inner = new JsonEnvelopeFileStore<QuickCommandsData>(fileUri, {
+      label: '快捷命令',
+      empty: () => ({ groups: [], commands: [] }),
+      parse: parseQuickCommandsContent,
+      serialize: (data) => ({
+        schemaVersion: QUICK_COMMANDS_SCHEMA_VERSION,
+        groups: data.groups,
+        commands: data.commands,
+      }),
+      onWarning: options.onWarning,
     })
   }
 
-  /** 损坏恢复：复制备份（原文件不动）→ 警告上报 → 按空数据继续；备份失败抛错。 */
-  private async recoverFromCorruption(reason: string): Promise<QuickCommandsData> {
-    const dirUri = vscode.Uri.joinPath(this.fileUri, '..')
-    const backupUri = vscode.Uri.joinPath(
-      dirUri,
-      `${path.basename(this.fileUri.fsPath)}.corrupt-${Date.now()}-${randomUUID().slice(0, 8)}.bak`
-    )
-    try {
-      await vscode.workspace.fs.copy(this.fileUri, backupUri)
-    } catch (err) {
-      throw new Error(
-        `快捷命令数据文件损坏且备份失败：无法将 ${this.fileUri.fsPath} 复制为 ${backupUri.fsPath}` +
-          `（${err instanceof Error ? err.message : String(err)}）。原文件保留在原位，请手动处理。`,
-        { cause: err }
-      )
-    }
-    this.options.onWarning?.(
-      `快捷命令数据文件损坏（${reason}）。原文件保留在原位，已复制备份到 ${path.basename(backupUri.fsPath)}，本次按空数据继续。`
-    )
-    return { groups: [], commands: [] }
+  load(): Promise<QuickCommandsData> {
+    return this.inner.load()
+  }
+
+  async save(data: QuickCommandsData): Promise<void> {
+    await this.inner.save(data)
   }
 }
 
@@ -395,7 +378,7 @@ export class QuickCommandsService implements vscode.Disposable {
     } catch (err) {
       this.groups = []
       this.commands = []
-      this.loadError = err instanceof Error ? err.message : String(err)
+      this.loadError = reasonOf(err)
     }
   }
 

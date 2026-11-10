@@ -1,4 +1,5 @@
 import { StringDecoder } from 'node:string_decoder'
+import { reasonOf } from '../../services/errors'
 import { LINE_ENDING_CHARS, type SerialServer } from './models'
 import type { SerialPortFactory, SerialPortLike } from './serialPortFactory'
 
@@ -147,7 +148,7 @@ export function createSerialLinkService(
         setState('connected')
       } catch (err) {
         if (generation !== myGeneration) return // 已被取消，不再上报
-        const message = err instanceof Error ? err.message : String(err)
+        const message = reasonOf(err)
         setState('error', `串口 ${next.serialPath} 打开失败：${message}`)
         throw err instanceof Error ? err : new Error(message)
       }

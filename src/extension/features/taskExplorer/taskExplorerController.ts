@@ -3,6 +3,7 @@ import type { WorkspaceTaskEntry } from './taskSource'
 import { isWorkspaceFileTask, taskKey, taskRef } from './taskSource'
 import { TaskExplorerTreeProvider, type TaskExplorerNode } from './taskExplorerTreeProvider'
 import { TaskStatusTracker } from './taskStatusTracker'
+import { reasonOf } from '../../services/errors'
 import { TaskUsageStore } from './taskUsageStore'
 import { locateTaskLabel } from './tasksJsonLocator'
 
@@ -140,7 +141,7 @@ export class TaskExplorerController implements vscode.Disposable {
       await vscode.tasks.executeTask(entry.task)
       this.usage.recordRun(entry.ref) // executeTask 成功提交后才记入最近运行
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+      const message = reasonOf(error)
       this.output.appendLine(`[taskExplorer] 运行失败：${message}`)
       void vscode.window.showErrorMessage(`运行任务失败：${message}`)
     }

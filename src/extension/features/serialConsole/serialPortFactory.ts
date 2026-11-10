@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module'
+import { reasonOf } from '../../services/errors'
 import type { Parity } from './models'
 
 /**
@@ -45,7 +46,7 @@ export class SerialPortUnavailableError extends Error {
   constructor(cause: unknown) {
     super(
       '无法加载串口模块 serialport' +
-        `（${cause instanceof Error ? cause.message : String(cause)}）。` +
+        `（${reasonOf(cause)}）。` +
         '请确认扩展依赖完整安装，且当前平台存在预编译二进制（win32-x64 / linux-x64 等）。'
     )
     this.name = 'SerialPortUnavailableError'

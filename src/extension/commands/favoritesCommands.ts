@@ -1,7 +1,7 @@
 import * as vscode from 'vscode'
 import type { FavoriteItem, FavoritesService } from '../features/favorites/favoritesService'
 import { COMMAND } from '../constants'
-import { type CommandRegistrar, showError } from './shared'
+import { requireTreeItem, resolveExplorerTargets, type CommandRegistrar, showError } from './shared'
 
 /**
  * 收藏夹场景命令分组（v3.4，13 方案；v3.6 增 openFavoritesDataFile，15 方案）——
@@ -18,16 +18,6 @@ export interface FavoritesCommandDeps {
   favorites: FavoritesService
 }
 
-/** 入参归一化为 Uri（资源管理器右键传入；其他来源可能传任意值）。 */
-function toUri(value: unknown): vscode.Uri | undefined {
-  return value instanceof vscode.Uri ? value : undefined
-}
-
-/** 当前编辑器文件 URI（未打开文件时 undefined）。 */
-function currentFileUri(): vscode.Uri | undefined {
-  return vscode.window.activeTextEditor?.document.uri
-}
-
 function isFavoriteItem(value: unknown): value is FavoriteItem {
   return (
     typeof value === 'object' &&
@@ -35,14 +25,6 @@ function isFavoriteItem(value: unknown): value is FavoriteItem {
     typeof (value as { id?: unknown }).id === 'string' &&
     typeof (value as { path?: unknown }).path === 'string'
   )
-}
-
-function requireItem(value: unknown, action: string): FavoriteItem | undefined {
-  if (isFavoriteItem(value)) {
-    return value
-  }
-  void vscode.window.showInformationMessage(`请从「收藏夹」视图${action}。`)
-  return undefined
 }
 
 export function registerFavoritesCommands(
@@ -53,9 +35,7 @@ export function registerFavoritesCommands(
 
   register(COMMAND.addFavorite, async (uri?: unknown, uris?: unknown[]) => {
     // 多选批量（explorer/context 传入 [uri, uris[]]）；单选 / 编辑器侧当前文件
-    const batch = Array.isArray(uris) ? uris.map(toUri).filter((u): u is vscode.Uri => !!u) : []
-    const single = toUri(uri) ?? currentFileUri()
-    const targets = batch.length > 0 ? batch : single ? [single] : []
+    const targets = resolveExplorerTargets(uri, uris)
     if (targets.length === 0) {
       void vscode.window.showInformationMessage('没有可收藏的文件或文件夹。')
       return
@@ -114,7 +94,7 @@ export function registerFavoritesCommands(
   })
 
   register(COMMAND.openFavorite, async (arg?: unknown) => {
-    const item = requireItem(arg, '调用打开')
+    const item = requireTreeItem(arg, isFavoriteItem, `请从「收藏夹」视图调用打开。`)
     if (!item) {
       return
     }
@@ -126,7 +106,7 @@ export function registerFavoritesCommands(
   })
 
   register(COMMAND.revealFavorite, async (arg?: unknown) => {
-    const item = requireItem(arg, '调用显示')
+    const item = requireTreeItem(arg, isFavoriteItem, `请从「收藏夹」视图调用显示。`)
     if (!item) {
       return
     }
@@ -138,7 +118,7 @@ export function registerFavoritesCommands(
   })
 
   register(COMMAND.copyFavoritePath, async (arg?: unknown) => {
-    const item = requireItem(arg, '复制路径')
+    const item = requireTreeItem(arg, isFavoriteItem, `请从「收藏夹」视图复制路径。`)
     if (!item) {
       return
     }
@@ -152,7 +132,7 @@ export function registerFavoritesCommands(
   })
 
   register(COMMAND.renameFavorite, async (arg?: unknown) => {
-    const item = requireItem(arg, '重命名别名')
+    const item = requireTreeItem(arg, isFavoriteItem, `请从「收藏夹」视图重命名别名。`)
     if (!item) {
       return
     }
@@ -174,7 +154,7 @@ export function registerFavoritesCommands(
   })
 
   register(COMMAND.removeFavorite, async (arg?: unknown) => {
-    const item = requireItem(arg, '移除收藏')
+    const item = requireTreeItem(arg, isFavoriteItem, `请从「收藏夹」视图移除收藏。`)
     if (!item) {
       return
     }

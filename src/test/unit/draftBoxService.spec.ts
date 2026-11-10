@@ -161,14 +161,20 @@ describe('DraftBoxService：并发与外部修改（v2.2.3 数据完整性）', 
     expect(titles).toContain('新条目')
   })
 
-  it('损坏文件：复制为 .bak 备份后按空数据继续，原文件不动', async () => {
+  it('损坏文件：复制为 .corrupt-*.bak 备份后按空数据继续，原文件不动（17 方案阶段 2 统一备份机制）', async () => {
     nodeFs.mkdirSync(nodePath.join(rootDir, '.vscode'), { recursive: true })
     nodeFs.writeFileSync(draftsFile(), '{broken json', 'utf8')
     const broken = new DraftBoxService(() => vscode.Uri.file(rootDir))
     expect(await broken.load()).toBe(0)
-    // 原文件保持原样（读取不写回），损坏内容已复制备份
+    // 原文件保持原样（读取不写回），损坏内容已复制备份（与其他数据文件同口径的 copy 型备份）
     expect(nodeFs.readFileSync(draftsFile(), 'utf8')).toBe('{broken json')
-    expect(nodeFs.readFileSync(`${draftsFile()}.bak`, 'utf8')).toBe('{broken json')
+    const backupName = nodeFs
+      .readdirSync(nodePath.join(rootDir, '.vscode'))
+      .find((name) => name.includes('.corrupt-') && name.endsWith('.bak'))
+    expect(backupName).toBeDefined()
+    expect(nodeFs.readFileSync(nodePath.join(rootDir, '.vscode', backupName!), 'utf8')).toBe(
+      '{broken json'
+    )
   })
 
   it('load 过滤非法条目（缺 id / title 的元素被丢弃）', async () => {

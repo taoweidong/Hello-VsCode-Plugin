@@ -1,8 +1,9 @@
-import { randomUUID } from 'node:crypto'
-import * as path from 'path'
 import * as vscode from 'vscode'
 import { STORAGE } from '../../constants'
-import { writeJsonAtomic } from '../../services/stores/atomicWrite'
+import {
+  JsonEnvelopeFileStore,
+  type EnvelopeParseResult,
+} from '../../services/stores/jsonEnvelopeStore'
 import type { SerialServer } from './models'
 import { normalizeSerialServerList } from './serverGuard'
 
@@ -26,94 +27,26 @@ export interface ServerStoreOptions {
   onWarning?: (message: string) => void
 }
 
-/**
- * 默认数据源：工作区内 JSON 文件（.vscode/serial-servers.json）。
- *
- * 损坏契约（比条目数据文件轻量，无三选一恢复模态）：
- * 解析失败 / 根节点形态不对时，**复制**备份（原文件留在原位）后按空数据继续；
- * 备份失败则抛错——绝不在没有备份的情况下把损坏文件静默当空数据覆盖。
- */
-export class JsonServerStore implements IServerStore {
-  constructor(
-    public readonly fileUri: vscode.Uri,
-    private readonly options: ServerStoreOptions = {}
-  ) {}
-
-  async load(): Promise<SerialServer[]> {
-    let text: string
-    try {
-      const raw = await vscode.workspace.fs.readFile(this.fileUri)
-      text = Buffer.from(raw).toString('utf8')
-    } catch (err) {
-      if (err instanceof vscode.FileSystemError && err.code === 'FileNotFound') {
-        return [] // 首次使用：文件尚不存在，视为空数据
-      }
-      // IO 错误（无权限 / 文件被占用等）不是损坏：留痕输出通道后上抛，
-      // 调用方（树视图 getChildren 等）静默降级时用户仍可在输出通道看到原因
-      this.options.onWarning?.(
-        `读取服务器数据失败（${this.fileUri.fsPath}）：${err instanceof Error ? err.message : String(err)}`
-      )
-      throw err
-    }
-    if (text.charCodeAt(0) === 0xfeff) {
-      text = text.slice(1) // 剥离 BOM，避免 JSON.parse 失败被误判为损坏
-    }
-
-    let data: unknown
-    try {
-      data = JSON.parse(text)
-    } catch (err) {
-      return this.recoverFromCorruption(err instanceof Error ? err.message : String(err))
-    }
-
-    if (Array.isArray(data)) {
-      // 顶层数组：宽容读取（手写编辑常见形态），下次保存自动迁移为信封
-      this.options.onWarning?.(
-        '服务器数据文件为顶层数组格式，已兼容读取，下次保存自动迁移为信封格式。'
-      )
-      return normalizeSerialServerList(data, this.options.onWarning)
-    }
-    if (isEnvelopeLike(data)) {
-      const envelope = data as { schemaVersion?: unknown; servers: unknown[] }
-      if (
-        envelope.schemaVersion !== undefined &&
-        envelope.schemaVersion !== SERVERS_SCHEMA_VERSION
-      ) {
-        this.options.onWarning?.(
-          `服务器数据文件 schemaVersion=${String(envelope.schemaVersion)} 与当前版本 ${SERVERS_SCHEMA_VERSION} 不一致，已尽力按 servers 读取。`
-        )
-      }
-      return normalizeSerialServerList(envelope.servers, this.options.onWarning)
-    }
-    return this.recoverFromCorruption('根节点既不是数组，也不是含 servers 数组的对象')
+/** 服务器数据内容解析（信封 + 顶层宽容读取，17 方案阶段 2 收敛到共享信封存储）。 */
+function parseServersContent(
+  data: unknown,
+  warn: (message: string) => void
+): EnvelopeParseResult<SerialServer[]> {
+  if (Array.isArray(data)) {
+    // 顶层数组：宽容读取（手写编辑常见形态），下次保存自动迁移为信封
+    warn('服务器数据文件为顶层数组格式，已兼容读取，下次保存自动迁移为信封格式。')
+    return { ok: true, value: normalizeSerialServerList(data, warn) }
   }
-
-  async save(servers: SerialServer[]): Promise<void> {
-    await writeJsonAtomic(this.fileUri, { schemaVersion: SERVERS_SCHEMA_VERSION, servers })
-  }
-
-  /** 损坏恢复：复制备份（原文件不动）→ 警告上报 → 按空数据继续；备份失败抛错。 */
-  private async recoverFromCorruption(reason: string): Promise<SerialServer[]> {
-    const dirUri = vscode.Uri.joinPath(this.fileUri, '..')
-    const now = Date.now()
-    const backupUri = vscode.Uri.joinPath(
-      dirUri,
-      `${path.basename(this.fileUri.fsPath)}.corrupt-${now}-${randomUUID().slice(0, 8)}.bak`
-    )
-    try {
-      await vscode.workspace.fs.copy(this.fileUri, backupUri)
-    } catch (err) {
-      throw new Error(
-        `服务器数据文件损坏且备份失败：无法将 ${this.fileUri.fsPath} 复制为 ${backupUri.fsPath}` +
-          `（${err instanceof Error ? err.message : String(err)}）。原文件保留在原位，请手动处理。`,
-        { cause: err }
+  if (isEnvelopeLike(data)) {
+    const envelope = data as { schemaVersion?: unknown; servers: unknown[] }
+    if (envelope.schemaVersion !== undefined && envelope.schemaVersion !== SERVERS_SCHEMA_VERSION) {
+      warn(
+        `服务器数据文件 schemaVersion=${String(envelope.schemaVersion)} 与当前版本 ${SERVERS_SCHEMA_VERSION} 不一致，已尽力按 servers 读取。`
       )
     }
-    this.options.onWarning?.(
-      `服务器数据文件损坏（${reason}）。原文件保留在原位，已复制备份到 ${path.basename(backupUri.fsPath)}，本次按空数据继续。`
-    )
-    return []
+    return { ok: true, value: normalizeSerialServerList(envelope.servers, warn) }
   }
+  return { ok: false, reason: '根节点既不是数组，也不是含 servers 数组的对象' }
 }
 
 /** 形态判定：对象且带 servers 数组（schemaVersion 可缺省，兼容手工编辑）。 */
@@ -123,6 +56,38 @@ function isEnvelopeLike(data: unknown): data is { servers: unknown[] } {
     data !== null &&
     Array.isArray((data as { servers?: unknown }).servers)
   )
+}
+
+/**
+ * 默认数据源：工作区内 JSON 文件（.vscode/serial-servers.json）。
+ *
+ * 损坏契约（比条目数据文件轻量，无三选一恢复模态，机制与收藏夹等一致）：
+ * 解析失败 / 根节点形态不对时，**复制**备份（原文件留在原位）后按空数据继续；
+ * 备份失败则抛错——绝不在没有备份的情况下把损坏文件静默当空数据覆盖。
+ */
+export class JsonServerStore implements IServerStore {
+  private readonly inner: JsonEnvelopeFileStore<SerialServer[]>
+
+  constructor(
+    public readonly fileUri: vscode.Uri,
+    options: ServerStoreOptions = {}
+  ) {
+    this.inner = new JsonEnvelopeFileStore<SerialServer[]>(fileUri, {
+      label: '服务器',
+      empty: () => [],
+      parse: parseServersContent,
+      serialize: (servers) => ({ schemaVersion: SERVERS_SCHEMA_VERSION, servers }),
+      onWarning: options.onWarning,
+    })
+  }
+
+  load(): Promise<SerialServer[]> {
+    return this.inner.load()
+  }
+
+  async save(servers: SerialServer[]): Promise<void> {
+    await this.inner.save(servers)
+  }
 }
 
 /** 备用数据源：无工作区时经 globalState 持久化，保证空窗口也能用。 */

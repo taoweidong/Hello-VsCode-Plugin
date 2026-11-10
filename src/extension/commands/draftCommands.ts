@@ -1,7 +1,8 @@
 import * as vscode from 'vscode'
 import { COMMAND } from '../constants'
 import type { DraftBoxService } from '../features/drafts/draftBoxService'
-import { type CommandRegistrar, showError } from './shared'
+import { reasonOf } from '../services/errors'
+import { currentFileUri, type CommandRegistrar, showError, toUri } from './shared'
 
 /**
  * 草稿箱场景命令分组（09 方案 §3.5：右键示例的新载体）。
@@ -31,16 +32,6 @@ function currentSelection(): { text: string; source: string } | undefined {
     return undefined
   }
   return { text, source: editor.document.fileName.split(/[\\/]/).pop() || '编辑器' }
-}
-
-/** 当前编辑器的文件 URI（未打开文件时 undefined）。 */
-function currentFileUri(): vscode.Uri | undefined {
-  return vscode.window.activeTextEditor?.document.uri
-}
-
-/** 入参归一化为 Uri（资源管理器右键传入；其他来源可能传任意值）。 */
-function toUri(value: unknown): vscode.Uri | undefined {
-  return value instanceof vscode.Uri ? value : undefined
 }
 
 /** 草稿箱不可用（未打开工作区）的统一提示。 */
@@ -102,7 +93,7 @@ export function registerDraftCommands(register: CommandRegistrar, deps: DraftCom
         (err: unknown) => {
           // 命令不裸 reject：追加失败如实呈现（否则异步失败完全不可见）
           showError(err)
-          return { ok: false, reason: err instanceof Error ? err.message : String(err) }
+          return { ok: false, reason: reasonOf(err) }
         }
       )
     }

@@ -2,6 +2,7 @@ import * as vscode from 'vscode'
 import { COMMAND, CONFIG, VIEW } from '../../constants'
 import type { WorkspaceTaskEntry } from './taskSource'
 import { groupByFolder, loadWorkspaceTasks, taskKeyFromRef } from './taskSource'
+import { reasonOf } from '../../services/errors'
 import type { TaskStatusTracker } from './taskStatusTracker'
 import type { TaskUsageStore } from './taskUsageStore'
 
@@ -361,7 +362,7 @@ export class TaskExplorerTreeProvider
       this.loadError = undefined
     } catch (error) {
       // 失败保留上次成功结果（与 TaskManagerTreeProvider 行为一致）
-      this.loadError = error instanceof Error ? error.message : String(error)
+      this.loadError = reasonOf(error)
       this.output.appendLine(`[taskExplorer] 任务加载失败：${this.loadError}`)
     }
     this.entryByKey = new Map(this.entries.map((entry) => [entry.key, entry]))

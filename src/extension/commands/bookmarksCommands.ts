@@ -1,7 +1,7 @@
 import * as vscode from 'vscode'
 import type { BookmarkItem, BookmarksService } from '../features/bookmarks/bookmarksService'
 import { COMMAND } from '../constants'
-import { type CommandRegistrar, showError } from './shared'
+import { requireTreeItem, type CommandRegistrar, showError } from './shared'
 
 /**
  * 书签场景命令分组（v3.6，14 方案 §5 + 实施期修正 jumpToBookmark）——8 条命令的薄壳，
@@ -28,14 +28,6 @@ function isBookmarkItem(value: unknown): value is BookmarkItem {
     typeof (value as { path?: unknown }).path === 'string' &&
     typeof (value as { line?: unknown }).line === 'number'
   )
-}
-
-function requireItem(value: unknown, action: string): BookmarkItem | undefined {
-  if (isBookmarkItem(value)) {
-    return value
-  }
-  void vscode.window.showInformationMessage(`请从「书签」视图${action}。`)
-  return undefined
 }
 
 const EMPTY_HINT = '暂无书签：在编辑器中按 Ctrl+Alt+K 给当前行添加书签。'
@@ -123,7 +115,7 @@ export function registerBookmarksCommands(
   })
 
   register(COMMAND.jumpToBookmark, async (arg?: unknown) => {
-    const item = requireItem(arg, '调用跳转')
+    const item = requireTreeItem(arg, isBookmarkItem, `请从「书签」视图调用跳转。`)
     if (!item) {
       return
     }
@@ -135,7 +127,7 @@ export function registerBookmarksCommands(
   })
 
   register(COMMAND.removeBookmark, async (arg?: unknown) => {
-    const item = requireItem(arg, '调用移除')
+    const item = requireTreeItem(arg, isBookmarkItem, `请从「书签」视图调用移除。`)
     if (!item) {
       return
     }

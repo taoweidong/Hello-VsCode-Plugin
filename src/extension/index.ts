@@ -32,6 +32,7 @@ import { migrateLegacyKeys } from './services/legacyMigration'
 import { recheckProbeByLabel } from './tasks/environmentTask'
 import { TaskRunner } from './tasks/taskRunner'
 import { TASKS } from './tasks/taskRegistry'
+import { reasonOf } from './services/errors'
 import { WebviewController, type WebviewControllerDeps } from '../webview/host/webviewController'
 import type { WebviewPageId } from '../webview/pages'
 
@@ -74,7 +75,7 @@ export function activate(context: vscode.ExtensionContext): void {
       void vscode.window.showInformationMessage(`无工作区收藏数据已迁移到文件：${fileUri.fsPath}`)
     },
   }).catch((err: unknown) => {
-    const message = err instanceof Error ? err.message : String(err)
+    const message = reasonOf(err)
     outputChannel.appendLine(`[收藏夹] 旧数据迁移失败（旧数据保留在 globalState）：${message}`)
     void vscode.window.showErrorMessage(`收藏数据迁移失败（旧数据已保留）：${message}`)
   })

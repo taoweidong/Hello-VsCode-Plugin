@@ -6,7 +6,7 @@ import type {
 } from '../features/quickCommands/quickCommandsService'
 import { readTerminalSelectionViaClipboard } from '../features/quickCommands/terminalSelection'
 import { COMMAND } from '../constants'
-import { type CommandRegistrar, showError } from './shared'
+import { requireTreeItem, type CommandRegistrar, showError } from './shared'
 
 /**
  * 快捷命令场景命令分组（v3.5，16 方案）——12 条命令的薄壳，全部委托 QuickCommandsService。
@@ -39,22 +39,6 @@ function isQuickCommandGroup(value: unknown): value is QuickCommandGroup {
     typeof (value as { name?: unknown }).name === 'string' &&
     typeof (value as { command?: unknown }).command !== 'string'
   )
-}
-
-function requireItem(value: unknown, action: string): QuickCommandItem | undefined {
-  if (isQuickCommandItem(value)) {
-    return value
-  }
-  void vscode.window.showInformationMessage(`请从「快捷命令」视图${action}。`)
-  return undefined
-}
-
-function requireGroup(value: unknown, action: string): QuickCommandGroup | undefined {
-  if (isQuickCommandGroup(value)) {
-    return value
-  }
-  void vscode.window.showInformationMessage(`请从「快捷命令」视图的分组节点${action}。`)
-  return undefined
 }
 
 interface GroupPickItem extends vscode.QuickPickItem {
@@ -235,7 +219,7 @@ export function registerQuickCommandsCommands(
   })
 
   register(COMMAND.executeQuickCommand, async (arg?: unknown) => {
-    const item = requireItem(arg, '执行快捷命令')
+    const item = requireTreeItem(arg, isQuickCommandItem, `请从「快捷命令」视图执行快捷命令。`)
     if (!item) {
       return
     }
@@ -247,7 +231,7 @@ export function registerQuickCommandsCommands(
   })
 
   register(COMMAND.editQuickCommand, async (arg?: unknown) => {
-    const item = requireItem(arg, '编辑命令文本')
+    const item = requireTreeItem(arg, isQuickCommandItem, `请从「快捷命令」视图编辑命令文本。`)
     if (!item) {
       return
     }
@@ -273,7 +257,7 @@ export function registerQuickCommandsCommands(
   })
 
   register(COMMAND.renameQuickCommand, async (arg?: unknown) => {
-    const item = requireItem(arg, '重命名别名')
+    const item = requireTreeItem(arg, isQuickCommandItem, `请从「快捷命令」视图重命名别名。`)
     if (!item) {
       return
     }
@@ -295,7 +279,7 @@ export function registerQuickCommandsCommands(
   })
 
   register(COMMAND.moveQuickCommandToGroup, async (arg?: unknown) => {
-    const item = requireItem(arg, '移动到分组')
+    const item = requireTreeItem(arg, isQuickCommandItem, `请从「快捷命令」视图移动到分组。`)
     if (!item) {
       return
     }
@@ -314,7 +298,7 @@ export function registerQuickCommandsCommands(
   })
 
   register(COMMAND.copyQuickCommand, async (arg?: unknown) => {
-    const item = requireItem(arg, '复制命令文本')
+    const item = requireTreeItem(arg, isQuickCommandItem, `请从「快捷命令」视图复制命令文本。`)
     if (!item) {
       return
     }
@@ -327,7 +311,7 @@ export function registerQuickCommandsCommands(
   })
 
   register(COMMAND.removeQuickCommand, async (arg?: unknown) => {
-    const item = requireItem(arg, '删除快捷命令')
+    const item = requireTreeItem(arg, isQuickCommandItem, `请从「快捷命令」视图删除快捷命令。`)
     if (!item) {
       return
     }
@@ -361,7 +345,11 @@ export function registerQuickCommandsCommands(
   })
 
   register(COMMAND.renameQuickCommandGroup, async (arg?: unknown) => {
-    const group = requireGroup(arg, '重命名分组')
+    const group = requireTreeItem(
+      arg,
+      isQuickCommandGroup,
+      `请从「快捷命令」视图的分组节点重命名分组。`
+    )
     if (!group) {
       return
     }
@@ -385,7 +373,11 @@ export function registerQuickCommandsCommands(
   })
 
   register(COMMAND.removeQuickCommandGroup, async (arg?: unknown) => {
-    const group = requireGroup(arg, '删除分组')
+    const group = requireTreeItem(
+      arg,
+      isQuickCommandGroup,
+      `请从「快捷命令」视图的分组节点删除分组。`
+    )
     if (!group) {
       return
     }
