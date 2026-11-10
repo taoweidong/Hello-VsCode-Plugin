@@ -1,7 +1,7 @@
 <svg width="900" height="560" viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif">
   <rect width="900" height="560" rx="8" fill="#3c3c3c"/>
   <rect width="900" height="34" rx="8" fill="#3c3c3c"/>
-  <text x="450" y="22" fill="#cccccc" font-size="13" text-anchor="middle">扩展开发宿主 — Hello VSCode 插件 侧边栏（6 个视图）</text>
+  <text x="450" y="22" fill="#cccccc" font-size="13" text-anchor="middle">扩展开发宿主 — Hello VSCode 插件 侧边栏（7 个视图）</text>
 
   <rect y="34" width="52" height="526" fill="#333333"/>
   <rect x="10" y="60" width="32" height="32" rx="4" fill="#094771" stroke="#0098ff"/>
@@ -69,14 +69,15 @@
   </g>
 
   <rect x="340" y="34" width="560" height="492" fill="#1e1e1e"/>
-  <text x="620" y="120" fill="#dcdcaa" font-size="16" text-anchor="middle" font-weight="bold">六个视图一览</text>
+  <text x="620" y="120" fill="#dcdcaa" font-size="16" text-anchor="middle" font-weight="bold">七个视图一览</text>
   <g font-size="13" fill="#cccccc">
     <text x="400" y="166">① 任务管理器 —— 工作区 tasks.json 任务树（运行/停止/收藏/定位）</text>
     <text x="400" y="196">② 收藏夹 —— 文件/文件夹路径收藏：别名、单击直达（v3.4）</text>
-    <text x="400" y="226">③ 环境信息 —— 激活时自动检测 Python / Node / Git 等</text>
-    <text x="400" y="256">④ 环境初始化 —— 步骤清单，单击执行单步或全部</text>
-    <text x="400" y="286">⑤ 任务管理 —— CRUD 分页表格（HTTP 打桩 / 真实接口）</text>
-    <text x="400" y="316">⑥ 串口服务器 —— 服务器管理 + 串口控制台下发命令</text>
+    <text x="400" y="226">② 快捷命令 —— 终端命令收藏：别名、分组、单击在终端执行（v3.5）</text>
+    <text x="400" y="256">③ 环境信息 —— 激活时自动检测 Python / Node / Git 等</text>
+    <text x="400" y="286">④ 环境初始化 —— 步骤清单，单击执行单步或全部</text>
+    <text x="400" y="316">⑤ 任务管理 —— CRUD 分页表格（HTTP 打桩 / 真实接口）</text>
+    <text x="400" y="346">⑥ 串口服务器 —— 服务器管理 + 串口控制台下发命令</text>
   </g>
   <rect x="380" y="348" width="480" height="142" rx="6" fill="#252526" stroke="#414141"/>
   <text x="396" y="374" fill="#dcdcaa" font-size="12" font-weight="bold">💡 建议的体验顺序</text>

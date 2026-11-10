@@ -4,6 +4,39 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.5.0] - 2026-11-10
+
+### 新增（快捷命令）
+
+- **「快捷命令」侧边栏视图**（第 7 视图，设计方案见
+  [需求与优化方案 16](docs/需求与优化方案/16-快捷命令设计方案.md)）：
+  - **终端命令收藏 + 别名 + 显式分组**：手动输入命令（支持多行）或
+    **收藏终端选中命令**（剪贴板桥接：内部命令 `workbench.action.terminal.copySelection`
+    把选区复制进剪贴板 → 读出 → 恢复原剪贴板；无选区/失败自动降级粘贴输入框，
+    `Terminal.selection` 仍为 proposed API 故不直读）；
+  - **分组**：薄实体两级树「分组 → 命令」，新建/重命名/删除分组（组内命令回落未分组，
+    删除有模态确认），未分组固定末位；命令可移动到分组，新命令插入所在分组顶部；
+  - **单击执行**：树节点单击 / inline ▶ / 右键 → 在名为 `QuickCommand` 的专用终端
+    `sendText` 原样执行（终端被关闭自动重建；`quickCommandReuseTerminal: false` 改为
+    每次新建）；cwd = 工作区首目录；每次执行回写使用次数/最近使用时间；
+  - **QuickPick 快速执行**：别名 + 命令全文模糊搜索、分组分隔显示，回车即执行；
+    条目右键另含编辑命令文本 / 复制 / 删除。
+  - **存储**：`.vscode/quick-commands.json`（信封 + 原子写 + 损坏自动备份 `.bak`，
+    复用收藏夹契约；无工作区回退 globalState；上限 200 条命令 / 50 个分组；
+    命令全文去重，重复仅提示不覆盖；已 gitignore）。
+  - 新增 12 命令：`addQuickCommand` / `captureTerminalSelection` / `quickRunCommands` /
+    `executeQuickCommand` / `editQuickCommand` / `renameQuickCommand` /
+    `moveQuickCommandToGroup` / `copyQuickCommand` / `removeQuickCommand` /
+    `createQuickCommandGroup` / `renameQuickCommandGroup` / `removeQuickCommandGroup`；
+    与收藏夹（收藏路径）、任务收藏（收藏 tasks.json 任务）正交。
+- 测试：新增 quickCommands 单测 60 例（守卫 / 双存储 / 服务 / 树视图 / 命令壳 /
+  剪贴板桥接）+ 宿主集成冒烟套件（12 命令注册 + 空态安全路径）；测试桩增量扩展
+  `Terminal` / `createTerminal` / `activeTerminal`（录制式）。
+- 文档：三件套（[功能介绍 09](docs/功能介绍/09-快捷命令.md) /
+  [开发指南 12](docs/开发指南/12-快捷命令.md) /
+  [设计方案 16](docs/需求与优化方案/16-快捷命令设计方案.md)）；
+  全库口径同步 7 视图 / 47 命令 / 10 配置。
+
 ## [3.4.0] - 2026-11-08
 
 ### 新增（收藏夹）

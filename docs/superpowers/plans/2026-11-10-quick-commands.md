@@ -53,23 +53,41 @@ docs/**（三件套 + 口径一致性）+ CHANGELOG.md
 ### Task 1: 数据模型与归一化守卫
 
 **Files:**
+
 - Create: `src/extension/features/quickCommands/quickCommandsService.ts`（仅模型/常量/守卫部分）
 - Test: `src/test/unit/quickCommands/quickCommandsService.spec.ts`
 
 **Interfaces (Produces):**
+
 ```ts
-export interface QuickCommandGroup { id: string; name: string; createdAt: string }
-export interface QuickCommandItem {
-  id: string; name: string; command: string; groupId: string | null
-  addedAt: string; lastUsedAt?: string; useCount?: number
+export interface QuickCommandGroup {
+  id: string
+  name: string
+  createdAt: string
 }
-export interface QuickCommandsData { groups: QuickCommandGroup[]; commands: QuickCommandItem[] }
+export interface QuickCommandItem {
+  id: string
+  name: string
+  command: string
+  groupId: string | null
+  addedAt: string
+  lastUsedAt?: string
+  useCount?: number
+}
+export interface QuickCommandsData {
+  groups: QuickCommandGroup[]
+  commands: QuickCommandItem[]
+}
 export const QUICK_COMMANDS_SCHEMA_VERSION = 1
 export const MAX_QUICK_COMMANDS = 200
 export const MAX_QUICK_COMMAND_GROUPS = 50
-export function normalizeQuickCommandData(raw: unknown, onWarning?: (m: string) => void): QuickCommandsData
-export function defaultAlias(command: string): string   // trim 后首词，截 20 字符
+export function normalizeQuickCommandData(
+  raw: unknown,
+  onWarning?: (m: string) => void
+): QuickCommandsData
+export function defaultAlias(command: string): string // trim 后首词，截 20 字符
 ```
+
 - 守卫规则：非信封对象 → 警告 + 空；条目缺 `command`（trim 后空）整条丢弃；`name` 缺省 `defaultAlias(command)`；`groupId` 非存在分组的 id → `null` + 警告（合并为一条汇总警告）；分组名 trim 后空整条丢弃；分组重名保留首个 + 警告；命令 >200 保留前 200、分组 >50 保留前 50 + 警告（对齐 favorites 的 normalize 口径）。
 
 - [ ] 写失败测试（信封读入 / 非信封告警 / 条目守卫丢命令缺项 / 悬空 groupId 回落 / 分组重名留首 / 双上限裁剪 / defaultAlias：首词+20 字符截断+多空白）
@@ -81,10 +99,12 @@ export function defaultAlias(command: string): string   // trim 后首词，截 
 ### Task 2: 双存储与装配工厂
 
 **Files:**
+
 - Modify: `src/extension/features/quickCommands/quickCommandsService.ts`
 - Test: 同 T1 spec 文件追加 describe
 
 **Interfaces (Produces):**
+
 ```ts
 export interface IQuickCommandsStore {
   load(): Promise<QuickCommandsData>
@@ -95,6 +115,7 @@ export class MementoQuickCommandsStore implements IQuickCommandsStore // (mement
 export function createQuickCommandsStore(context: vscode.ExtensionContext, options?: { onWarning? }): IQuickCommandsStore
 // STORAGE 键在 T8 落 constants；本任务先在文件内 const QUICK_COMMANDS_FILE = '.vscode/quick-commands.json'、MEMENTO_KEY = 'extStarter.quickCommands'，T8 收敛
 ```
+
 - JSON 信封 `{ schemaVersion, groups, commands }` 经 `writeJsonAtomic`；FileNotFound → 空数据；parse 失败/根节点形状不符 → 复制 `.corrupt-*.bak`（文件名模式照抄 favoritesService:152-171）→ 警告 → 空数据。
 - 工厂：有 workspaceFolders[0] → JSON，否则 Memento（照抄 createFavoritesStore:192-204）。
 
@@ -105,37 +126,49 @@ export function createQuickCommandsStore(context: vscode.ExtensionContext, optio
 ### Task 3: QuickCommandsService 业务方法
 
 **Files:**
+
 - Modify: `src/extension/features/quickCommands/quickCommandsService.ts`
 - Test: 同 spec 追加
 
 **Interfaces (Produces):**
+
 ```ts
 export type AddCommandStatus =
   | { status: 'added'; item: QuickCommandItem }
   | { status: 'duplicate'; existing: QuickCommandItem }
-  | { status: 'cap' } | { status: 'invalid' }
+  | { status: 'cap' }
+  | { status: 'invalid' }
 export type UpdateTextStatus = 'updated' | 'duplicate' | 'notfound' | 'empty'
-export type GroupOp = { status: 'created'; group: QuickCommandGroup } | { status: 'duplicate'; existing: QuickCommandGroup } | { status: 'cap' }
+export type GroupOp =
+  | { status: 'created'; group: QuickCommandGroup }
+  | { status: 'duplicate'; existing: QuickCommandGroup }
+  | { status: 'cap' }
 export type RenameGroupStatus = 'renamed' | 'duplicate' | 'notfound'
 export class QuickCommandsService implements vscode.Disposable {
   readonly onDidChange: vscode.Event<void>
   loadError: string | undefined
   constructor(store: IQuickCommandsStore)
-  load(): Promise<void>                       // 失败置 loadError，不清空旧数据（favorites 同款）
-  listCommands(): QuickCommandItem[]; listGroups(): QuickCommandGroup[]
+  load(): Promise<void> // 失败置 loadError，不清空旧数据（favorites 同款）
+  listCommands(): QuickCommandItem[]
+  listGroups(): QuickCommandGroup[]
   get(id: string): QuickCommandItem | undefined
-  addCommand(input: { command: string; name?: string; groupId: string | null }): Promise<AddCommandStatus>
+  addCommand(input: {
+    command: string
+    name?: string
+    groupId: string | null
+  }): Promise<AddCommandStatus>
   renameCommand(id: string, name: string): Promise<boolean>
   updateCommandText(id: string, command: string): Promise<UpdateTextStatus>
   removeCommand(id: string): Promise<boolean>
-  moveCommandToGroup(id: string, groupId: string | null): Promise<boolean>  // groupId 非存在分组 → false
+  moveCommandToGroup(id: string, groupId: string | null): Promise<boolean> // groupId 非存在分组 → false
   createGroup(name: string): Promise<GroupOp>
   renameGroup(id: string, name: string): Promise<RenameGroupStatus>
-  removeGroup(id: string): Promise<boolean>   // 组内命令 groupId → null；无命令也允许删
-  recordExecution(id: string): Promise<void>  // lastUsedAt=now, useCount+1
+  removeGroup(id: string): Promise<boolean> // 组内命令 groupId → null；无命令也允许删
+  recordExecution(id: string): Promise<void> // lastUsedAt=now, useCount+1
   dispose(): void
 }
 ```
+
 - 新命令插入**所在分组顶部**（同 groupId 首个条目之前；null 组同理）；onDidChange 每次 persist 后 fire。
 - [ ] 失败测试：load 成功/失败；addCommand 增/重(Review Focus 5：既有条目字段不变)/上限/空命令 invalid；插入分组顶部；rename/update/remove；move（含非法 groupId false）；createGroup 增/重/上限；renameGroup 三态；removeGroup 回落；recordExecution 回写并持久化
 - [ ] FAIL → 实现 → PASS
@@ -144,18 +177,22 @@ export class QuickCommandsService implements vscode.Disposable {
 ### Task 4: 测试桩扩展（Terminal）+ execute 终端执行
 
 **Files:**
+
 - Modify: `src/test/unit/stubs/vscode.ts`、`src/extension/features/quickCommands/quickCommandsService.ts`
 - Test: 同 spec 追加
 
 **Interfaces (Produces):**
+
 - 桩：`export class Terminal { name: string; exitStatus?: { reason: string } | undefined; show(preserveFocus?: boolean): void; sendText(text: string, shouldExecute?: boolean): void }`（show/sendText 走 `__record('terminalShow' | 'terminalSendText', …)`；实例入 `__stubs.terminals`）；`window.createTerminal(options)` → `__record('createTerminal', options)` 并返回新桩；`window.activeTerminal` getter 读 `__stubs.activeTerminal`（可注入）；`__resetStubs` 清空两者。`TerminalExitStatus` 不建模，`exitStatus` 直接公开可变字段。
 - 服务：`constructor(store, options?: { getWorkspaceRoot?: () => vscode.Uri | undefined; getReuseTerminal?: () => boolean })`，默认实现分别读 `workspaceFolders?.[0]?.uri` 与 `getConfiguration(CONFIG.section).get(CONFIG.quickCommandReuseTerminal, true)`（CONFIG 键 T8 落 constants，本任务文件内 const 过渡，值为 `'extStarter'` / `'quickCommandReuseTerminal'`）。
+
 ```ts
 execute(item: QuickCommandItem): Promise<void>
 // 无注入时：reuse && (!terminal || terminal.exitStatus !== undefined) → createTerminal({ name: 'QuickCommand', cwd: root })
 // 之后 terminal.show(); terminal.sendText(item.command, true); await recordExecution(item.id)
 export const QUICK_COMMAND_TERMINAL_NAME = 'QuickCommand'
 ```
+
 - [ ] 桩先行：扩展 vscode.ts（无测试；以现有测试全绿为回归线）
 - [ ] 失败测试：首次执行 createTerminal(name/cwd) + show + sendText(原文, true) + useCount 回写；二次执行复用（仅一条 createTerminal 记录）；exitStatus 置值后重建（Review Focus 4）；getReuseTerminal=false 每次新建；无工作区 cwd undefined
 - [ ] FAIL → 实现 → PASS；全量 `npx vitest run` 回归
@@ -164,11 +201,13 @@ export const QUICK_COMMAND_TERMINAL_NAME = 'QuickCommand'
 ### Task 5: 树视图 Provider
 
 **Files:**
+
 - Create: `src/extension/features/quickCommands/quickCommandsTreeProvider.ts`
 - Test: `src/test/unit/quickCommands/quickCommandsTreeProvider.spec.ts`
 
 **Interfaces (Consumes):** `QuickCommandsService`（onDidChange/listCommands/listGroups/loadError）、`COMMAND.executeQuickCommand`（本任务先用字面量 `'extStarter.executeQuickCommand'`，T8 收敛——直接 import constants 会连带全量改动，故 T5 自持常量、T8 统一）。
 **Interfaces (Produces):**
+
 ```ts
 export type QuickCommandTreeNode =
   | { kind: 'group'; group: QuickCommandGroup | null; children: QuickCommandItem[] }
@@ -176,6 +215,7 @@ export type QuickCommandTreeNode =
   | { kind: 'info'; text: string; icon: string }
 export class QuickCommandsTreeProvider implements vscode.TreeDataProvider<QuickCommandTreeNode>, vscode.Disposable
 ```
+
 - 根：loadError → info('error')；全空 → info 空态（icon 'star-empty' 同 favorites 口径可自选）；否则分组节点按 listGroups 序 + 未分组（有内容才出现，末位）。
 - group 节点：label `${name} (${N})` / 未分组 label `未分组 (${N})`，icon 'folder'/'inbox'，Collapsed，contextValue 'quickCommandGroup'；command 节点：label=别名，description=命令单行截断 60（`\s+`→空格），icon 'terminal'，tooltip MarkdownString（命令/分组/已执行 N 次/收藏于），contextValue 'quickCommand'，`treeItem.command = { command: 'extStarter.executeQuickCommand', title: '执行快捷命令', arguments: [item] }`。
 - [ ] 失败测试：空态/错误态 info；分组序与未分组末位/隐藏；group 节点各字段；command 节点各字段（含单击路由与 contextValue）；getChildren(group) 返回其命令
@@ -185,10 +225,12 @@ export class QuickCommandsTreeProvider implements vscode.TreeDataProvider<QuickC
 ### Task 6: 剪贴板桥接
 
 **Files:**
+
 - Create: `src/extension/features/quickCommands/terminalSelection.ts`
 - Test: `src/test/unit/quickCommands/terminalSelection.spec.ts`
 
 **Interfaces (Produces):**
+
 ```ts
 export const TERMINAL_COPY_SELECTION_COMMAND = 'workbench.action.terminal.copySelection'
 export async function readTerminalSelectionViaClipboard(): Promise<string | undefined>
@@ -196,6 +238,7 @@ export async function readTerminalSelectionViaClipboard(): Promise<string | unde
 // → finally writeText(backup) 恢复；返回 text.trim() && text !== backup ? text : undefined
 // executeCommand 抛错 → 捕获 → 恢复剪贴板 → 返回 undefined（不抛出）
 ```
+
 - 测试驱动方式：`__stubs.clipboard` 假剪贴板 + `__stubs.registeredCommands.set(TERMINAL_COPY_SELECTION_COMMAND, handler)` 模拟复制（handler 里改写 `__stubs.clipboard`）；抛错用例注册一个 throw 的 handler。
 - [ ] 失败测试：正常读取（备份被恢复、命令被调用）；无选区（handler 不改剪贴板）→ undefined；选区==备份 → undefined；空白选区 → undefined；handler 抛错 → undefined 且剪贴板已恢复（Review Focus 3 前置）
 - [ ] FAIL → 实现 → PASS
@@ -204,16 +247,25 @@ export async function readTerminalSelectionViaClipboard(): Promise<string | unde
 ### Task 7: 命令壳（12 条）
 
 **Files:**
+
 - Create: `src/extension/commands/quickCommandsCommands.ts`
 - Test: `src/test/unit/quickCommands/quickCommandsCommands.spec.ts`
 
 **Interfaces (Consumes):** T1-T6 全部符号、`COMMAND.*`（本任务用字面量映射表 `const CMD = { addQuickCommand: 'extStarter.addQuickCommand', ... }`，T8 收敛为 constants 导入）、`CommandRegistrar`/`showError`（commands/shared）。
 **Interfaces (Produces):**
+
 ```ts
-export interface QuickCommandsCommandDeps { quickCommands: QuickCommandsService }
-export function registerQuickCommandsCommands(register: CommandRegistrar, deps: QuickCommandsCommandDeps): void
+export interface QuickCommandsCommandDeps {
+  quickCommands: QuickCommandsService
+}
+export function registerQuickCommandsCommands(
+  register: CommandRegistrar,
+  deps: QuickCommandsCommandDeps
+): void
 ```
+
 12 条命令行为（守卫风格照抄 favoritesCommands 的 requireItem）：
+
 1. `addQuickCommand`（无参）：InputBox 命令文本（validate 非空 trim）→ InputBox 别名（value=defaultAlias，可空=用默认）→ pickGroup QuickPick（分组列表 + `未分组` Separator 分节 + `$(add) 新建分组…`；新建→InputBox→createGroup，duplicate 复用 existing 并提示）→ addCommand；提示：已收藏「别名」/ 已存在相同命令「既有别名」/ 已达上限 / 无效输入。
 2. `captureTerminalSelection`（无参）：`window.activeTerminal` 无 → 提示"没有活动的终端"并 return；桥接 undefined → InputBox（placeholder：请在终端选中命令后重试，或直接粘贴命令）→ 有值走与 1 相同的别名/分组/入库；桥接成功直接走别名/分组/入库。
 3. `quickRunCommands`：空列表提示 return；QuickPick（Separator 按组分节 + 未分组节；item {label: 别名, description: 命令单行, detail: `分组名 · 已执行 N 次`}，matchOnDescription: true，placeHolder '执行快捷命令…'）→ `quickCommands.execute(picked.item)`，错误 showError。
@@ -226,6 +278,7 @@ export function registerQuickCommandsCommands(register: CommandRegistrar, deps: 
 10. `createQuickCommandGroup`：InputBox 分组名 → createGroup（duplicate 提示已存在）。
 11. `renameQuickCommandGroup(arg?)`：requireGroup 守卫（item 形状含 id/name 无 command）→ InputBox → renameGroup 三态提示。
 12. `removeQuickCommandGroup(arg?)`：requireGroup → `showWarningMessage(组内 N 条命令将回落到未分组，确定删除？, { modal: true }, '删除')`；取消 return → removeGroup。
+
 - pickGroup 实现为文件内私有函数 `pickGroup(quickCommands, options: { allowCreate: boolean }): Promise<{ groupId: string | null } | undefined>`（undefined = 用户取消）。
 - [ ] 失败测试（dialogQueue 应答驱动）：流程 1 全链路 + 各取消点；流程 2 的三分支（无终端 / 桥接 undefined → InputBox / 桥接成功）；流程 3 空态 + 回车执行；4-12 各主路径与守卫无参不抛错；Review Focus 3 断言
 - [ ] FAIL → 实现 → PASS
@@ -234,9 +287,11 @@ export function registerQuickCommandsCommands(register: CommandRegistrar, deps: 
 ### Task 8: constants 收敛 + 装配
 
 **Files:**
+
 - Modify: `src/extension/constants.ts`、`src/extension/commands/index.ts:17-60`、`src/extension/index.ts:140-152` 后追加、`quickCommandsService.ts`/`quickCommandsTreeProvider.ts`/`quickCommandsCommands.ts`（字面量改 import）
 
 **Interfaces (Produces):**
+
 - `VIEW`: `quickCommandsViewId: 'extStarter.quickCommandsView'`、`quickCommandContextValue: 'quickCommand'`、`quickCommandGroupContextValue: 'quickCommandGroup'`；`COMMAND`: `addQuickCommand / captureTerminalSelection / quickRunCommands / executeQuickCommand / editQuickCommand / renameQuickCommand / moveQuickCommandToGroup / copyQuickCommand / removeQuickCommand / createQuickCommandGroup / renameQuickCommandGroup / removeQuickCommandGroup`（值 `extStarter.<同名>`）；`STORAGE`: `quickCommandsFileName: '.vscode/quick-commands.json'`、`quickCommandsMementoKey: 'extStarter.quickCommands'`；`CONFIG`: `quickCommandReuseTerminal: 'quickCommandReuseTerminal'`。
 - `CommandDeps` + `quickCommands: QuickCommandsService`；`registerCommands` 尾部加 `registerQuickCommandsCommands(register, { quickCommands: deps.quickCommands })`。
 - `index.ts` 在 favorites 装配块后照抄：`new QuickCommandsService(createQuickCommandsStore(context, { onWarning: m => outputChannel.appendLine(`[快捷命令] ${m}`) }))` → push/load → `new QuickCommandsTreeProvider(service)` → `createTreeView(VIEW.quickCommandsViewId, …)`；`registerCommands` deps 加 `quickCommands`。
@@ -247,9 +302,11 @@ export function registerQuickCommandsCommands(register: CommandRegistrar, deps: 
 ### Task 9: package.json 清单 + nls + gitignore + 版本号
 
 **Files:**
+
 - Modify: `package.json`、`package.nls.json`、`package.nls.zh-cn.json`、`.gitignore`
 
 **Interfaces:** 全部键值以 T8 constants 为准（见 spec §6.1 表格，title 用 nls 占位）。
+
 - views.extStarter 数组：favoritesView 块后插入 `{"id":"extStarter.quickCommandsView","name":"%view.quickCommands.name%"}`。
 - commands 数组追加 12 条（icon：add `$(add)`、capture `$(terminal)`、quickRun `$(play)`、execute `$(play)`、edit `$(pencil)`、rename `$(edit)`、move `$(folder)`、copy `$(copy)`、remove `$(close)`、createGroup `$(new-folder)`、renameGroup `$(edit)`、removeGroup `$(close)`）。
 - menus：
@@ -266,6 +323,7 @@ export function registerQuickCommandsCommands(register: CommandRegistrar, deps: 
 ### Task 10: 集成冒烟套件
 
 **Files:**
+
 - Modify: `src/test/extension.test.ts`（文件尾追加 suite，照抄 1024-1049 favorites 套件形态）
 
 - [ ] 追加 `suite('快捷命令（v3.5 集成冒烟）')`：① 12 条命令全部注册（`vscode.commands.getCommands()`）；② `quickRunCommands` 与 `captureTerminalSelection` 无参可执行（两者空态均为信息提示安全路径，**不执行 addQuickCommand**——其会在真实宿主阻塞等待输入）
@@ -275,6 +333,7 @@ export function registerQuickCommandsCommands(register: CommandRegistrar, deps: 
 ### Task 11: 文档三件套 + 口径一致性 + CHANGELOG
 
 **Files:**
+
 - Rename（已在执行期完成）: 设计文档现为 `docs/需求与优化方案/16-快捷命令设计方案.md`（标题与 §10 自引用已同步），本任务提交该文件
 - Create: `docs/功能介绍/09-快捷命令.md`（用户视角：新增/捕获/分组/执行/QuickPick，含视图树示意 ASCII）、`docs/开发指南/12-快捷命令.md`（三件套结构、剪贴板桥接原理与风险、桩扩展、门禁注意）
 - Modify（口径 6 视图/35 命令 → 7 视图/47 命令）:

@@ -108,10 +108,7 @@ async function pickGroup(
 }
 
 /** 别名 + 分组两步收集并入库（新增与捕获共用；command 由调用方先行取得）。 */
-async function promptAndAdd(
-  quickCommands: QuickCommandsService,
-  command: string
-): Promise<void> {
+async function promptAndAdd(quickCommands: QuickCommandsService, command: string): Promise<void> {
   const alias = await vscode.window.showInputBox({
     prompt: '快捷命令别名（留空使用命令首词）',
     value: command.trim().split(/\s+/)[0]?.slice(0, 20) ?? '',

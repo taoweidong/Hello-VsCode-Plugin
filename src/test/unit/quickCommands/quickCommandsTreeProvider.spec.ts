@@ -72,7 +72,9 @@ async function loaded(
   return provider
 }
 
-function isInfo(node: QuickCommandTreeNode): node is Extract<QuickCommandTreeNode, { kind: 'info' }> {
+function isInfo(
+  node: QuickCommandTreeNode
+): node is Extract<QuickCommandTreeNode, { kind: 'info' }> {
   return node.kind === 'info'
 }
 
@@ -117,7 +119,9 @@ describe('QuickCommandsTreeProvider（两级树）', () => {
       ],
     })
     const nodes = await provider.getChildren()
-    const kinds = nodes.map((node) => (node.kind === 'group' ? node.group?.name ?? '未分组' : node.kind))
+    const kinds = nodes.map((node) =>
+      node.kind === 'group' ? (node.group?.name ?? '未分组') : node.kind
+    )
     expect(kinds).toEqual(['git', '构建'])
   })
 

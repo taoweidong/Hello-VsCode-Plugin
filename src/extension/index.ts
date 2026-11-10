@@ -167,7 +167,9 @@ export function activate(context: vscode.ExtensionContext): void {
   const quickCommandsProvider = new QuickCommandsTreeProvider(quickCommands)
   context.subscriptions.push(
     quickCommandsProvider,
-    vscode.window.createTreeView(VIEW.quickCommandsViewId, { treeDataProvider: quickCommandsProvider })
+    vscode.window.createTreeView(VIEW.quickCommandsViewId, {
+      treeDataProvider: quickCommandsProvider,
+    })
   )
 
   // ---------- Webview 页面装配（M4）：面板上下文 + 序列化器（窗口重载恢复） ----------

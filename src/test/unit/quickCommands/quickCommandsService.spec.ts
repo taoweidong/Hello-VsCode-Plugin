@@ -299,10 +299,12 @@ describe('QuickCommandsService（业务服务）', () => {
     })
     await service.load()
     await service.addCommand({ command: 'git new', name: 'new', groupId: 'g1' })
-    expect(service.listCommands().filter((item) => item.groupId === 'g1').map((i) => i.name)).toEqual([
-      'new',
-      'old',
-    ])
+    expect(
+      service
+        .listCommands()
+        .filter((item) => item.groupId === 'g1')
+        .map((i) => i.name)
+    ).toEqual(['new', 'old'])
   })
 
   it('addCommand：重复命令文本仅提示（既有条目字段不变，Review Focus 5）', async () => {

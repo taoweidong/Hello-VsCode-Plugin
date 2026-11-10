@@ -104,7 +104,8 @@ function normalizeGroupList(
   let dropped = 0
   let duplicated = 0
   for (const entry of entries) {
-    const record = typeof entry === 'object' && entry !== null ? (entry as Record<string, unknown>) : undefined
+    const record =
+      typeof entry === 'object' && entry !== null ? (entry as Record<string, unknown>) : undefined
     const name = typeof record?.name === 'string' ? record.name.trim() : ''
     if (!record || name.length === 0) {
       dropped += 1
@@ -148,7 +149,8 @@ function normalizeCommandList(
   let dropped = 0
   let dangling = 0
   for (const entry of entries) {
-    const record = typeof entry === 'object' && entry !== null ? (entry as Record<string, unknown>) : undefined
+    const record =
+      typeof entry === 'object' && entry !== null ? (entry as Record<string, unknown>) : undefined
     const command = typeof record?.command === 'string' ? record.command.trim() : ''
     if (!record || command.length === 0) {
       dropped += 1
@@ -172,9 +174,12 @@ function normalizeCommandList(
       groupId,
       addedAt: typeof record.addedAt === 'string' ? record.addedAt : new Date().toISOString(),
       lastUsedAt: typeof record.lastUsedAt === 'string' ? record.lastUsedAt : undefined,
-      useCount: typeof record.useCount === 'number' && Number.isInteger(record.useCount) && record.useCount >= 0
-        ? record.useCount
-        : undefined,
+      useCount:
+        typeof record.useCount === 'number' &&
+        Number.isInteger(record.useCount) &&
+        record.useCount >= 0
+          ? record.useCount
+          : undefined,
     })
   }
   if (dropped > 0) {

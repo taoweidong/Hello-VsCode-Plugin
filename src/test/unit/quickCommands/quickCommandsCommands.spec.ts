@@ -99,7 +99,11 @@ describe('快捷命令命令壳（v3.5）', () => {
 
       const items = service.listCommands()
       expect(items).toHaveLength(1)
-      expect(items[0]).toMatchObject({ name: 'push', command: 'git push origin main', groupId: 'g1' })
+      expect(items[0]).toMatchObject({
+        name: 'push',
+        command: 'git push origin main',
+        groupId: 'g1',
+      })
       expect(recordedOf('showInformationMessage').at(-1)!.args[0]).toMatchObject({
         message: expect.stringContaining('已收藏'),
       })
@@ -170,7 +174,10 @@ describe('快捷命令命令壳（v3.5）', () => {
 
       await run('extStarter.captureTerminalSelection')
 
-      expect(service.listCommands()[0]).toMatchObject({ command: 'git push origin main', groupId: 'g1' })
+      expect(service.listCommands()[0]).toMatchObject({
+        command: 'git push origin main',
+        groupId: 'g1',
+      })
       expect(__stubs.clipboard).toBe('') // 备份（空）已恢复
     })
 

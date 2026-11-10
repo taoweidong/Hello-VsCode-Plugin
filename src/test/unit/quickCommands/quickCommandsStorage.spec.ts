@@ -12,7 +12,12 @@ import {
   QUICK_COMMANDS_SCHEMA_VERSION,
   type QuickCommandsData,
 } from '../../../extension/features/quickCommands/quickCommandsService'
-import { __resetStubs, __stubs, createMementoStub, createExtensionContextStub } from '../stubs/vscode'
+import {
+  __resetStubs,
+  __stubs,
+  createMementoStub,
+  createExtensionContextStub,
+} from '../stubs/vscode'
 
 /**
  * 快捷命令双存储（v3.5，16 方案）：工作区 `.vscode/quick-commands.json`（信封 +
@@ -34,10 +39,7 @@ function setWorkspace(root: string): void {
 }
 
 function quickCommandsFileUri(root: string): vscode.Uri {
-  return vscode.Uri.joinPath(
-    vscode.Uri.file(root),
-    ...QUICK_COMMANDS_FILE_NAME.split('/')
-  )
+  return vscode.Uri.joinPath(vscode.Uri.file(root), ...QUICK_COMMANDS_FILE_NAME.split('/'))
 }
 
 const sampleData: QuickCommandsData = {
