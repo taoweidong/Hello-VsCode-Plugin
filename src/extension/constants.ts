@@ -156,6 +156,8 @@ export const COMMAND = {
   renameFavorite: 'extStarter.renameFavorite',
   /** 移除收藏（条目右键 + inline 悬停删除按钮；无需确认，可重新添加） */
   removeFavorite: 'extStarter.removeFavorite',
+  /** 打开收藏数据文件（收藏夹视图标题栏 + 命令面板；15 方案：手动备份不用记路径） */
+  openFavoritesDataFile: 'extStarter.openFavoritesDataFile',
 
   // 快捷命令（v3.5：终端命令收藏 + 别名 + 显式分组 + 单击终端执行，16 方案；
   // 与收藏夹 favorites（收藏路径）、任务收藏 addTaskToFavorites（收藏 tasks.json 任务）正交）

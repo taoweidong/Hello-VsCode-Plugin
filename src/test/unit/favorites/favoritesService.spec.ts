@@ -319,7 +319,9 @@ describe('GlobalJsonFavoritesStore（无工作区回退，15 方案）', () => {
     expect(items).toHaveLength(1)
     expect(items[0]?.name).toBe('备忘')
     await store.save(items)
-    const envelope = JSON.parse(await nodeFs.promises.readFile(globalFileUri(globalRoot).fsPath, 'utf8'))
+    const envelope = JSON.parse(
+      await nodeFs.promises.readFile(globalFileUri(globalRoot).fsPath, 'utf8')
+    )
     expect(envelope.schemaVersion).toBe(FAVORITES_SCHEMA_VERSION)
   })
 })

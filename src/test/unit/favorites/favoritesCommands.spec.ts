@@ -3,9 +3,13 @@ import * as nodeOs from 'node:os'
 import * as nodePath from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
 import * as vscode from 'vscode'
-import { COMMAND } from '../../../extension/constants'
+import { COMMAND, STORAGE } from '../../../extension/constants'
 import type { FavoriteItem } from '../../../extension/features/favorites/favoritesService'
-import { FavoritesService } from '../../../extension/features/favorites/favoritesService'
+import {
+  FAVORITES_SCHEMA_VERSION,
+  FavoritesService,
+  JsonFavoritesStore,
+} from '../../../extension/features/favorites/favoritesService'
 import { registerFavoritesCommands } from '../../../extension/commands/favoritesCommands'
 import { __resetStubs, __stubs } from '../stubs/vscode'
 
@@ -25,6 +29,7 @@ function makeService(): FavoritesService {
     async save(next) {
       items = next
     },
+    dataFileUri: () => vscode.Uri.file('/memory/favorites.json'),
   })
 }
 
@@ -43,7 +48,7 @@ beforeEach(() => {
 })
 
 describe('registerFavoritesCommands（收藏夹命令）', () => {
-  it('① 7 个命令全部注册', () => {
+  it('① 8 个命令全部注册', () => {
     const registered = new Map<string, (...args: unknown[]) => unknown>()
     registerFavoritesCommands((id, cb) => registered.set(id, cb), { favorites: makeService() })
     expect([...registered.keys()].sort()).toEqual(
@@ -55,6 +60,7 @@ describe('registerFavoritesCommands（收藏夹命令）', () => {
         COMMAND.copyFavoritePath,
         COMMAND.renameFavorite,
         COMMAND.removeFavorite,
+        COMMAND.openFavoritesDataFile,
       ].sort()
     )
   })
@@ -172,6 +178,29 @@ describe('registerFavoritesCommands（收藏夹命令）', () => {
     const item = favorites.list()[0]
     __stubs.dialogQueue.push({ label: '快速', description: item?.path, detail: '文件', item })
     await registered.get(COMMAND.quickOpenFavorites)?.()
+    expect(
+      __stubs.recorded.some(
+        (entry) =>
+          entry.kind === 'executeCommand' && JSON.stringify(entry.args).includes('vscode.open')
+      )
+    ).toBe(true)
+  })
+
+  it('⑩ 打开数据文件：缺失先写空信封，再 vscode.open 数据文件路径', async () => {
+    const dir = await nodeFs.promises.mkdtemp(nodePath.join(nodeOs.tmpdir(), 'favdata-'))
+    const fileUri = vscode.Uri.joinPath(
+      vscode.Uri.file(dir),
+      ...STORAGE.favoritesFileName.split('/')
+    )
+    const favorites = new FavoritesService(new JsonFavoritesStore(fileUri))
+    const registered = new Map<string, (...args: unknown[]) => unknown>()
+    registerFavoritesCommands((id, cb) => registered.set(id, cb), { favorites })
+    await registered.get(COMMAND.openFavoritesDataFile)?.()
+    const envelope = JSON.parse(await nodeFs.promises.readFile(fileUri.fsPath, 'utf8')) as {
+      schemaVersion: number
+      items: unknown[]
+    }
+    expect(envelope).toEqual({ schemaVersion: FAVORITES_SCHEMA_VERSION, items: [] })
     expect(
       __stubs.recorded.some(
         (entry) =>

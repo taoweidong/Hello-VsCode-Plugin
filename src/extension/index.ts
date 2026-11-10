@@ -10,7 +10,10 @@ import { TaskManagerTreeProvider } from './features/taskManager/taskManagerTreeP
 import { DraftBoxService } from './features/drafts/draftBoxService'
 import { FavoritesService } from './features/favorites/favoritesService'
 import { FavoritesTreeProvider } from './features/favorites/favoritesTreeProvider'
-import { createFavoritesStore, migrateFavoritesMementoToFile } from './features/favorites/favoritesService'
+import {
+  createFavoritesStore,
+  migrateFavoritesMementoToFile,
+} from './features/favorites/favoritesService'
 import {
   createQuickCommandsStore,
   QuickCommandsService,

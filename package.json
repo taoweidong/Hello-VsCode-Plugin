@@ -289,6 +289,12 @@
         "icon": "$(close)"
       },
       {
+        "command": "extStarter.openFavoritesDataFile",
+        "title": "%command.openFavoritesDataFile.title%",
+        "category": "%command.category%",
+        "icon": "$(json)"
+      },
+      {
         "command": "extStarter.addQuickCommand",
         "title": "%command.addQuickCommand.title%",
         "category": "%command.category%",
@@ -417,6 +423,11 @@
           "command": "extStarter.quickOpenFavorites",
           "when": "view == extStarter.favoritesView",
           "group": "navigation@1"
+        },
+        {
+          "command": "extStarter.openFavoritesDataFile",
+          "when": "view == extStarter.favoritesView",
+          "group": "navigation@2"
         },
         {
           "command": "extStarter.addQuickCommand",

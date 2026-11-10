@@ -4,12 +4,14 @@ import { COMMAND } from '../constants'
 import { type CommandRegistrar, showError } from './shared'
 
 /**
- * 收藏夹场景命令分组（v3.4，13 方案）——7 条命令的薄壳，全部委托 FavoritesService。
+ * 收藏夹场景命令分组（v3.4，13 方案；v3.6 增 openFavoritesDataFile，15 方案）——
+ * 8 条命令的薄壳，全部委托 FavoritesService。
  *
  - addFavorite：资源管理器右键收 (uri, uris[])（单选/多选批量）、编辑器右键/标题栏收当前文件；
    单条添加弹别名输入框（默认 basename，可留空），批量添加直接用 basename 并汇总提示；
  - 带参命令（open/reveal/copy/rename/remove）无参调用给出可操作提示，不抛错；
-   quickOpenFavorites 用 QuickPick 列出全部收藏，回车即打开。
+   quickOpenFavorites 用 QuickPick 列出全部收藏，回车即打开；
+ - openFavoritesDataFile：确保数据文件存在后用编辑器打开——手动备份/迁移直接拷该文件。
  */
 
 export interface FavoritesCommandDeps {
@@ -181,6 +183,16 @@ export function registerFavoritesCommands(
       if (removed) {
         void vscode.window.showInformationMessage(`已从收藏夹移除「${item.name}」。`)
       }
+    } catch (err) {
+      showError(err)
+    }
+  })
+
+  // 15 方案：打开数据文件——文件缺失先写空信封（所见即存储格式），失败如实提示
+  register(COMMAND.openFavoritesDataFile, async () => {
+    try {
+      await favorites.ensureDataFile()
+      await vscode.commands.executeCommand('vscode.open', favorites.dataFileUri())
     } catch (err) {
       showError(err)
     }

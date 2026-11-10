@@ -49,6 +49,7 @@
   "command.copyFavoritePath.title": "复制收藏路径",
   "command.renameFavorite.title": "重命名收藏别名",
   "command.removeFavorite.title": "移除收藏",
+  "command.openFavoritesDataFile.title": "打开收藏数据文件",
   "command.addQuickCommand.title": "新增快捷命令",
   "command.captureTerminalSelection.title": "收藏终端选中命令",
   "command.quickRunCommands.title": "快速执行快捷命令",

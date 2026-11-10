@@ -27,6 +27,7 @@ function makeMemoryStore(initial: FavoriteItem[] = []): IFavoritesStore {
     async save(next) {
       items = next
     },
+    dataFileUri: () => vscode.Uri.file('/memory/favorites.json'),
   }
 }
 
@@ -86,6 +87,7 @@ describe('FavoritesTreeProvider（收藏夹树视图）', () => {
     const failing: IFavoritesStore = {
       load: () => Promise.reject(new Error('磁盘不可用')),
       save: () => Promise.resolve(),
+      dataFileUri: () => vscode.Uri.file('/memory/favorites.json'),
     }
     const service = new FavoritesService(failing)
     await service.load()
