@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import * as vscode from 'vscode'
 import {
   defaultAlias,
   MAX_QUICK_COMMAND_GROUPS,
@@ -10,7 +11,7 @@ import {
   type QuickCommandGroup,
   type QuickCommandsData,
 } from '../../../extension/features/quickCommands/quickCommandsService'
-import { __resetStubs } from '../stubs/vscode'
+import { __resetStubs, __setConfig, __stubs } from '../stubs/vscode'
 
 /**
  * 快捷命令服务（v3.5，16 方案）：归一化守卫（信封读入 / 丢坏条 / 悬空分组引用 /
@@ -449,5 +450,93 @@ describe('QuickCommandsService（业务服务）', () => {
     })
     await service.addCommand({ command: 'ls', groupId: null })
     expect(fired).toBeGreaterThan(0)
+  })
+})
+
+describe('QuickCommandsService.execute（专用终端，v3.5）', () => {
+  beforeEach(() => {
+    __resetStubs()
+  })
+
+  function recordedOf(kind: string): { kind: string; args: unknown[] }[] {
+    return __stubs.recorded.filter((entry) => entry.kind === kind)
+  }
+
+  it('首次执行：创建专用终端（cwd=工作区首目录）→ show → sendText 原样执行 → 回写 useCount', async () => {
+    __stubs.workspaceFolders = [{ uri: vscode.Uri.file('/ws-root'), name: 'ws', index: 0 }]
+    const { service } = makeService({
+      commands: [{ id: 'c1', name: 'a', command: 'git push --force-with-lease' }],
+    })
+    await service.load()
+    await service.execute(service.get('c1')!)
+
+    const creates = recordedOf('createTerminal')
+    expect(creates).toHaveLength(1)
+    const options = creates[0]!.args[0] as { name?: string; cwd?: { fsPath: string } }
+    expect(options.name).toBe('QuickCommand')
+    expect(options.cwd?.fsPath).toContain('ws-root')
+
+    const shows = recordedOf('terminalShow')
+    expect(shows).toHaveLength(1)
+
+    const sends = recordedOf('terminalSendText')
+    expect(sends).toHaveLength(1)
+    expect(sends[0]!.args[0]).toMatchObject({
+      name: 'QuickCommand',
+      text: 'git push --force-with-lease',
+      shouldExecute: true,
+    })
+    expect(service.get('c1')!.useCount).toBe(1)
+    expect(typeof service.get('c1')!.lastUsedAt).toBe('string')
+  })
+
+  it('二次执行复用既有终端（仅一次 createTerminal；Review Focus 4 的正常面）', async () => {
+    __stubs.workspaceFolders = [{ uri: vscode.Uri.file('/ws-root'), name: 'ws', index: 0 }]
+    const { service } = makeService({ commands: [{ id: 'c1', name: 'a', command: 'ls' }] })
+    await service.load()
+    await service.execute(service.get('c1')!)
+    await service.execute(service.get('c1')!)
+    expect(recordedOf('createTerminal')).toHaveLength(1)
+    expect(recordedOf('terminalSendText')).toHaveLength(2)
+  })
+
+  it('终端被用户关闭（exitStatus 置值）后再次执行 → 自动重建', async () => {
+    __stubs.workspaceFolders = [{ uri: vscode.Uri.file('/ws-root'), name: 'ws', index: 0 }]
+    const { service } = makeService({ commands: [{ id: 'c1', name: 'a', command: 'ls' }] })
+    await service.load()
+    await service.execute(service.get('c1')!)
+    __stubs.terminals[0]!.exitStatus = { reason: 'closed' }
+    await service.execute(service.get('c1')!)
+    expect(recordedOf('createTerminal')).toHaveLength(2)
+    expect(recordedOf('terminalSendText')).toHaveLength(2)
+  })
+
+  it('配置 quickCommandReuseTerminal=false → 每次执行新建终端', async () => {
+    __stubs.workspaceFolders = [{ uri: vscode.Uri.file('/ws-root'), name: 'ws', index: 0 }]
+    __setConfig('extStarter', 'quickCommandReuseTerminal', false)
+    const { service } = makeService({ commands: [{ id: 'c1', name: 'a', command: 'ls' }] })
+    await service.load()
+    await service.execute(service.get('c1')!)
+    await service.execute(service.get('c1')!)
+    expect(recordedOf('createTerminal')).toHaveLength(2)
+  })
+
+  it('getReuseTerminal 注入 false → 每次新建（不读配置）', async () => {
+    const store = new FakeStore()
+    store.data = { groups: [], commands: [{ id: 'c1', name: 'a', command: 'ls', addedAt: 't' }] }
+    const service = new QuickCommandsService(store, { getReuseTerminal: () => false })
+    await service.load()
+    await service.execute(service.get('c1')!)
+    await service.execute(service.get('c1')!)
+    expect(recordedOf('createTerminal')).toHaveLength(2)
+  })
+
+  it('无工作区 → createTerminal 的 cwd 为 undefined（VSCode 默认位置）', async () => {
+    __stubs.workspaceFolders = undefined
+    const { service } = makeService({ commands: [{ id: 'c1', name: 'a', command: 'ls' }] })
+    await service.load()
+    await service.execute(service.get('c1')!)
+    const options = recordedOf('createTerminal')[0]!.args[0] as { cwd?: unknown }
+    expect(options.cwd).toBeUndefined()
   })
 })

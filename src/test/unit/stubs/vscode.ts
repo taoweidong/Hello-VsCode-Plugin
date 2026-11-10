@@ -347,6 +347,10 @@ export interface StubState {
     __fireDelete: () => void
     dispose: () => void
   }[]
+  /** 已创建的终端桩（快捷命令 v3.5；createTerminal 按序追加） */
+  terminals: Terminal[]
+  /** 可注入的活动终端（captureTerminalSelection / execute 用；undefined = 无） */
+  activeTerminal: Terminal | undefined
 }
 
 export const __stubs: StubState = {
@@ -365,6 +369,8 @@ export const __stubs: StubState = {
   executeTaskError: undefined,
   activeTextEditor: undefined,
   fileWatchers: [],
+  terminals: [],
+  activeTerminal: undefined,
 }
 
 /** 每个用例 setup 时调用：清空全部副作用。 */
@@ -391,6 +397,8 @@ export function __resetStubs(options?: { keepWorkspaceFolders?: boolean }): void
   __stubs.executeTaskError = undefined
   __stubs.activeTextEditor = undefined
   __stubs.fileWatchers = []
+  __stubs.terminals = []
+  __stubs.activeTerminal = undefined
   taskStartEmitter = new EventEmitter<FakeTaskExecution>()
   taskEndEmitter = new EventEmitter<FakeTaskExecution>()
 }
@@ -404,6 +412,24 @@ export function __setConfig(section: string, key: string, value: unknown): void 
 }
 
 /* ---------------- window ---------------- */
+
+/** 终端桩：形状对齐真实 vscode.Terminal 的快捷命令消费面（name/exitStatus/show/sendText）。 */
+export class Terminal {
+  exitStatus: { reason: string } | undefined = undefined
+  constructor(
+    readonly name: string,
+    readonly creationOptions?: { name?: string; cwd?: string | Uri }
+  ) {}
+  show(preserveFocus?: boolean): void {
+    __record('terminalShow', { name: this.name, preserveFocus })
+  }
+  sendText(text: string, shouldExecute?: boolean): void {
+    __record('terminalSendText', { name: this.name, text, shouldExecute })
+  }
+  dispose(): void {
+    __record('terminalDispose', this.name)
+  }
+}
 
 function nextDialogAnswer(): unknown {
   return dialogQueue.length ? dialogQueue.shift() : undefined
@@ -432,6 +458,20 @@ function createOutputChannelStub(name: string) {
 
 export const window = {
   createOutputChannel: (name: string) => createOutputChannelStub(name),
+  /**
+   * 终端桩（快捷命令 v3.5）：创建即录制并入 __stubs.terminals；
+   * sendText / show 录制，exitStatus 公开可变（测试手动置值模拟用户关闭终端）。
+   */
+  createTerminal: (options?: { name?: string; cwd?: string | Uri }) => {
+    __record('createTerminal', options)
+    const terminal = new Terminal(options?.name ?? 'stub-terminal')
+    __stubs.terminals.push(terminal)
+    return terminal
+  },
+  /** 活动终端（测试经 __stubs.activeTerminal 注入；undefined = 无）。 */
+  get activeTerminal(): Terminal | undefined {
+    return __stubs.activeTerminal
+  },
   /** 活动编辑器（测试经 __stubs.activeTextEditor 注入；真实形态见 ActiveTextEditorStub）。 */
   get activeTextEditor(): ActiveTextEditorStub | undefined {
     return __stubs.activeTextEditor

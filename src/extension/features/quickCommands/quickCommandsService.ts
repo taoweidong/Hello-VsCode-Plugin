@@ -326,17 +326,34 @@ export type GroupOp =
 /** 分组重命名结果。 */
 export type RenameGroupStatus = 'renamed' | 'duplicate' | 'notfound'
 
+/** 专用复用终端名（16 方案 §5：避免每次执行刷屏新建）。 */
+export const QUICK_COMMAND_TERMINAL_NAME = 'QuickCommand'
+/** 复用终端配置键（T8 收敛进 constants 前暂居本文件）。 */
+export const QUICK_COMMAND_REUSE_TERMINAL_KEY = 'quickCommandReuseTerminal'
+/** 配置段名（= CONFIG.section，T8 收敛前暂居本文件）。 */
+export const QUICK_COMMANDS_CONFIG_SECTION = 'extStarter'
+
 /** 快捷命令业务服务：命令与树视图的唯一数据入口。 */
 export class QuickCommandsService implements vscode.Disposable {
   private groups: QuickCommandGroup[] = []
   private commands: QuickCommandItem[] = []
   /** 首次 load 失败的原因（树视图以 info 节点呈现；成功后清空）。 */
   loadError: string | undefined
+  /** 专用复用终端（exitStatus 非 undefined = 已被用户关闭，执行前重建）。 */
+  private terminal: vscode.Terminal | undefined
 
   private readonly _onDidChange = new vscode.EventEmitter<void>()
   readonly onDidChange = this._onDidChange.event
 
-  constructor(private readonly store: IQuickCommandsStore) {}
+  constructor(
+    private readonly store: IQuickCommandsStore,
+    private readonly options: {
+      /** 工作区根提供者（可注入，测试友好；默认第一个工作区文件夹）。 */
+      getWorkspaceRoot?: () => vscode.Uri | undefined
+      /** 是否复用专用终端（可注入；默认读 quickCommandReuseTerminal 配置，缺省 true）。 */
+      getReuseTerminal?: () => boolean
+    } = {}
+  ) {}
 
   /** 加载持久化数据（激活时调用；失败保留空列表并记录原因）。 */
   async load(): Promise<void> {
@@ -523,6 +540,29 @@ export class QuickCommandsService implements vscode.Disposable {
     item.lastUsedAt = new Date().toISOString()
     item.useCount = (item.useCount ?? 0) + 1
     await this.persist()
+  }
+
+  /**
+   * 在终端执行快捷命令（16 方案 §5）：复用名为 QuickCommand 的专用终端
+   * （被关闭后自动重建）；cwd = 工作区首目录；命令原样 sendText，不做任何改写。
+   */
+  async execute(item: QuickCommandItem): Promise<void> {
+    const reuse = this.options.getReuseTerminal
+      ? this.options.getReuseTerminal()
+      : vscode.workspace
+          .getConfiguration(QUICK_COMMANDS_CONFIG_SECTION)
+          .get<boolean>(QUICK_COMMAND_REUSE_TERMINAL_KEY, true)
+    if (!reuse || !this.terminal || this.terminal.exitStatus !== undefined) {
+      this.terminal = vscode.window.createTerminal({
+        name: QUICK_COMMAND_TERMINAL_NAME,
+        cwd: this.options.getWorkspaceRoot
+          ? this.options.getWorkspaceRoot()
+          : vscode.workspace.workspaceFolders?.[0]?.uri,
+      })
+    }
+    this.terminal.show()
+    this.terminal.sendText(item.command, true)
+    await this.recordExecution(item.id)
   }
 
   dispose(): void {
