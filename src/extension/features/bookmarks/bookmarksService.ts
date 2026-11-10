@@ -224,7 +224,12 @@ export class BookmarksService implements vscode.Disposable {
   private readonly _onDidChange = new vscode.EventEmitter<void>()
   readonly onDidChange = this._onDidChange.event
 
-  constructor(private readonly store: IBookmarksStore) {}
+  constructor(
+    private readonly store: IBookmarksStore,
+    /** 工作区文件夹提供者（可注入，测试友好；默认第一个工作区文件夹；resolveBookmarkUri 回退用）。 */
+    private readonly getWorkspaceFolder: () => vscode.WorkspaceFolder | undefined = () =>
+      vscode.workspace.workspaceFolders?.[0]
+  ) {}
 
   /** 加载持久化数据（激活时调用；失败保留空列表并记录原因）。 */
   async load(): Promise<void> {
@@ -240,6 +245,72 @@ export class BookmarksService implements vscode.Disposable {
 
   list(): BookmarkItem[] {
     return [...this.items]
+  }
+
+  /**
+   * 把存储路径解析为可访问 URI（与收藏夹 resolveFavoriteUri 同语义）：
+   * 相对路径逐工作区文件夹尝试 fs.stat 存在性，命中即用；全未命中回退第一个
+   * 文件夹；绝对路径（含工作区外书签）直接 Uri.file。文件不存在也返回最佳
+   * 猜测 URI——由调用方决定错误呈现（jump 时 openTextDocument 如实报错）。
+   */
+  async resolveBookmarkUri(item: BookmarkItem): Promise<vscode.Uri> {
+    if (path.isAbsolute(item.path)) {
+      return vscode.Uri.file(item.path)
+    }
+    const folders = vscode.workspace.workspaceFolders ?? []
+    for (const folder of folders) {
+      const candidate = vscode.Uri.joinPath(folder.uri, ...item.path.split('/'))
+      try {
+        await vscode.workspace.fs.stat(candidate)
+        return candidate
+      } catch {
+        // 换下一个工作区文件夹
+      }
+    }
+    const fallback = folders[0] ?? this.getWorkspaceFolder()
+    return vscode.Uri.joinPath(fallback?.uri ?? vscode.Uri.file(path.sep), ...item.path.split('/'))
+  }
+
+  /**
+   * 跳转：解析 URI → 打开文档 → selection 置行首 + reveal 居中（视口外才居中）。
+   * 行号越界（文件被改短）钳制到最后一行并如实提示；空文档定位到第 0 行。
+   */
+  async jump(item: BookmarkItem): Promise<vscode.Uri> {
+    const uri = await this.resolveBookmarkUri(item)
+    const document = await vscode.workspace.openTextDocument(uri)
+    const editor = await vscode.window.showTextDocument(document)
+    let line = item.line
+    if (document.lineCount > 0 && item.line > document.lineCount - 1) {
+      line = document.lineCount - 1
+      void vscode.window.showInformationMessage(
+        `书签行号越界（L${item.line + 1}），已定位到文件末尾。`
+      )
+    }
+    const position = new vscode.Position(line, 0)
+    editor.selection = new vscode.Selection(position, position)
+    editor.revealRange(
+      new vscode.Range(position, position),
+      vscode.TextEditorRevealType.InCenterIfOutsideViewport
+    )
+    return uri
+  }
+
+  /** 数据文件落点（透传当前 store；「打开数据文件」命令依赖）。 */
+  dataFileUri(): vscode.Uri {
+    return this.store.dataFileUri()
+  }
+
+  /** 确保数据文件存在：缺失时写空信封（「打开数据文件」所见即存储格式）。 */
+  async ensureDataFile(): Promise<void> {
+    try {
+      await vscode.workspace.fs.stat(this.store.dataFileUri())
+    } catch (err) {
+      if (err instanceof vscode.FileSystemError && err.code === 'FileNotFound') {
+        await this.store.save([])
+        return
+      }
+      throw err
+    }
   }
 
   /** 工作区内 → POSIX 相对路径；否则绝对 fsPath（同步判定，与收藏夹添加口径一致）。 */

@@ -13,8 +13,9 @@ import {
   JsonBookmarksStore,
   MAX_BOOKMARKS,
   normalizeBookmarkList,
+  type BookmarkItem,
 } from '../../../extension/features/bookmarks/bookmarksService'
-import { __resetStubs, __stubs, createMementoStub } from '../stubs/vscode'
+import { __resetStubs, __setDocument, __stubs, createMementoStub } from '../stubs/vscode'
 
 /**
  * 代码书签服务（v3.6，14 方案）：存储契约（信封 / 顶层兼容 / 损坏备份，与收藏夹同口径）、
@@ -50,6 +51,11 @@ async function writeFile(root: string, rel: string, content = ''): Promise<vscod
 
 function makeService(root = tmpRoot, onWarning?: (message: string) => void): BookmarksService {
   return new BookmarksService(new JsonBookmarksStore(bookmarksFileUri(root), { onWarning }))
+}
+
+/** 构造书签条目（解析/跳转用例的手工形态）。 */
+function makeItem(path: string, line: number): BookmarkItem {
+  return { id: 'test', path, line, text: '', addedAt: '2026-11-10T00:00:00Z' }
 }
 
 /** 无工作区场景的 ExtensionContext 替身（globalStorageUri 落在 tmpRoot 下）。 */
@@ -328,5 +334,106 @@ describe('store 装配路由（14 方案 §3）', () => {
     ]
     await global.save(items)
     await expect(global.load()).resolves.toEqual(items)
+  })
+})
+
+describe('resolveBookmarkUri / jump / ensureDataFile（14 方案 §4）', () => {
+  function revealStartLine(): number {
+    const reveal = __stubs.recorded.find((entry) => entry.kind === 'revealRange')
+    const payload = reveal?.args?.[0] as { range: { start: { line: number } } } | undefined
+    if (!payload?.range) {
+      throw new Error('应有 revealRange 录制')
+    }
+    return payload.range.start.line
+  }
+
+  it('⑲ 相对路径：命中所属工作区文件夹', async () => {
+    await writeFile(tmpRoot, 'docs/g.md')
+    const service = makeService()
+    const resolved = await service.resolveBookmarkUri(makeItem('docs/g.md', 3))
+    expect(resolved.fsPath).toBe(nodePath.join(tmpRoot, 'docs', 'g.md'))
+  })
+
+  it('⑳ 多根：命中第二工作区文件夹；全未命中回退第一个文件夹', async () => {
+    const secondRoot = nodePath.join(tmpRoot, 'second-root')
+    await nodeFs.promises.mkdir(nodePath.join(secondRoot, 'x'), { recursive: true })
+    await nodeFs.promises.writeFile(nodePath.join(secondRoot, 'x', 'bm.md'), '')
+    __stubs.workspaceFolders = [
+      { uri: vscode.Uri.file(tmpRoot), name: 'first', index: 0 },
+      { uri: vscode.Uri.file(secondRoot), name: 'second', index: 1 },
+    ]
+    const service = makeService()
+    const hit = await service.resolveBookmarkUri(makeItem('x/bm.md', 0))
+    expect(hit.fsPath).toBe(nodePath.join(secondRoot, 'x', 'bm.md'))
+    const miss = await service.resolveBookmarkUri(makeItem('y/nope.md', 0))
+    expect(miss.fsPath).toBe(nodePath.join(tmpRoot, 'y', 'nope.md'))
+  })
+
+  it('㉑ 绝对路径直接 Uri.file（无工作区也不受影响）', async () => {
+    const outsidePath = nodePath.join(nodeOs.tmpdir(), `bm-outside-${Date.now()}.ts`)
+    await nodeFs.promises.writeFile(outsidePath, '')
+    __stubs.workspaceFolders = undefined
+    const service = makeService()
+    const resolved = await service.resolveBookmarkUri(makeItem(outsidePath, 0))
+    expect(resolved.fsPath).toBe(vscode.Uri.file(outsidePath).fsPath)
+    await nodeFs.promises.rm(outsidePath, { force: true })
+  })
+
+  it('㉒ jump：showTextDocument + reveal 定位到行（0-based → 定位第 2 行）', async () => {
+    const fileUri = await writeFile(tmpRoot, 'doc.md', 'l0\nl1\nl2')
+    __setDocument(fileUri, 'l0\nl1\nl2')
+    const service = makeService()
+    const uri = await service.jump(makeItem('doc.md', 1))
+    expect(uri.fsPath).toBe(fileUri.fsPath)
+    expect(__stubs.recorded.some((entry) => entry.kind === 'showTextDocument')).toBe(true)
+    expect(revealStartLine()).toBe(1)
+  })
+
+  it('㉓ 行号越界：钳制到文件末尾并如实提示', async () => {
+    const fileUri = await writeFile(tmpRoot, 'doc.md', 'l0\nl1\nl2')
+    __setDocument(fileUri, 'l0\nl1\nl2')
+    const service = makeService()
+    await service.jump(makeItem('doc.md', 99))
+    expect(revealStartLine()).toBe(2)
+    expect(
+      __stubs.recorded.some(
+        (entry) =>
+          entry.kind === 'showInformationMessage' && JSON.stringify(entry.args).includes('越界')
+      )
+    ).toBe(true)
+  })
+
+  it('㉔ 空文档：定位到第 0 行并提示越界', async () => {
+    const fileUri = await writeFile(tmpRoot, 'empty.md', '')
+    __setDocument(fileUri, '')
+    const service = makeService()
+    await service.jump(makeItem('empty.md', 5))
+    expect(revealStartLine()).toBe(0)
+    expect(
+      __stubs.recorded.some(
+        (entry) =>
+          entry.kind === 'showInformationMessage' && JSON.stringify(entry.args).includes('越界')
+      )
+    ).toBe(true)
+  })
+
+  it('㉕ 文件不存在：openTextDocument 抛错向上传播（命令壳负责呈现）', async () => {
+    const service = makeService()
+    await expect(service.jump(makeItem('ghost.md', 0))).rejects.toThrow()
+  })
+
+  it('㉖ ensureDataFile：文件缺失写空信封；已存在不改写', async () => {
+    const service = makeService()
+    expect(service.dataFileUri().fsPath).toBe(bookmarksFileUri(tmpRoot).fsPath)
+    await service.ensureDataFile()
+    const envelope = JSON.parse(
+      await nodeFs.promises.readFile(bookmarksFileUri(tmpRoot).fsPath, 'utf8')
+    ) as { schemaVersion: number; items: unknown[] }
+    expect(envelope).toEqual({ schemaVersion: 1, items: [] })
+    await nodeFs.promises.writeFile(bookmarksFileUri(tmpRoot).fsPath, 'KEEP')
+    await service.ensureDataFile()
+    await expect(nodeFs.promises.readFile(bookmarksFileUri(tmpRoot).fsPath, 'utf8')).resolves.toBe(
+      'KEEP'
+    )
   })
 })

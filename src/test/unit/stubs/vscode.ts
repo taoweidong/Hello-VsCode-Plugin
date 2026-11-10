@@ -712,7 +712,7 @@ export const workspace = {
   },
 }
 
-/** 假 TextDocument：getText / positionAt / offsetAt 按 content 计算（定位断言用）。 */
+/** 假 TextDocument：getText / positionAt / offsetAt / lineCount 按 content 计算（定位断言用）。 */
 export function createFakeTextDocument(uri: Uri, content: string) {
   const lines = content.split('\n')
   return {
@@ -720,6 +720,7 @@ export function createFakeTextDocument(uri: Uri, content: string) {
     fileName: uri.fsPath,
     languageId: 'jsonc',
     getText: (): string => content,
+    lineCount: lines.length,
     positionAt(offset: number): Position {
       const clamped = Math.max(0, Math.min(offset, content.length))
       const before = content.slice(0, clamped).split('\n')
