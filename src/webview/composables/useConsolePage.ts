@@ -1,42 +1,28 @@
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { ref } from 'vue'
 import {
   isCommandHistoryWire,
-  isHostMessage,
+  isSerialPortBrief,
   isSerialServerWire,
+  sanitizeWireList,
   type CommandHistoryWire,
   type FieldDef,
   type SerialLinkStateWire,
+  type SerialConsoleInitExtra,
   type SerialPortBrief,
   type SerialServerWire,
   type WebviewMessage,
 } from '../protocol'
-import { useVsCodeApi } from '../shared/useVsCodeApi'
+import { useHostMessages } from '../shared/useHostMessages'
 
 /**
- * window 的最小结构（宿主消息通道）。本文件被根 tsconfig（lib 仅 ES2022，无 DOM）
- * 纳入类型检查，与 shared/useVsCodeApi.ts 同款：经结构化 cast 访问浏览器全局。
- */
-interface WebviewWindow {
-  addEventListener(type: string, listener: (event: { data: unknown }) => void): void
-  removeEventListener(type: string, listener: (event: { data: unknown }) => void): void
-}
-
-function webviewWindow(): WebviewWindow {
-  return (globalThis as unknown as { window: WebviewWindow }).window
-}
-
-/**
- * 串口控制台页面的消息编排（taskManager 页面未复用本 composable，自行编排）：
- * 宿主消息经 isHostMessage 守卫后按类型分发；页面侧只经 post 发送协议消息。
+ * 串口控制台页面的消息编排（17 方案阶段 3 起与 taskManager/useTaskPage 同基
+ * useHostMessages）：宿主消息经守卫后按类型分发；页面侧只经 post 发送协议消息。
  * 表单类页面（init/submitAck/error）之外，本页是事件驱动控制台——
  * init 只在握手时出现一次，其余消息随时可到。
  */
 
-export interface ConsoleInitExtra {
-  servers: SerialServerWire[]
-  history: CommandHistoryWire[]
-  initialServerId: string | null
-}
+/** 页面 init 装配数据（键约定见 protocol.SerialConsoleInitExtra——单一来源）。 */
+export type ConsoleInitExtra = SerialConsoleInitExtra
 
 export interface ConsoleLinkState {
   serverId: string | null
@@ -59,15 +45,10 @@ export function useConsolePage(options: ConsolePageOptions): {
   hostError: import('vue').Ref<string>
   post(message: WebviewMessage): void
 } {
-  const api = useVsCodeApi()
   const initialized = ref(false)
   const hostError = ref('')
 
-  const onHostMessage = (event: { data: unknown }): void => {
-    const message: unknown = event.data
-    if (!isHostMessage(message)) {
-      return
-    }
+  const { post } = useHostMessages((message) => {
     switch (message.type) {
       case 'init': {
         initialized.value = true
@@ -77,8 +58,12 @@ export function useConsolePage(options: ConsolePageOptions): {
           {
             // 元素级守卫（P2-F4）：isHostMessage 对 init.extra 只验容器，
             // 畸形元素在此过滤，不让坏数据进入 UI 状态
-            servers: Array.isArray(extra.servers) ? extra.servers.filter(isSerialServerWire) : [],
-            history: Array.isArray(extra.history) ? extra.history.filter(isCommandHistoryWire) : [],
+            servers: Array.isArray(extra.servers)
+              ? sanitizeWireList(extra.servers, isSerialServerWire, '服务器列表')
+              : [],
+            history: Array.isArray(extra.history)
+              ? sanitizeWireList(extra.history, isCommandHistoryWire, '命令历史')
+              : [],
             initialServerId:
               typeof extra.initialServerId === 'string' ? extra.initialServerId : null,
           },
@@ -87,7 +72,7 @@ export function useConsolePage(options: ConsolePageOptions): {
         break
       }
       case 'serialServers':
-        options.onServers(message.servers)
+        options.onServers(sanitizeWireList(message.servers, isSerialServerWire, '服务器列表'))
         break
       case 'serialState':
         options.onLinkState({
@@ -100,10 +85,10 @@ export function useConsolePage(options: ConsolePageOptions): {
         options.onData(message.text, message.seq)
         break
       case 'serialPorts':
-        options.onPorts(message.ports)
+        options.onPorts(sanitizeWireList(message.ports, isSerialPortBrief, '串口列表'))
         break
       case 'commandHistory':
-        options.onHistory(message.entries)
+        options.onHistory(sanitizeWireList(message.entries, isCommandHistoryWire, '命令历史'))
         break
       case 'error':
         hostError.value = message.message
@@ -112,19 +97,7 @@ export function useConsolePage(options: ConsolePageOptions): {
       default:
         break
     }
-  }
-
-  onMounted(() => {
-    webviewWindow().addEventListener('message', onHostMessage)
-    api.postMessage({ type: 'ready' })
   })
-  onBeforeUnmount(() => {
-    webviewWindow().removeEventListener('message', onHostMessage)
-  })
-
-  const post = (message: WebviewMessage): void => {
-    api.postMessage(message)
-  }
 
   return { initialized, hostError, post }
 }

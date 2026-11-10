@@ -6,6 +6,23 @@
 
 ## [Unreleased]
 
+### 重构（17 方案阶段 3：前端编排统一，行为保持）
+
+- **taskManager 页面编排收进 `useTaskPage`**：查询/分页/弹框/轮询/消息处理五种
+  职责自 755 行 App.vue 的 script 抽出（App.vue 剩模板胶水），编排契约与
+  serialConsole 同基；
+- **新增 `useHostMessages` 公共基座**：监听/ready/isHostMessage 分发/类型化 post
+  一处实现，useConsolePage 与 useTaskPage 两页共用（消除各自 ~50 行样板）；
+- **taskManager 接入 webview state 持久化（P2-F2）**：查询条件/页码/每页条数/
+  打开中的弹框草稿经 setState 持久化（500ms 防抖），面板隐藏销毁后恢复
+  （对齐 serialConsole 先例）；
+- **taskList 坏元素过滤而非整条拒绝（P2-F3）**：列表类消息守卫只验容器形态，
+  新增 `sanitizeWireList` 元素级清洗（丢弃 + 告警）——宿主新增枚举值时旧页面
+  降级显示而非列表全空（serialServers/commandHistory/ports 同口径）；
+- **init.extra 协议化（P1-5）**：`SerialConsoleInitExtra` 成为键名单一来源；
+- **onSend 200ms 魔法超时改 onHistory 驱动**（12 号文档遗留项升级修复，
+  快速连发时 loading 不再提前解锁）；persistTimer 卸载清理（P3-08）。
+
 ### 重构（17 方案阶段 2：存储层与共享工具统一，行为保持）
 
 - **JSON 信封存储四合一口**：新增共享 `JsonEnvelopeFileStore` + `copyCorruptBackup`

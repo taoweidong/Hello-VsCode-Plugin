@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   isCommandHistoryWire,
   isHostMessage,
+  isSerialPortBrief,
   isSerialServerWire,
+  isTaskItemWire,
   isWebviewMessage,
+  sanitizeWireList,
 } from '../../../webview/protocol'
 
 /** protocol.ts 运行时守卫（03 §5.5 / 05 T2.4）：逐字段窄化，非法样例一律拒绝。 */
@@ -203,45 +206,8 @@ describe('isHostMessage：任务管理消息', () => {
       'taskList.page.items 非数组',
       { type: 'taskList', page: { items: 'x', total: 1, page: 1, pageSize: 10 } },
     ],
-    [
-      'taskList.page 元素缺 id',
-      { type: 'taskList', page: { items: [{ name: 'x' }], total: 1, page: 1, pageSize: 10 } },
-    ],
-    [
-      'taskList.page.status 非法字面量',
-      {
-        type: 'taskList',
-        page: { items: [{ ...taskItem, status: 'done' }], total: 1, page: 1, pageSize: 10 },
-      },
-    ],
-    [
-      'taskList.page.progress 非数字',
-      {
-        type: 'taskList',
-        page: { items: [{ ...taskItem, progress: '42' }], total: 1, page: 1, pageSize: 10 },
-      },
-    ],
-    [
-      'taskList.page.createdAt 非字符串',
-      {
-        type: 'taskList',
-        page: { items: [{ ...taskItem, createdAt: 1 }], total: 1, page: 1, pageSize: 10 },
-      },
-    ],
-    [
-      'taskList.page.notes 非字符串',
-      {
-        type: 'taskList',
-        page: { items: [{ ...taskItem, notes: 1 }], total: 1, page: 1, pageSize: 10 },
-      },
-    ],
-    [
-      'taskList.page.buildType 非法字面量',
-      {
-        type: 'taskList',
-        page: { items: [{ ...taskItem, buildType: 'patch' }], total: 1, page: 1, pageSize: 10 },
-      },
-    ],
+    // 元素级负例已随 P2-F3（17 方案阶段 3）迁移到 sanitizeWireList 测试：
+    // 列表守卫只验容器形态，坏元素由消费方过滤而非整条拒绝
     [
       'taskList.page.total 非数字',
       { type: 'taskList', page: { items: [], total: '1', page: 1, pageSize: 10 } },
@@ -333,16 +299,7 @@ describe('isHostMessage：串口控制台消息', () => {
   it.each([
     ['serialPorts 缺 ports', { type: 'serialPorts' }],
     ['serialPorts.ports 非数组', { type: 'serialPorts', ports: 'COM3' }],
-    ['serialPorts.ports 元素缺 path', { type: 'serialPorts', ports: [{ manufacturer: 'USB' }] }],
-    ['serialServers.ports 元素缺 name', { type: 'serialServers', servers: [{ id: '1' }] }],
-    [
-      'serialServers 元素 baudRate 非数字',
-      { type: 'serialServers', servers: [{ ...serialServer, baudRate: '115200' }] },
-    ],
-    [
-      'serialServers 元素 autoLogin 非布尔',
-      { type: 'serialServers', servers: [{ ...serialServer, autoLogin: 1 }] },
-    ],
+    // 元素级负例已随 P2-F3（17 方案阶段 3）迁移到 sanitizeWireList 测试
     ['serialState 缺 state', { type: 'serialState', serverId: 'srv-1' }],
     ['serialState.state 非法字面量', { type: 'serialState', serverId: 'srv-1', state: 'open' }],
     ['serialState.serverId 数字', { type: 'serialState', serverId: 1, state: 'connected' }],
@@ -353,14 +310,6 @@ describe('isHostMessage：串口控制台消息', () => {
     ['serialData 缺 seq', { type: 'serialData', text: 'x' }],
     ['serialData.seq 非数字', { type: 'serialData', seq: '1', text: 'x' }],
     ['serialData.text 非字符串', { type: 'serialData', seq: 1, text: null }],
-    [
-      'commandHistory 元素缺 useCount',
-      { type: 'commandHistory', entries: [{ id: 'h1', command: 'x', lastUsedAt: 1 }] },
-    ],
-    [
-      'commandHistory 元素 command 非字符串',
-      { type: 'commandHistory', entries: [{ id: 'h1', command: 1, lastUsedAt: 1, useCount: 1 }] },
-    ],
   ])('拒绝非法消息：%s', (_name, sample) => {
     expect(isHostMessage(sample)).toBe(false)
   })
@@ -408,5 +357,66 @@ describe('isSerialServerWire / isCommandHistoryWire（元素级守卫）', () =>
   it('列表场景：filter(isSerialServerWire) 只保留合法元素（useConsolePage 的 init.extra 过滤语义）', () => {
     const mixed = [validServer, { id: 'bad' }, null, validServer]
     expect(mixed.filter(isSerialServerWire)).toHaveLength(2)
+  })
+})
+
+/* ================= 列表元素级清洗（17 方案阶段 3，P2-F3 前向兼容） ================= */
+
+describe('sanitizeWireList（容器放行 + 坏元素过滤，宿主新增枚举值时旧页面降级而非白屏化）', () => {
+  const good = { ...serialServer }
+  it('好元素保留、坏元素丢弃并告警', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      const clean = sanitizeWireList(
+        [good, { ...good, id: 42 }, good],
+        isSerialServerWire,
+        '服务器列表'
+      )
+      expect(clean).toHaveLength(2)
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('1 条畸形元素'))
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
+  it('全好元素：零丢弃零告警', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      expect(sanitizeWireList([good], isSerialServerWire, '服务器列表')).toHaveLength(1)
+      expect(warnSpy).not.toHaveBeenCalled()
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
+  it('taskItem 坏元素过滤（迁移自旧 isHostMessage 负例）', () => {
+    expect(sanitizeWireList([{ name: 'x' }], isTaskItemWire, '任务列表')).toEqual([])
+    expect(sanitizeWireList([{ ...taskItem, status: 'done' }], isTaskItemWire, '任务列表')).toEqual(
+      []
+    )
+    expect(sanitizeWireList([{ ...taskItem, progress: '42' }], isTaskItemWire, '任务列表')).toEqual(
+      []
+    )
+    expect(sanitizeWireList([taskItem], isTaskItemWire, '任务列表')).toEqual([taskItem])
+  })
+
+  it('ports / commandHistory 元素过滤', () => {
+    expect(sanitizeWireList([{ manufacturer: 'USB' }], isSerialPortBrief, '串口列表')).toEqual([])
+    expect(
+      sanitizeWireList(
+        [{ id: 'h1', command: 'x', lastUsedAt: 1 }],
+        isCommandHistoryWire,
+        '命令历史'
+      )
+    ).toEqual([])
+  })
+
+  it('合法变体全保留（buildType=incremental / 带 manufacturer 的 port）', () => {
+    expect(
+      sanitizeWireList([{ ...taskItem, buildType: 'incremental' }], isTaskItemWire, '任务列表')
+    ).toEqual([{ ...taskItem, buildType: 'incremental' }])
+    expect(
+      sanitizeWireList([{ path: 'COM9', manufacturer: 'USB' }], isSerialPortBrief, '串口列表')
+    ).toEqual([{ path: 'COM9', manufacturer: 'USB' }])
   })
 })

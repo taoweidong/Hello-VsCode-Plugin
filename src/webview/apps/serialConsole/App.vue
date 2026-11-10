@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import type {
   CommandHistoryWire,
   FieldDef,
@@ -129,6 +129,8 @@ const { initialized, post } = useConsolePage({
   },
   onHistory(entries) {
     history.value = entries
+    // 发送成功 = 宿主记录并回推历史：在此解除发送在途态（与 onSend 注释对应）
+    sending.value = false
   },
   onError(message, field) {
     saving.value = false
@@ -236,10 +238,8 @@ function onSend(value: string): void {
   sending.value = true
   appendOutput({ seq: nextEchoSeq(), text: `> ${value.trim()}\n`, kind: 'echo' })
   post({ type: 'serialSend', command: value })
-  // 发送完成（历史推送到达）即解除在途态
-  setTimeout(() => {
-    sending.value = false
-  }, 200)
+  // 在途态由宿主的 commandHistory 推送解除（onHistory；失败走 onError）——
+  // 此前是 200ms 魔法超时，快速连发时提前解锁（17 方案阶段 3，12 号遗留项升级修复）
 }
 
 function onHistoryFill(value: string): void {
@@ -267,6 +267,11 @@ watch(
   },
   { deep: true }
 )
+
+onBeforeUnmount(() => {
+  // 卸载后不再回写 webview state（P3-08：防抖定时器随组件销毁）
+  if (persistTimer !== undefined) clearTimeout(persistTimer)
+})
 </script>
 
 <template>

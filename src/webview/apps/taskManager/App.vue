@@ -1,19 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useTemplateRef } from 'vue'
-import {
-  isHostMessage,
-  type TaskBuildTypeWire,
-  type TaskItemStatusWire,
-  type TaskItemWire,
-  type TaskQueryWire,
-  type WebviewMessage,
-} from '../../protocol'
-import type { FormField } from '../../formSchema'
+import type { TaskBuildTypeWire, TaskItemStatusWire, TaskItemWire } from '../../protocol'
 import SchemaForm from '../../components/SchemaForm.vue'
-import { schemaDefaults, toFormFields } from '../../components/fieldAdapter'
-import { useTwoStepConfirm } from '../../composables/useTwoStepConfirm'
-import { useVsCodeApi } from '../../shared/useVsCodeApi'
 import AppShell from '../../ui/AppShell.vue'
 import VBadge from '../../ui/VBadge.vue'
 import VButton from '../../ui/VButton.vue'
@@ -22,6 +10,7 @@ import VLoading from '../../ui/VLoading.vue'
 import VSelect from '../../ui/VSelect.vue'
 import VInput from '../../ui/VInput.vue'
 import VToolbar from '../../ui/VToolbar.vue'
+import { useTaskPage } from './useTaskPage'
 
 /**
  * 任务管理（v2.6）：典型 CRUD 实例——
@@ -29,7 +18,7 @@ import VToolbar from '../../ui/VToolbar.vue'
  * 支持新增 / 编辑 / 删除 / 查询。后端接口由宿主打桩模拟（stub）或真实 REST（HTTP），
  * 页面侧只认协议，两种实现零改动。
  *
- * 消息流：
+ * 消息流（编排契约见 useTaskPage / useHostMessages，17 方案阶段 3 收敛）：
  * - `ready` → init（schema = TASK_FIELD_DEFS）；
  * - `taskListRequest`（查询 / 分页）→ 宿主 taskList 页；
  * - `submit`（新建 / 编辑，主按钮先过本地必填校验）→ 宿主写成功后 submitAck
@@ -38,17 +27,37 @@ import VToolbar from '../../ui/VToolbar.vue'
  * - `taskDelete` → taskList（行内两段式布防确认，不依赖浏览器模态——webview 沙箱
  *   下 confirm 恒被忽略，见 useTwoStepConfirm / agent.md 硬性规约 9）；
  * - 轮询：init 完成 且 存在排队 / 运行中任务时每 3s 刷新当前查询条件，展示实时进度。
+ * - 持久化：查询条件 / 页码 / 打开中的弹框草稿经 webview state 恢复（P2-F2）。
  */
 
-const POLL_INTERVAL_MS = 3000
-const DEFAULT_PAGE_SIZE = 10
-
-const vscode = useVsCodeApi()
-
-/** 上行消息编译期校验（17 方案阶段 1，P1-3：拼错消息名 / payload 直接过不了类型检查）。 */
-function post(message: WebviewMessage): void {
-  vscode.postMessage(message)
-}
+const {
+  fields,
+  loading,
+  items,
+  page,
+  total,
+  pageSize,
+  query,
+  feedback,
+  totalPages,
+  canPrev,
+  canNext,
+  search,
+  resetQuery,
+  changePageSize,
+  gotoPage,
+  dialogOpen,
+  editingId,
+  dialogDraft,
+  dialogErrors,
+  saving,
+  openCreate,
+  openEdit,
+  closeDialog,
+  submitDialog: submitDialogRaw,
+  deleteConfirm,
+  confirmDelete,
+} = useTaskPage()
 
 const STATUS_META: Record<TaskItemStatusWire, { label: string; cls: string }> = {
   queued: { label: '排队中', cls: 'task-status--queued' },
@@ -82,218 +91,12 @@ const PAGE_SIZE_OPTIONS = [
   { value: '50', label: '50 条 / 页' },
 ]
 
-const fields = ref<FormField[]>([])
-const initialized = ref(false)
-const loading = ref(false)
-const items = ref<TaskItemWire[]>([])
-const page = ref(1)
-const total = ref(0)
-const pageSize = ref(DEFAULT_PAGE_SIZE)
-const query = reactive<{
-  keyword: string
-  status: TaskItemStatusWire | 'all' | ''
-  buildType: TaskBuildTypeWire | 'all' | ''
-}>({ keyword: '', status: '', buildType: '' })
-const feedback = ref<{ kind: 'success' | 'error'; text: string } | null>(null)
-
-/** 编辑弹框状态 */
-const dialogOpen = ref(false)
-const editingId = ref<string | null>(null)
-const dialogDraft = ref<Record<string, unknown>>({})
-const dialogErrors = ref<Record<string, string>>({})
-const saving = ref(false)
-
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
-const hasActiveTask = computed(() =>
-  items.value.some((task) => task.status === 'queued' || task.status === 'running')
-)
-const canPrev = computed(() => page.value > 1)
-const canNext = computed(() => page.value < totalPages.value)
-
-function currentQuery(): TaskQueryWire {
-  const q: TaskQueryWire = { page: page.value, pageSize: pageSize.value }
-  const keyword = query.keyword.trim()
-  if (keyword) q.keyword = keyword
-  if (query.status) q.status = query.status
-  if (query.buildType) q.buildType = query.buildType
-  return q
-}
-
-function requestPage(): void {
-  loading.value = true
-  post({ type: 'taskListRequest', query: currentQuery() })
-}
-
-function search(): void {
-  page.value = 1
-  feedback.value = null
-  requestPage()
-}
-
-function resetQuery(): void {
-  query.keyword = ''
-  query.status = ''
-  query.buildType = ''
-  page.value = 1
-  feedback.value = null
-  requestPage()
-}
-
-function changePageSize(value: string): void {
-  pageSize.value = Number(value) || DEFAULT_PAGE_SIZE
-  page.value = 1
-  requestPage()
-}
-
-function gotoPage(target: number): void {
-  const clamped = Math.min(Math.max(1, target), totalPages.value)
-  if (clamped === page.value) return
-  page.value = clamped
-  requestPage()
-}
-
-/* ------------------------------ 弹框（增 / 改） ------------------------------ */
-
-function openCreate(): void {
-  editingId.value = null
-  dialogDraft.value = schemaDefaults(fields.value)
-  dialogErrors.value = {}
-  dialogOpen.value = true
-}
-
-function openEdit(task: TaskItemWire): void {
-  editingId.value = task.id
-  dialogDraft.value = {
-    name: task.name,
-    branch: task.branch,
-    buildType: task.buildType,
-    notes: task.notes ?? '',
-  }
-  dialogErrors.value = {}
-  dialogOpen.value = true
-}
-
-function closeDialog(): void {
-  if (saving.value) return
-  dialogOpen.value = false
-  editingId.value = null
-  dialogErrors.value = {}
-}
-
+/** 弹框表单模板引用：本地必填校验经 SchemaForm 的 validate/focusFirst 完成。 */
 const dialogFormRef = useTemplateRef<typeof SchemaForm>('dialogForm')
 
 function submitDialog(): void {
-  if (saving.value) return
-  // 主按钮本地必填校验（对齐 serialConsole / P2-F2）：空必填不发 submit，
-  // 就地显示字段错误并聚焦首个控件，避免一次注定失败的宿主往返
-  if (dialogFormRef.value && !dialogFormRef.value.validate()) {
-    dialogFormRef.value.focusFirst()
-    return
-  }
-  saving.value = true
-  dialogErrors.value = {}
-  post({
-    type: 'submit',
-    draft: { ...dialogDraft.value, id: editingId.value ?? undefined },
-  })
+  submitDialogRaw(dialogFormRef.value ?? undefined)
 }
-
-/** 行内删除的两段式布防确认（key = 任务 id，3s 内再点执行）。 */
-const deleteConfirm = useTwoStepConfirm()
-
-function confirmDelete(task: TaskItemWire): void {
-  if (deleteConfirm.confirm(task.id)) {
-    post({ type: 'taskDelete', id: task.id })
-  }
-}
-
-/* -------------------------------- 消息处理 -------------------------------- */
-
-function onMessage(event: MessageEvent): void {
-  const message = event.data
-  if (!isHostMessage(message)) return
-
-  switch (message.type) {
-    case 'init':
-      fields.value = toFormFields(message.schema)
-      initialized.value = true
-      requestPage()
-      break
-
-    case 'taskList': {
-      // 纯数据刷新：轮询应答与提交后的重查都走这里，关框只认 submitAck
-      // （否则轮询应答先落时会误关弹框并伪造「已保存」）
-      loading.value = false
-      items.value = message.page.items
-      total.value = message.page.total
-      page.value = message.page.page
-      pageSize.value = message.page.pageSize
-      break
-    }
-
-    case 'submitAck': {
-      // 写操作已被宿主受理：此处关框并给出成功反馈。宿主提交生命周期有 10s
-      // 超时兜底（超时走 error 分支复位 saving），弹框不会永久卡死
-      if (dialogOpen.value && saving.value) {
-        saving.value = false
-        dialogOpen.value = false
-        editingId.value = null
-        feedback.value = { kind: 'success', text: '任务已保存。' }
-      }
-      break
-    }
-
-    case 'error': {
-      loading.value = false
-      const field = message.field
-      if (dialogOpen.value) {
-        saving.value = false
-        if (field) {
-          dialogErrors.value = { ...dialogErrors.value, [field]: message.message }
-        }
-      }
-      feedback.value = { kind: 'error', text: message.message }
-      break
-    }
-
-    default:
-      break
-  }
-}
-
-let pollTimer: ReturnType<typeof setInterval> | undefined
-
-function startPolling(): void {
-  if (pollTimer !== undefined) return
-  pollTimer = setInterval(() => {
-    // 仅在 init 完成 且 存在排队 / 运行中任务时刷新：init 失败（initialized
-    // 恒 false）不再空转请求，全部任务落定后自然停止
-    if (initialized.value && hasActiveTask.value) {
-      requestPage()
-    }
-  }, POLL_INTERVAL_MS)
-}
-
-function stopPolling(): void {
-  if (pollTimer === undefined) return
-  clearInterval(pollTimer)
-  pollTimer = undefined
-}
-
-watch(hasActiveTask, (active) => {
-  if (!active) feedback.value = null
-})
-
-onMounted(() => {
-  window.addEventListener('message', onMessage)
-  post({ type: 'ready' })
-  startPolling()
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('message', onMessage)
-  stopPolling()
-})
 
 function formatTime(iso?: string): string {
   if (!iso) return '—'

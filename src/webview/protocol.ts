@@ -106,6 +106,25 @@ export interface TaskItemWire {
   [extra: string]: unknown
 }
 
+/**
+ * serialConsole 页面 init.extra 的约定键（17 方案阶段 3 协议化，P1-5：
+ * 键名唯一来源，消除 useConsolePage / webviewController / panel 三处字面量散落；
+ * 拼错键名从此过不了类型检查）。
+ */
+export interface SerialConsoleInitExtra {
+  /** 服务器列表初装（畸形元素由消费方经 sanitizeWireList 过滤） */
+  servers: SerialServerWire[]
+  /** 命令历史初装（MRU 序，已去重） */
+  history: CommandHistoryWire[]
+  /** 打开面板时自动连接的目标（命令预选 / 序列化恢复；null = 不自动连） */
+  initialServerId: string | null
+  /**
+   * webview state 持久化的页面草稿（webviewController 统一注入，键名 'persisted'；
+   * 页面自产自销，协议层不校验内部形态）。
+   */
+  persisted?: unknown
+}
+
 /** 宿主 → Webview */
 export type HostMessage =
   | {
@@ -172,7 +191,7 @@ function isFieldDef(v: unknown): v is FieldDef {
   )
 }
 
-function isSerialPortBrief(v: unknown): v is SerialPortBrief {
+export function isSerialPortBrief(v: unknown): v is SerialPortBrief {
   return (
     isPlainObject(v) &&
     typeof v.path === 'string' &&
@@ -216,7 +235,7 @@ export function isCommandHistoryWire(v: unknown): v is CommandHistoryWire {
   )
 }
 
-function isTaskItemWire(v: unknown): v is TaskItemWire {
+export function isTaskItemWire(v: unknown): v is TaskItemWire {
   return (
     isPlainObject(v) &&
     typeof v.id === 'string' &&
@@ -259,11 +278,35 @@ function isTaskPageWire(v: unknown): v is TaskPageWire {
   return (
     isPlainObject(v) &&
     Array.isArray(v.items) &&
-    v.items.every(isTaskItemWire) &&
     typeof v.total === 'number' &&
     typeof v.page === 'number' &&
     typeof v.pageSize === 'number'
   )
+}
+
+/**
+ * 元素级清洗（17 方案阶段 3，P2-F3 前向兼容）：列表类消息的守卫只验容器形态，
+ * 元素合法性由消费方经本函数过滤——宿主新增枚举值 / 字段时，旧页面丢弃坏元素
+ * 并告警，而不是整条拒绝导致列表全空（「向后兼容地扩展」的落地口径）。
+ */
+export function sanitizeWireList<T>(
+  list: readonly unknown[],
+  guard: (value: unknown) => value is T,
+  label: string
+): T[] {
+  const clean: T[] = []
+  let dropped = 0
+  for (const entry of list) {
+    if (guard(entry)) {
+      clean.push(entry)
+    } else {
+      dropped += 1
+    }
+  }
+  if (dropped > 0) {
+    console.warn(`[protocol] ${label}中 ${dropped} 条畸形元素已丢弃（可能是宿主新增了枚举值）`)
+  }
+  return clean
 }
 
 /** 宿主收到消息时先过本守卫，再按 type 分发。 */
@@ -320,9 +363,10 @@ export function isHostMessage(v: unknown): v is HostMessage {
     case 'error':
       return typeof v.message === 'string' && (v.field === undefined || typeof v.field === 'string')
     case 'serialPorts':
-      return Array.isArray(v.ports) && v.ports.every(isSerialPortBrief)
+      // 容器形态校验；元素合法性由消费方 sanitizeWireList 过滤（P2-F3 前向兼容）
+      return Array.isArray(v.ports)
     case 'serialServers':
-      return Array.isArray(v.servers) && v.servers.every(isSerialServerWire)
+      return Array.isArray(v.servers)
     case 'serialState':
       return (
         (typeof v.serverId === 'string' || v.serverId === null) &&
@@ -332,7 +376,7 @@ export function isHostMessage(v: unknown): v is HostMessage {
     case 'serialData':
       return typeof v.seq === 'number' && typeof v.text === 'string'
     case 'commandHistory':
-      return Array.isArray(v.entries) && v.entries.every(isCommandHistoryWire)
+      return Array.isArray(v.entries)
     case 'taskList':
       return isTaskPageWire(v.page)
     default:
