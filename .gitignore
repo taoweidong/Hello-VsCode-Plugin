@@ -18,6 +18,8 @@ release/
 .vscode/*.drafts.json
 # 收藏夹数据文件（v3.4，13 方案：文件/文件夹路径收藏）
 .vscode/favorites.json
+# 快捷命令数据文件（v3.5，16 方案：终端命令收藏 + 分组）
+.vscode/quick-commands.json
 
 # 测试与覆盖率产物（M6：vitest coverage / Playwright）
 coverage/

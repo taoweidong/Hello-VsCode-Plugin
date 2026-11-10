@@ -2,7 +2,7 @@
   "name": "hello-vscode-plugin",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "3.4.0",
+  "version": "3.5.0",
   "publisher": "your-publisher",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -52,6 +52,10 @@
         {
           "id": "extStarter.favoritesView",
           "name": "%view.favorites.name%"
+        },
+        {
+          "id": "extStarter.quickCommandsView",
+          "name": "%view.quickCommands.name%"
         },
         {
           "id": "extStarter.envView",
@@ -283,6 +287,78 @@
         "title": "%command.removeFavorite.title%",
         "category": "%command.category%",
         "icon": "$(close)"
+      },
+      {
+        "command": "extStarter.addQuickCommand",
+        "title": "%command.addQuickCommand.title%",
+        "category": "%command.category%",
+        "icon": "$(add)"
+      },
+      {
+        "command": "extStarter.captureTerminalSelection",
+        "title": "%command.captureTerminalSelection.title%",
+        "category": "%command.category%",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "extStarter.quickRunCommands",
+        "title": "%command.quickRunCommands.title%",
+        "category": "%command.category%",
+        "icon": "$(play)"
+      },
+      {
+        "command": "extStarter.executeQuickCommand",
+        "title": "%command.executeQuickCommand.title%",
+        "category": "%command.category%",
+        "icon": "$(play)"
+      },
+      {
+        "command": "extStarter.editQuickCommand",
+        "title": "%command.editQuickCommand.title%",
+        "category": "%command.category%",
+        "icon": "$(pencil)"
+      },
+      {
+        "command": "extStarter.renameQuickCommand",
+        "title": "%command.renameQuickCommand.title%",
+        "category": "%command.category%",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "extStarter.moveQuickCommandToGroup",
+        "title": "%command.moveQuickCommandToGroup.title%",
+        "category": "%command.category%",
+        "icon": "$(folder)"
+      },
+      {
+        "command": "extStarter.copyQuickCommand",
+        "title": "%command.copyQuickCommand.title%",
+        "category": "%command.category%",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "extStarter.removeQuickCommand",
+        "title": "%command.removeQuickCommand.title%",
+        "category": "%command.category%",
+        "icon": "$(close)"
+      },
+      {
+        "command": "extStarter.createQuickCommandGroup",
+        "title": "%command.createQuickCommandGroup.title%",
+        "category": "%command.category%",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "extStarter.renameQuickCommandGroup",
+        "title": "%command.renameQuickCommandGroup.title%",
+        "category": "%command.category%",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "extStarter.removeQuickCommandGroup",
+        "title": "%command.removeQuickCommandGroup.title%",
+        "category": "%command.category%",
+        "icon": "$(close)"
       }
     ],
     "menus": {
@@ -341,6 +417,21 @@
           "command": "extStarter.quickOpenFavorites",
           "when": "view == extStarter.favoritesView",
           "group": "navigation@1"
+        },
+        {
+          "command": "extStarter.addQuickCommand",
+          "when": "view == extStarter.quickCommandsView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "extStarter.quickRunCommands",
+          "when": "view == extStarter.quickCommandsView",
+          "group": "navigation@2"
+        },
+        {
+          "command": "extStarter.createQuickCommandGroup",
+          "when": "view == extStarter.quickCommandsView",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
@@ -473,6 +564,61 @@
           "command": "extStarter.removeFavorite",
           "when": "view == extStarter.favoritesView && viewItem == favorite",
           "group": "inline@1"
+        },
+        {
+          "command": "extStarter.executeQuickCommand",
+          "when": "view == extStarter.quickCommandsView && viewItem == quickCommand",
+          "group": "inline@1"
+        },
+        {
+          "command": "extStarter.renameQuickCommand",
+          "when": "view == extStarter.quickCommandsView && viewItem == quickCommand",
+          "group": "inline@2"
+        },
+        {
+          "command": "extStarter.removeQuickCommand",
+          "when": "view == extStarter.quickCommandsView && viewItem == quickCommand",
+          "group": "inline@3"
+        },
+        {
+          "command": "extStarter.executeQuickCommand",
+          "when": "view == extStarter.quickCommandsView && viewItem == quickCommand",
+          "group": "1_run@1"
+        },
+        {
+          "command": "extStarter.editQuickCommand",
+          "when": "view == extStarter.quickCommandsView && viewItem == quickCommand",
+          "group": "2_manage@1"
+        },
+        {
+          "command": "extStarter.renameQuickCommand",
+          "when": "view == extStarter.quickCommandsView && viewItem == quickCommand",
+          "group": "2_manage@2"
+        },
+        {
+          "command": "extStarter.moveQuickCommandToGroup",
+          "when": "view == extStarter.quickCommandsView && viewItem == quickCommand",
+          "group": "2_manage@3"
+        },
+        {
+          "command": "extStarter.copyQuickCommand",
+          "when": "view == extStarter.quickCommandsView && viewItem == quickCommand",
+          "group": "2_manage@4"
+        },
+        {
+          "command": "extStarter.removeQuickCommand",
+          "when": "view == extStarter.quickCommandsView && viewItem == quickCommand",
+          "group": "2_manage@5"
+        },
+        {
+          "command": "extStarter.renameQuickCommandGroup",
+          "when": "view == extStarter.quickCommandsView && viewItem == quickCommandGroup",
+          "group": "2_manage@1"
+        },
+        {
+          "command": "extStarter.removeQuickCommandGroup",
+          "when": "view == extStarter.quickCommandsView && viewItem == quickCommandGroup",
+          "group": "2_manage@2"
         }
       ],
       "editor/context": [
@@ -548,6 +694,12 @@
           "command": "extStarter.addFavorite",
           "when": "editorIsOpen",
           "group": "navigation@6"
+        }
+      ],
+      "terminal/context": [
+        {
+          "command": "extStarter.captureTerminalSelection",
+          "group": "9_starter@1"
         }
       ]
     },
@@ -667,6 +819,11 @@
             "favorites": true
           },
           "description": "%configuration.taskExpanded.description%"
+        },
+        "extStarter.quickCommandReuseTerminal": {
+          "type": "boolean",
+          "default": true,
+          "description": "%configuration.quickCommandReuseTerminal.description%"
         }
       }
     }
