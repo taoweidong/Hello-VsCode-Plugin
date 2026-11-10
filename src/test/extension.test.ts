@@ -1047,3 +1047,35 @@ suite('收藏夹（v3.4 集成冒烟）', () => {
     })
   })
 })
+
+suite('快捷命令（v3.5 集成冒烟）', () => {
+  test('12 条快捷命令命令全部注册', async () => {
+    const commands = new Set(await vscode.commands.getCommands())
+    for (const id of [
+      'extStarter.addQuickCommand',
+      'extStarter.captureTerminalSelection',
+      'extStarter.quickRunCommands',
+      'extStarter.executeQuickCommand',
+      'extStarter.editQuickCommand',
+      'extStarter.renameQuickCommand',
+      'extStarter.moveQuickCommandToGroup',
+      'extStarter.copyQuickCommand',
+      'extStarter.removeQuickCommand',
+      'extStarter.createQuickCommandGroup',
+      'extStarter.renameQuickCommandGroup',
+      'extStarter.removeQuickCommandGroup',
+    ]) {
+      assert.ok(commands.has(id), `命令未注册：${id}`)
+    }
+  })
+
+  test('快捷命令空态安全路径可执行（quickRunCommands / captureTerminalSelection）', async () => {
+    // 只走空态信息提示路径，不执行 addQuickCommand（其会在真实宿主阻塞等待输入）
+    await assert.doesNotReject(async () => {
+      await vscode.commands.executeCommand('extStarter.quickRunCommands')
+    })
+    await assert.doesNotReject(async () => {
+      await vscode.commands.executeCommand('extStarter.captureTerminalSelection')
+    })
+  })
+})
