@@ -106,6 +106,9 @@ function systemItems(): TaskItem[] {
   ]
 }
 
+/** 环境检测任务的 taskId（index.ts 的定位/重检逻辑与任务注册共用，P3-06 单一来源）。 */
+export const ENVIRONMENT_TASK_ID = 'environment'
+
 /**
  * 构造环境检测任务（executor 可注入，默认真实探测）。
  * 09 方案阶段 3：从硬编码六项改为「遍历 ENVIRONMENT_PROBES 注册表 + 2 系统项」，
@@ -113,7 +116,7 @@ function systemItems(): TaskItem[] {
  */
 export function createEnvironmentTask(executor: ProbeExecutor = defaultExecutor): StartupTask {
   const task: StartupTask = {
-    id: 'environment',
+    id: ENVIRONMENT_TASK_ID,
     title: '环境检测',
     timeoutMs: 60000,
 

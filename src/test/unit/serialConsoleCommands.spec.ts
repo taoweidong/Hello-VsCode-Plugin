@@ -159,6 +159,7 @@ describe('SerialConsoleController.deleteServer', () => {
     const controller2 = new SerialConsoleController(context, makeOutputChannel())
     // 预置一条服务器（经 store）
     const server = makeNode('srv-x').server
+    if (!server) throw new Error('节点缺少 server')
     await controller2.store.save([server])
     await context.secrets.store('extStarter.serialServer.srv-x.password', 'p')
 

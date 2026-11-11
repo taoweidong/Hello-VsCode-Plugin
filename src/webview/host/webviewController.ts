@@ -398,9 +398,24 @@ export class WebviewController {
     }
   }
 
-  /** 宿主 → 页面：下发协议消息（面板已关闭时静默丢弃）。 */
+  /** 宿主 → 页面：下发协议消息（面板已关闭时静默丢弃；保留投递失败痕迹，P3-10）。 */
   post(message: HostMessage): void {
-    void this.panel?.webview.postMessage(message)
+    const panel = this.panel
+    if (!panel) {
+      return
+    }
+    void Promise.resolve(panel.webview.postMessage(message)).then(
+      (delivered) => {
+        if (delivered === false) {
+          console.warn(`[webview] 消息未送达（面板正在释放）：${message.type}`)
+        }
+      },
+      (err: unknown) => {
+        console.warn(
+          `[webview] 消息投递失败：${message.type}（${err instanceof Error ? err.message : String(err)}）`
+        )
+      }
+    )
   }
 
   /**

@@ -70,6 +70,7 @@
   "command.removeQuickCommand.title": "删除快捷命令",
   "command.createQuickCommandGroup.title": "新建命令分组",
   "command.renameQuickCommandGroup.title": "重命名命令分组",
+  "command.openQuickCommandsDataFile.title": "打开快捷命令数据文件",
   "command.removeQuickCommandGroup.title": "删除命令分组",
   "configuration.taskGroupWithSeparator.description": "按分隔符把任务 label 拆入虚拟文件夹分组展示。",
   "configuration.taskGroupSeparator.description": "拆分任务 label 的分隔符（默认 \"-\"；支持多字符，如 a--b--c 配 \"--\"）。",

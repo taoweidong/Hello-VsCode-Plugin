@@ -123,8 +123,9 @@ export function useTaskPage(): {
     return q
   }
 
-  function requestPage(): void {
-    loading.value = true
+  /** 请求一页；silent = 轮询等后台刷新，不置全局 loading（表头「加载中…」不闪烁）。 */
+  function requestPage(silent = false): void {
+    if (!silent) loading.value = true
     post({ type: 'taskListRequest', query: currentQuery() })
   }
 
@@ -272,9 +273,9 @@ export function useTaskPage(): {
     if (pollTimer !== undefined) return
     pollTimer = setInterval(() => {
       // 仅在 init 完成 且 存在排队 / 运行中任务时刷新：init 失败（initialized
-      // 恒 false）不再空转请求，全部任务落定后自然停止
+      // 恒 false）不再空转请求，全部任务落定后自然停止；静默刷新不置 loading（P3-07）
       if (initialized.value && hasActiveTask.value) {
-        requestPage()
+        requestPage(true)
       }
     }, POLL_INTERVAL_MS)
   }

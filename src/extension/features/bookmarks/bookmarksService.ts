@@ -221,9 +221,15 @@ export class BookmarksService implements vscode.Disposable {
 
   constructor(
     private readonly store: IBookmarksStore,
-    /** 工作区文件夹提供者（可注入，测试友好；默认第一个工作区文件夹；resolveBookmarkUri 回退用）。 */
-    private readonly getWorkspaceFolder: () => vscode.WorkspaceFolder | undefined = () =>
-      vscode.workspace.workspaceFolders?.[0]
+    /**
+     * 工作区文件夹提供者（可注入，测试友好；P3-12 DI 统一）：
+     * 传 uri 时返回该 URI 所属文件夹（storagePathFor 用）；不传时返回第一个文件夹
+     * （resolveBookmarkUri 的回退用）。
+     */
+    private readonly getWorkspaceFolder: (
+      uri?: vscode.Uri
+    ) => vscode.WorkspaceFolder | undefined = (uri) =>
+      uri ? vscode.workspace.getWorkspaceFolder(uri) : vscode.workspace.workspaceFolders?.[0]
   ) {}
 
   /** 加载持久化数据（激活时调用；失败保留空列表并记录原因；完成后触发变更事件）。 */
@@ -272,7 +278,11 @@ export class BookmarksService implements vscode.Disposable {
       }
     }
     const fallback = folders[0] ?? this.getWorkspaceFolder()
-    return vscode.Uri.joinPath(fallback?.uri ?? vscode.Uri.file(path.sep), ...item.path.split('/'))
+    if (!fallback) {
+      // P3-13：无工作区时相对路径无法解析——给出可读错误（不再返回怪异 URI）
+      throw new Error(`无法解析书签路径：未打开工作区且路径不是绝对路径（${item.path}）。`)
+    }
+    return vscode.Uri.joinPath(fallback.uri, ...item.path.split('/'))
   }
 
   /**
@@ -319,7 +329,7 @@ export class BookmarksService implements vscode.Disposable {
 
   /** 工作区内 → POSIX 相对路径；否则绝对 fsPath（同步判定，与收藏夹添加口径一致）。 */
   storagePathFor(uri: vscode.Uri): string {
-    const folder = vscode.workspace.getWorkspaceFolder(uri)
+    const folder = this.getWorkspaceFolder(uri)
     return folder ? toPosix(path.relative(folder.uri.fsPath, uri.fsPath)) : uri.fsPath
   }
 

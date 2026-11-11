@@ -423,6 +423,14 @@ describe('resolveBookmarkUri / jump / ensureDataFile（14 方案 §4）', () => 
     ).toBe(true)
   })
 
+  it('P3-13：无工作区时相对路径无法解析 → 可读错误（不再返回怪异 URI）', async () => {
+    const service = makeService()
+    __stubs.workspaceFolders = undefined
+    await expect(service.resolveBookmarkUri(makeItem('src/a.ts', 0))).rejects.toThrow(
+      '未打开工作区且路径不是绝对路径'
+    )
+  })
+
   it('㉕ 文件不存在：openTextDocument 抛错向上传播（命令壳负责呈现）', async () => {
     const service = makeService()
     await expect(service.jump(makeItem('ghost.md', 0))).rejects.toThrow()

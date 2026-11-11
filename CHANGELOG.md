@@ -4,7 +4,35 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [3.7.0] - 2026-11-11
+
+### 新增（17 方案阶段 4：快捷命令数据可迁移）
+
+- **无工作区回退明文 JSON 化**：`MementoQuickCommandsStore` → `GlobalJsonQuickCommandsStore`
+  （globalStorage 目录下明文 `quick-commands.json`，信封契约与工作区文件完全一致）——
+  对齐 15 方案收藏夹 / 书签先例，所有场景下快捷命令数据都是可手动拷贝的 JSON 文件；
+- **激活期一次性迁移**：旧 globalState（`extStarter.quickCommands`）数据自动搬到
+  globalStorage 文件（与有无工作区无关地执行、幂等、写成功才清旧键、失败保留旧数据如实上报）；
+- **「打开数据文件」入口**：快捷命令视图标题栏新增 `openQuickCommandsDataFile`
+  （命令总数 56 → 57）——一键定位存储 JSON，手动备份不用记路径；文件缺失时先写空信封
+  再打开（所见即存储格式）。
+
+### 修复与优化（17 方案阶段 4：P3 批次）
+
+- **P3-01** `createGroup` 空白名返回独立 `invalid` 状态（不再误报「数量已达上限」）；
+- **P3-02** 无活动终端的提示与粘贴降级链一致（不再提示「请重试」自相矛盾）；
+- **P3-03** 「未分组」标签收敛为 `UNGROUPED_LABEL` 单一来源（6 处字面量）；
+- **P3-04** 上限提示文案引用 `MAX_QUICK_COMMANDS` / `MAX_QUICK_COMMAND_GROUPS` 常量；
+- **P3-05** 串口服务器数据文件路径收编 `constants.STORAGE.serialServersFileName`（单一来源）；
+- **P3-06** 环境检测 taskId 收敛为 `ENVIRONMENT_TASK_ID` 常量；
+- **P3-07** taskManager 轮询改静默刷新（表头「加载中…」不再每 3 秒闪烁）；
+- **P3-09** Webview manifest 产物路径越界断言（`localResourceRoots` 之外的纵深防御）；
+- **P3-10** `postMessage` 投递失败（false / reject）留痕，不再静默丢弃；
+- **P3-11** 串口服务器树加载失败呈现错误节点（与其他 7 个树一致，不再静默空树）；
+- **P3-12** `bookmarksService.storagePathFor` 改走注入的工作区文件夹提供者（DI 统一）；
+- **P3-13** 无工作区时相对路径解析改为可读错误（收藏 / 书签，不再返回怪异 URI）。
+
+## [3.6.3] - 2026-11-11
 
 ### 重构（17 方案阶段 3：前端编排统一，行为保持）
 
@@ -23,6 +51,8 @@
 - **onSend 200ms 魔法超时改 onHistory 驱动**（12 号文档遗留项升级修复，
   快速连发时 loading 不再提前解锁）；persistTimer 卸载清理（P3-08）。
 
+## [3.6.2] - 2026-11-11
+
 ### 重构（17 方案阶段 2：存储层与共享工具统一，行为保持）
 
 - **JSON 信封存储四合一口**：新增共享 `JsonEnvelopeFileStore` + `copyCorruptBackup`
@@ -38,6 +68,8 @@
   `currentFileUri` / `resolveExplorerTargets`，favorites/bookmarks/quickCommands
   三份 requireItem 复制与 favorites/draft 的批量归一化收敛（copyCommands 因
   无编辑器回退语义保持独立实现并加注释说明）。
+
+## [3.6.1] - 2026-11-11
 
 ### 修复（17 方案阶段 1：P1 正确性，评估报告见
 

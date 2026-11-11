@@ -6,6 +6,7 @@ import {
   type EnvelopeParseResult,
 } from '../../services/stores/jsonEnvelopeStore'
 import { QueuedStoreMutations } from '../../services/stores/queuedFileStore'
+import { writeJsonAtomic } from '../../services/stores/atomicWrite'
 import { reasonOf } from '../../services/errors'
 
 /**
@@ -201,10 +202,12 @@ function normalizeCommandList(
   return items
 }
 
-/** 快捷命令数据源抽象（双实现：工作区文件 + Memento）。 */
+/** 快捷命令数据源抽象（双实现：工作区文件 + globalStorage 明文文件，17 方案阶段 4）。 */
 export interface IQuickCommandsStore {
   load(): Promise<QuickCommandsData>
   save(data: QuickCommandsData): Promise<void>
+  /** 数据文件落点（「打开数据文件」命令依赖；对齐收藏夹 / 书签口径）。 */
+  dataFileUri(): vscode.Uri
 }
 
 /**
@@ -257,29 +260,20 @@ export class JsonQuickCommandsStore implements IQuickCommandsStore {
   async save(data: QuickCommandsData): Promise<void> {
     await this.inner.save(data)
   }
-}
 
-/** 备用数据源：无工作区时经 globalState 持久化。 */
-export class MementoQuickCommandsStore implements IQuickCommandsStore {
-  constructor(
-    private readonly memento: vscode.Memento,
-    private readonly key: string,
-    private readonly options: { onWarning?: (message: string) => void } = {}
-  ) {}
-
-  async load(): Promise<QuickCommandsData> {
-    return normalizeQuickCommandData(
-      this.memento.get<unknown>(this.key, { groups: [], commands: [] }),
-      this.options.onWarning
-    )
-  }
-
-  async save(data: QuickCommandsData): Promise<void> {
-    await this.memento.update(this.key, data)
+  dataFileUri(): vscode.Uri {
+    return this.fileUri
   }
 }
 
-/** 装配：有工作区 → 工作区文件；无工作区 → globalState。 */
+/**
+ * 备用数据源：无工作区时落到 globalStorage 目录下的明文 JSON（17 方案阶段 4
+ * 对齐 15 方案收藏夹先例——所有场景都是可手动拷贝的明文 JSON；旧的 globalState
+ * 回退经激活期 migrateQuickCommandsMementoToFile 一次性迁移）。
+ */
+export class GlobalJsonQuickCommandsStore extends JsonQuickCommandsStore {}
+
+/** 装配：有工作区 → 工作区文件；无工作区 → globalStorage 明文 JSON。 */
 export function createQuickCommandsStore(
   context: vscode.ExtensionContext,
   options: { onWarning?: (message: string) => void } = {}
@@ -291,7 +285,56 @@ export function createQuickCommandsStore(
       options
     )
   }
-  return new MementoQuickCommandsStore(context.globalState, QUICK_COMMANDS_MEMENTO_KEY, options)
+  return new GlobalJsonQuickCommandsStore(
+    vscode.Uri.joinPath(context.globalStorageUri, STORAGE.quickCommandsGlobalFileName),
+    options
+  )
+}
+
+/**
+ * 激活期一次性迁移（17 方案阶段 4，对齐 migrateFavoritesMementoToFile 口径）：
+ * 把旧 globalState（`extStarter.quickCommands`）数据搬到 globalStorage 明文 JSON——
+ * 与有无工作区无关地无条件执行，消除孤儿窗口；幂等（旧键清除后永不再触发）。
+ *
+ * 分支：① 无数据 → 静默跳过；② 全局文件已存在 → 旧键直接作废清除（不合并）；
+ * ③ 文件不存在 → 归一化写入信封，写成功才清旧键，onMigrated 回调一次；
+ * ④ 写失败 → 错误向上抛，旧键保留。
+ */
+export async function migrateQuickCommandsMementoToFile(
+  context: vscode.ExtensionContext,
+  options: {
+    onWarning?: (message: string) => void
+    onMigrated?: (fileUri: vscode.Uri) => void
+  } = {}
+): Promise<boolean> {
+  const legacy = context.globalState.get<unknown>(QUICK_COMMANDS_MEMENTO_KEY)
+  if (legacy === undefined) {
+    return false
+  }
+  const fileUri = vscode.Uri.joinPath(context.globalStorageUri, STORAGE.quickCommandsGlobalFileName)
+  let exists = true
+  try {
+    await vscode.workspace.fs.stat(fileUri)
+  } catch (err) {
+    if (err instanceof vscode.FileSystemError && err.code === 'FileNotFound') {
+      exists = false
+    } else {
+      throw err
+    }
+  }
+  if (exists) {
+    await context.globalState.update(QUICK_COMMANDS_MEMENTO_KEY, undefined)
+    return false
+  }
+  const data = normalizeQuickCommandData(legacy, options.onWarning)
+  await writeJsonAtomic(fileUri, {
+    schemaVersion: QUICK_COMMANDS_SCHEMA_VERSION,
+    groups: data.groups,
+    commands: data.commands,
+  })
+  await context.globalState.update(QUICK_COMMANDS_MEMENTO_KEY, undefined)
+  options.onMigrated?.(fileUri)
+  return true
 }
 
 /** 添加结果（命令壳用于提示与分支渲染）。 */
@@ -304,17 +347,21 @@ export type AddCommandStatus =
 /** 修改命令文本结果（'duplicate' = 与其他条目命令文本相同）。 */
 export type UpdateTextStatus = 'updated' | 'duplicate' | 'notfound' | 'empty'
 
-/** 新建分组结果（duplicate 返回既有组，壳层可直接复用）。 */
+/** 新建分组结果（duplicate 返回既有组，壳层可直接复用；invalid = 空白名，P3-01）。 */
 export type GroupOp =
   | { status: 'created'; group: QuickCommandGroup }
   | { status: 'duplicate'; existing: QuickCommandGroup }
   | { status: 'cap' }
+  | { status: 'invalid' }
 
 /** 分组重命名结果。 */
 export type RenameGroupStatus = 'renamed' | 'duplicate' | 'notfound'
 
 /** 专用复用终端名（16 方案 §5：避免每次执行刷屏新建）。 */
 export const QUICK_COMMAND_TERMINAL_NAME = 'QuickCommand'
+
+/** 未分组节点的展示标签（groupId=null；此前 6 处字面量，P3-03 收敛）。 */
+export const UNGROUPED_LABEL = '未分组'
 
 /** 快捷命令业务服务：命令与树视图的唯一数据入口。 */
 export class QuickCommandsService implements vscode.Disposable {
@@ -384,6 +431,24 @@ export class QuickCommandsService implements vscode.Disposable {
 
   listCommands(): QuickCommandItem[] {
     return [...this.commands]
+  }
+
+  /** 数据文件落点（透传当前 store；「打开数据文件」命令依赖）。 */
+  dataFileUri(): vscode.Uri {
+    return this.store.dataFileUri()
+  }
+
+  /** 确保数据文件存在：缺失时写空信封（「打开数据文件」所见即存储格式）。 */
+  async ensureDataFile(): Promise<void> {
+    try {
+      await vscode.workspace.fs.stat(this.store.dataFileUri())
+    } catch (err) {
+      if (err instanceof vscode.FileSystemError && err.code === 'FileNotFound') {
+        await this.store.save({ groups: [], commands: [] })
+        return
+      }
+      throw err
+    }
   }
 
   listGroups(): QuickCommandGroup[] {
@@ -506,7 +571,7 @@ export class QuickCommandsService implements vscode.Disposable {
     return this.mutations.run(async () => {
       const trimmed = name.trim()
       if (trimmed.length === 0) {
-        return { status: 'cap' } // 调用方（壳层）保证非空；此分支仅防御
+        return { status: 'invalid' } // 空白名 ≠ 数量上限（P3-01 状态语义纠正）
       }
       const existing = this.groups.find((group) => group.name === trimmed)
       if (existing) {

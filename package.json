@@ -2,7 +2,7 @@
   "name": "hello-vscode-plugin",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "3.6.3",
+  "version": "3.7.0",
   "publisher": "your-publisher",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -417,6 +417,12 @@
         "title": "%command.removeQuickCommandGroup.title%",
         "category": "%command.category%",
         "icon": "$(close)"
+      },
+      {
+        "command": "extStarter.openQuickCommandsDataFile",
+        "title": "%command.openQuickCommandsDataFile.title%",
+        "category": "%command.category%",
+        "icon": "$(json)"
       }
     ],
     "menus": {
@@ -510,6 +516,11 @@
           "command": "extStarter.createQuickCommandGroup",
           "when": "view == extStarter.quickCommandsView",
           "group": "navigation@3"
+        },
+        {
+          "command": "extStarter.openQuickCommandsDataFile",
+          "when": "view == extStarter.quickCommandsView",
+          "group": "navigation@4"
         }
       ],
       "view/item/context": [

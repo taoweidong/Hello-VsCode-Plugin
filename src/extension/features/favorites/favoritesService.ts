@@ -402,7 +402,11 @@ export class FavoritesService implements vscode.Disposable {
       }
     }
     const fallback = folders[0] ?? this.getWorkspaceFolder()
-    return vscode.Uri.joinPath(fallback?.uri ?? vscode.Uri.file(path.sep), ...item.path.split('/'))
+    if (!fallback) {
+      // P3-13：无工作区时相对路径无法解析——给出可读错误（不再返回怪异 URI）
+      throw new Error(`无法解析收藏路径：未打开工作区且路径不是绝对路径（${item.path}）。`)
+    }
+    return vscode.Uri.joinPath(fallback.uri, ...item.path.split('/'))
   }
 
   /** 打开收藏项：文件 → 编辑器；文件夹 → 资源管理器 reveal。返回目标 URI。 */

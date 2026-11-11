@@ -83,6 +83,11 @@ describe('resolveEntryAssets', () => {
     ])
   })
 
+  it('manifest 产物路径越界（..）→ 抛清晰错误（P3-09 纵深防御）', () => {
+    const manifest = { gallery: { file: '../evil.js' } }
+    expect(() => resolveEntryAssets(webview, manifest, 'gallery', webviewRoot)).toThrow('越界')
+  })
+
   it('按入口源路径键解析（Vite 常见格式：键 = src 相对路径），并递归收集共享 chunk 的 css', () => {
     const manifest = {
       'src/webview/apps/serialConsole/main.ts': {

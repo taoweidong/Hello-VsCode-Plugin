@@ -1,12 +1,16 @@
 import * as vscode from 'vscode'
-import type {
-  QuickCommandGroup,
-  QuickCommandItem,
-  QuickCommandsService,
+import {
+  MAX_QUICK_COMMAND_GROUPS,
+  MAX_QUICK_COMMANDS,
+  UNGROUPED_LABEL,
+  type QuickCommandGroup,
+  type QuickCommandItem,
+  type QuickCommandsService,
 } from '../features/quickCommands/quickCommandsService'
 import { readTerminalSelectionViaClipboard } from '../features/quickCommands/terminalSelection'
 import { COMMAND } from '../constants'
 import { requireTreeItem, type CommandRegistrar, showError } from './shared'
+import { reasonOf } from '../services/errors'
 
 /**
  * 快捷命令场景命令分组（v3.5，16 方案）——12 条命令的薄壳，全部委托 QuickCommandsService。
@@ -62,8 +66,8 @@ async function pickGroup(
       items.push({ label: group.name, groupId: group.id })
     }
   }
-  items.push({ label: '未分组', kind: vscode.QuickPickItemKind.Separator })
-  items.push({ label: '未分组', groupId: null })
+  items.push({ label: UNGROUPED_LABEL, kind: vscode.QuickPickItemKind.Separator })
+  items.push({ label: UNGROUPED_LABEL, groupId: null })
   if (options.allowCreate) {
     items.push({ label: '$(add) 新建分组…', create: true })
   }
@@ -85,7 +89,10 @@ async function pickGroup(
       void vscode.window.showInformationMessage(`分组「${result.existing.name}」已存在，直接使用。`)
       return { groupId: result.existing.id }
     }
-    void vscode.window.showWarningMessage('分组数量已达上限（50 个）。')
+    if (result.status === 'invalid') {
+      return undefined // 空白名（P3-01：独立状态，不再误报数量上限）
+    }
+    void vscode.window.showWarningMessage(`分组数量已达上限（${MAX_QUICK_COMMAND_GROUPS} 个）。`)
     return undefined
   }
   return { groupId: pick.groupId ?? null }
@@ -113,7 +120,7 @@ async function promptAndAdd(quickCommands: QuickCommandsService, command: string
         `已存在相同命令：「${result.existing.name}」（不重复收藏）。`
       )
     } else if (result.status === 'cap') {
-      void vscode.window.showWarningMessage('快捷命令数量已达上限（200 条）。')
+      void vscode.window.showWarningMessage(`快捷命令数量已达上限（${MAX_QUICK_COMMANDS} 条）。`)
     } else {
       void vscode.window.showWarningMessage('命令文本不能为空。')
     }
@@ -140,8 +147,8 @@ function buildRunItems(quickCommands: QuickCommandsService): RunPickItem[] {
   }
   const ungrouped = commands.filter((entry) => entry.groupId === null)
   if (ungrouped.length > 0) {
-    items.push({ label: '未分组', kind: vscode.QuickPickItemKind.Separator })
-    items.push(...ungrouped.map((item) => runItemOf(item, '未分组')))
+    items.push({ label: UNGROUPED_LABEL, kind: vscode.QuickPickItemKind.Separator })
+    items.push(...ungrouped.map((item) => runItemOf(item, UNGROUPED_LABEL)))
   }
   return items
 }
@@ -178,9 +185,8 @@ export function registerQuickCommandsCommands(
 
   register(COMMAND.captureTerminalSelection, async () => {
     if (!vscode.window.activeTerminal) {
-      void vscode.window.showInformationMessage(
-        '没有活动的终端：请打开终端选中命令后重试，或直接粘贴命令。'
-      )
+      // 与降级链一致（下一步就是粘贴输入框），不再提示「请重试」自相矛盾（P3-02）
+      void vscode.window.showInformationMessage('没有活动的终端：可直接粘贴命令进行收藏。')
     }
     // 降级链（16 方案 §4.2 / 评审修正）：无终端或桥接读不到选区 → 统一走粘贴输入框
     let commandText: string | undefined
@@ -336,8 +342,12 @@ export function registerQuickCommandsCommands(
         void vscode.window.showInformationMessage(`已创建分组「${result.group.name}」。`)
       } else if (result.status === 'duplicate') {
         void vscode.window.showInformationMessage(`分组「${result.existing.name}」已存在。`)
+      } else if (result.status === 'invalid') {
+        void vscode.window.showInformationMessage('分组名不能为空。')
       } else {
-        void vscode.window.showWarningMessage('分组数量已达上限（50 个）。')
+        void vscode.window.showWarningMessage(
+          `分组数量已达上限（${MAX_QUICK_COMMAND_GROUPS} 个）。`
+        )
       }
     } catch (err) {
       showError(err)
@@ -399,6 +409,19 @@ export function registerQuickCommandsCommands(
       }
     } catch (err) {
       showError(err)
+    }
+  })
+
+  // 17 方案阶段 4（对齐 15 方案）：打开数据文件——文件缺失先写空信封（所见即存储
+  // 格式），手动备份/迁移直接拷该文件
+  register(COMMAND.openQuickCommandsDataFile, async () => {
+    try {
+      await quickCommands.ensureDataFile()
+      await vscode.commands.executeCommand('vscode.open', quickCommands.dataFileUri())
+    } catch (err) {
+      void vscode.window.showErrorMessage(
+        err instanceof Error ? reasonOf(err) : `操作失败：${reasonOf(err)}`
+      )
     }
   })
 }

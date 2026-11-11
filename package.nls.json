@@ -70,6 +70,7 @@
   "command.removeQuickCommand.title": "Remove Quick Command",
   "command.createQuickCommandGroup.title": "Create Quick Command Group",
   "command.renameQuickCommandGroup.title": "Rename Quick Command Group",
+  "command.openQuickCommandsDataFile.title": "Open Quick Commands Data File",
   "command.removeQuickCommandGroup.title": "Remove Quick Command Group",
   "configuration.taskGroupWithSeparator.description": "Group workspace tasks into virtual folders by splitting task labels on the separator.",
   "configuration.taskGroupSeparator.description": "Separator used to split task labels into tree folders (default \"-\"; multi-character separators such as \"--\" are supported).",

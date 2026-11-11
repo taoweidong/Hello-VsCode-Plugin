@@ -215,6 +215,10 @@ class FakeStore implements IQuickCommandsStore {
   async save(data: QuickCommandsData): Promise<void> {
     this.data = JSON.parse(JSON.stringify(data)) as QuickCommandsData
   }
+
+  dataFileUri(): vscode.Uri {
+    return vscode.Uri.file('/memory/quick-commands.json')
+  }
 }
 
 /** 种子宽松形态：只填用例关心的字段，其余由辅助函数补默认值。 */
@@ -274,6 +278,9 @@ describe('QuickCommandsService（业务服务）', () => {
         throw new Error('磁盘炸了')
       }
       async save(): Promise<void> {}
+      dataFileUri(): vscode.Uri {
+        return vscode.Uri.file('/memory/quick-commands.json')
+      }
     })()
     const service = new QuickCommandsService(failing)
     await service.load()
@@ -405,10 +412,20 @@ describe('QuickCommandsService（业务服务）', () => {
           return { groups: manyGroups, commands: [] }
         }
         async save(): Promise<void> {}
+        dataFileUri(): vscode.Uri {
+          return vscode.Uri.file('/memory/quick-commands.json')
+        }
       })()
     )
     await full.load()
     expect((await full.createGroup('新组')).status).toBe('cap')
+  })
+
+  it('createGroup：空白名返回 invalid（P3-01 状态语义，不再误报 cap）', async () => {
+    const { service } = makeService()
+    await service.load()
+    expect(await service.createGroup('   ')).toEqual({ status: 'invalid' })
+    expect(service.listGroups()).toEqual([])
   })
 
   it('renameGroup：renamed / duplicate / notfound', async () => {

@@ -25,6 +25,10 @@ class FakeStore implements IQuickCommandsStore {
   async save(data: QuickCommandsData): Promise<void> {
     this.data = JSON.parse(JSON.stringify(data)) as QuickCommandsData
   }
+
+  dataFileUri(): vscode.Uri {
+    return vscode.Uri.file('/memory/quick-commands.json')
+  }
 }
 
 /** 种子宽松形态：只填用例关心的字段，其余由辅助函数补默认值。 */
@@ -375,5 +379,21 @@ describe('快捷命令命令壳（v3.5）', () => {
       }
       expect(recordedOf('showInformationMessage').length).toBeGreaterThanOrEqual(8)
     })
+  })
+})
+
+describe('openQuickCommandsDataFile（17 方案阶段 4）', () => {
+  it('确保数据文件存在后用编辑器打开（注册 + 行为）', async () => {
+    const { service, registered, run } = makeHost()
+    await service.load()
+    expect(registered.has('extStarter.openQuickCommandsDataFile')).toBe(true)
+    void vscode.commands.registerCommand('vscode.open', () => undefined)
+    await run('extStarter.openQuickCommandsDataFile')
+    const opens = recordedOf('executeCommand').filter(
+      (entry) => (entry.args[0] as { command?: string }).command === 'vscode.open'
+    )
+    expect(opens).toHaveLength(1)
+    const openedUri = (opens[0]!.args[0] as { args: unknown[] }).args[0] as vscode.Uri
+    expect(openedUri.fsPath).toBe(vscode.Uri.file('/memory/quick-commands.json').fsPath)
   })
 })

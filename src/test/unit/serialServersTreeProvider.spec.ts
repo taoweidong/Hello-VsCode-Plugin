@@ -38,15 +38,21 @@ describe('SerialServersTreeProvider', () => {
   it('getChildren 从 store 加载并包装节点', async () => {
     const { provider } = makeProvider([makeServer(), makeServer({ id: 'srv-2' })])
     const children = await provider.getChildren()
-    expect(children.map((node) => node.server.id)).toEqual(['srv-1', 'srv-2'])
+    expect(children.map((node) => node.server?.id)).toEqual(['srv-1', 'srv-2'])
   })
 
-  it('加载失败静默为空列表（警告已由 store 上报）', async () => {
+  it('加载失败 → 错误节点（P3-11：不再静默空树，警告仍由 store 上报）', async () => {
     const provider = new SerialServersTreeProvider({
       loadServers: () => Promise.reject(new Error('io')),
       getStatus: () => ({ serverId: undefined, state: 'disconnected' }),
     })
-    await expect(provider.getChildren()).resolves.toEqual([])
+    const nodes = await provider.getChildren()
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]?.server).toBeUndefined()
+    expect(nodes[0]?.errorMessage).toContain('服务器列表加载失败')
+    const item = provider.getTreeItem(nodes[0]!)
+    expect(item.contextValue).toBe('serialServersError')
+    expect(item.label).toContain('服务器列表加载失败')
   })
 
   it('未连接条目：描述为 串口·波特率，contextValue=serialServer，单击命令为连接', async () => {

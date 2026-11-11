@@ -61,7 +61,7 @@ export function registerSerialConsoleCommands(
 
   // 「编辑」与「连接」当前是同一动作（打开面板并预选服务器，P3-C3 收敛为同一
   // handler）：将来语义分叉时在此拆开，避免只改一处
-  const openPanelWithNodeId = guard((node?: SerialServerNode) => openPanel(node?.server.id))
+  const openPanelWithNodeId = guard((node?: SerialServerNode) => openPanel(node?.server?.id))
 
   register(COMMAND.editSerialServer, openPanelWithNodeId)
 

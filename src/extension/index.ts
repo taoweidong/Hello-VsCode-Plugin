@@ -17,6 +17,7 @@ import {
   migrateFavoritesMementoToFile,
 } from './features/favorites/favoritesService'
 import {
+  migrateQuickCommandsMementoToFile,
   createQuickCommandsStore,
   QuickCommandsService,
 } from './features/quickCommands/quickCommandsService'
@@ -29,7 +30,7 @@ import { SerialConsolePanel } from './features/serialConsole/serialConsolePanel'
 import { TaskExplorerController } from './features/taskExplorer/taskExplorerController'
 import { EnvironmentTreeProvider } from './providers/environmentTreeProvider'
 import { migrateLegacyKeys } from './services/legacyMigration'
-import { recheckProbeByLabel } from './tasks/environmentTask'
+import { ENVIRONMENT_TASK_ID, recheckProbeByLabel } from './tasks/environmentTask'
 import { TaskRunner } from './tasks/taskRunner'
 import { TASKS } from './tasks/taskRegistry'
 import { reasonOf } from './services/errors'
@@ -80,6 +81,22 @@ export function activate(context: vscode.ExtensionContext): void {
     void vscode.window.showErrorMessage(`收藏数据迁移失败（旧数据已保留）：${message}`)
   })
 
+  // 17 方案阶段 4：无工作区快捷命令数据从 globalState 一次性迁移到 globalStorage
+  // 明文 JSON（对齐收藏夹 15 方案口径，幂等；写成功才清旧键，失败保留旧数据）
+  void migrateQuickCommandsMementoToFile(context, {
+    onWarning: (message) => outputChannel.appendLine(`[快捷命令] ${message}`),
+    onMigrated: (fileUri) => {
+      outputChannel.appendLine(`[快捷命令] 无工作区数据已迁移到：${fileUri.fsPath}`)
+      void vscode.window.showInformationMessage(
+        `无工作区快捷命令数据已迁移到文件：${fileUri.fsPath}`
+      )
+    },
+  }).catch((err: unknown) => {
+    const message = reasonOf(err)
+    outputChannel.appendLine(`[快捷命令] 旧数据迁移失败（旧数据保留在 globalState）：${message}`)
+    void vscode.window.showErrorMessage(`快捷命令数据迁移失败（旧数据已保留）：${message}`)
+  })
+
   // ---------- 启动任务（环境信息） ----------
   const taskRunner = new TaskRunner(TASKS, outputChannel)
   context.subscriptions.push(taskRunner)
@@ -98,7 +115,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const recheckEnvironmentItem = async (label: string): Promise<void> => {
     const item = await recheckProbeByLabel(label)
     if (item) {
-      taskRunner.updateItem('environment', item)
+      taskRunner.updateItem(ENVIRONMENT_TASK_ID, item)
     }
   }
 
@@ -107,7 +124,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const initService = new InitService(
     createInitSteps({
       getEnvironmentSnapshot: () =>
-        taskRunner.lastResults.find((result) => result.taskId === 'environment'),
+        taskRunner.lastResults.find((result) => result.taskId === ENVIRONMENT_TASK_ID),
     }),
     outputChannel
   )

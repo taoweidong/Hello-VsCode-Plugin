@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import { COMMAND } from '../../constants'
+import { reasonOf } from '../../services/errors'
 import type { SerialServer } from './models'
 import type { LinkStatusSnapshot } from './serialConsolePanel'
 
@@ -28,6 +29,17 @@ export class SerialServersTreeProvider
   }
 
   getTreeItem(node: SerialServerNode): vscode.TreeItem {
+    if (!node.server) {
+      // 加载失败错误节点（P3-11：与其他树一致，不再静默空树）
+      const item = new vscode.TreeItem(
+        node.errorMessage ?? '服务器列表加载失败',
+        vscode.TreeItemCollapsibleState.None
+      )
+      item.iconPath = new vscode.ThemeIcon('error')
+      item.contextValue = 'serialServersError'
+      item.tooltip = node.errorMessage
+      return item
+    }
     const { server } = node
     const status = this.deps.getStatus()
     const isActive = status.serverId === server.id
@@ -53,8 +65,9 @@ export class SerialServersTreeProvider
     try {
       const servers = await this.deps.loadServers()
       return servers.map((server) => ({ server }))
-    } catch {
-      return [] // 加载失败静默为空列表：警告已由 store 的 onWarning 上报输出通道
+    } catch (err) {
+      // 加载失败呈现错误节点（P3-11）；详细原因仍由 store 的 onWarning 上报输出通道
+      return [{ errorMessage: `服务器列表加载失败：${reasonOf(err)}` }]
     }
   }
 
@@ -93,5 +106,8 @@ export class SerialServersTreeProvider
 }
 
 export interface SerialServerNode {
-  server: SerialServer
+  /** 服务器节点（错误节点时为 undefined） */
+  server?: SerialServer
+  /** 加载失败错误节点的文案（P3-11） */
+  errorMessage?: string
 }

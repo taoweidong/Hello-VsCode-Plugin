@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import { STORAGE } from '../../constants'
+// SERVERS_FILE_RELATIVE_PATH 已收编 constants.STORAGE.serialServersFileName（P3-05）
 import {
   JsonEnvelopeFileStore,
   type EnvelopeParseResult,
@@ -19,8 +20,8 @@ export interface IServerStore {
 /** 当前存储格式版本（信封 {schemaVersion, servers}）。 */
 export const SERVERS_SCHEMA_VERSION = 1
 
-/** 服务器数据文件（相对工作区根，固定路径；条目数据文件走 storagePath 配置，两者互不影响）。 */
-export const SERVERS_FILE_RELATIVE_PATH = '.vscode/serial-servers.json'
+/** 服务器数据文件（相对工作区根，固定路径；单一来源 constants.STORAGE，P3-05；导出别名供测试）。 */
+export const SERVERS_FILE_RELATIVE_PATH = STORAGE.serialServersFileName
 
 export interface ServerStoreOptions {
   /** 数据修复 / 损坏警告上报（extension.ts 接 outputChannel）。 */
@@ -125,7 +126,7 @@ export function createServerStore(
   const root = vscode.workspace.workspaceFolders?.[0]?.uri
   if (root) {
     return new JsonServerStore(
-      vscode.Uri.joinPath(root, ...SERVERS_FILE_RELATIVE_PATH.split('/')),
+      vscode.Uri.joinPath(root, ...STORAGE.serialServersFileName.split('/')),
       options
     )
   }

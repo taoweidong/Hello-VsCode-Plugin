@@ -26,6 +26,10 @@ class FakeStore implements IQuickCommandsStore {
   async save(data: QuickCommandsData): Promise<void> {
     this.data = JSON.parse(JSON.stringify(data)) as QuickCommandsData
   }
+
+  dataFileUri(): vscode.Uri {
+    return vscode.Uri.file('/memory/quick-commands.json')
+  }
 }
 
 /** 种子宽松形态：只填用例关心的字段，其余由辅助函数补默认值。 */
@@ -89,6 +93,9 @@ describe('QuickCommandsTreeProvider（两级树）', () => {
         throw new Error('读不出来')
       }
       async save(): Promise<void> {}
+      dataFileUri(): vscode.Uri {
+        return vscode.Uri.file('/memory/quick-commands.json')
+      }
     })()
     const service = new QuickCommandsService(failing)
     const provider = new QuickCommandsTreeProvider(service)

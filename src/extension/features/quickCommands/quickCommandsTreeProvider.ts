@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import { COMMAND, VIEW } from '../../constants'
+import { UNGROUPED_LABEL } from './quickCommandsService'
 import type {
   QuickCommandGroup,
   QuickCommandItem,
@@ -48,7 +49,7 @@ export class QuickCommandsTreeProvider
       return info
     }
     if (node.kind === 'group') {
-      const label = node.group ? node.group.name : '未分组'
+      const label = node.group ? node.group.name : UNGROUPED_LABEL
       const treeItem = new vscode.TreeItem(
         `${label} (${node.children.length})`,
         vscode.TreeItemCollapsibleState.Collapsed
@@ -72,7 +73,7 @@ export class QuickCommandsTreeProvider
       [
         `**${item.name}**`,
         `- 命令：\`${item.command.replace(/`/g, '\\`')}\``,
-        `- 分组：${node.group ? node.group.name : '未分组'}`,
+        `- 分组：${node.group ? node.group.name : UNGROUPED_LABEL}`,
         `- 已执行：${item.useCount ?? 0} 次${item.lastUsedAt ? `（最近 ${new Date(item.lastUsedAt).toLocaleString()}）` : ''}`,
         `- 收藏于：${new Date(item.addedAt).toLocaleString()}`,
       ].join('\n')

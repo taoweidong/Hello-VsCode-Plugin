@@ -271,6 +271,20 @@ describe('FavoritesService（业务服务）', () => {
     )
   })
 
+  it('P3-13：无工作区时相对路径无法解析 → 可读错误（不再返回怪异 URI）', async () => {
+    const service = makeService()
+    __stubs.workspaceFolders = undefined
+    await expect(
+      service.resolveFavoriteUri({
+        id: 'x',
+        name: 'x',
+        path: 'src/a.ts',
+        isFolder: false,
+        addedAt: 'x',
+      })
+    ).rejects.toThrow('未打开工作区且路径不是绝对路径')
+  })
+
   it('⑯ 超上限 200：新收藏插头部，超出丢最旧（服务层，13 方案 §7）', async () => {
     // 内存 store：上限裁剪是纯服务逻辑，200+ 次落盘徒增 Windows 清理竞态（ENOTEMPTY）
     let saved: FavoriteItem[] = []

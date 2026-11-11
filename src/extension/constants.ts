@@ -211,6 +211,11 @@ export const COMMAND = {
   renameQuickCommandGroup: 'extStarter.renameQuickCommandGroup',
   /** 删除命令分组（分组节点右键；模态确认，组内命令回落未分组） */
   removeQuickCommandGroup: 'extStarter.removeQuickCommandGroup',
+  /**
+   * 打开快捷命令数据文件（视图标题栏 + 命令面板；17 方案阶段 4 对齐 15 方案：
+   * 手动备份不用记路径）
+   */
+  openQuickCommandsDataFile: 'extStarter.openQuickCommandsDataFile',
 } as const
 
 /**
@@ -290,6 +295,17 @@ export const STORAGE = {
    * 已同步进 .gitignore。
    */
   quickCommandsFileName: '.vscode/quick-commands.json',
-  /** 快捷命令：未打开工作区时，globalState 的存储键 */
+  /**
+   * 快捷命令：未打开工作区时，globalStorage 目录下的明文 JSON 文件名（17 方案
+   * 阶段 4 对齐 15 方案口径——手动拷贝即备份迁移）。
+   */
+  quickCommandsGlobalFileName: 'quick-commands.json',
+  /** 快捷命令旧 globalState 存储键：仅供激活期一次性迁移读取旧数据（迁移后清除） */
   quickCommandsMementoKey: 'extStarter.quickCommands',
+  /**
+   * 串口服务器数据文件（相对工作区根；自 serverStore.SERVERS_FILE_RELATIVE_PATH
+   * 收编单一来源，17 方案阶段 4 / P3-05）。
+   * 已同步进 .gitignore。
+   */
+  serialServersFileName: '.vscode/serial-servers.json',
 } as const

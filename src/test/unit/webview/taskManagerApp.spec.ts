@@ -466,6 +466,8 @@ describe('taskManager 页面：轮询', () => {
     expect(postedOf('taskListRequest')).toHaveLength(2)
     await vi.advanceTimersByTimeAsync(3_000)
     expect(postedOf('taskListRequest')).toHaveLength(3)
+    // P3-07：轮询为静默刷新——表头「加载中…」不随轮询闪烁
+    expect(w.find('.task-table-loading').exists()).toBe(false)
 
     // 全部落定：停止刷新
     hostMessage({

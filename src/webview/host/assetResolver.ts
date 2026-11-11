@@ -132,9 +132,27 @@ export function resolveEntryAssets(
       `Webview manifest 中找不到入口「${entryId}」的产物。manifest 可用键：${available}`
     )
   }
-  const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(webviewRoot, chunk.file))
+  const scriptUri = webview.asWebviewUri(resolveInsideRoot(webviewRoot, chunk.file))
   const styleUris = collectCssFiles(manifest, chunk, new Set([entryId])).map((cssFile) =>
-    webview.asWebviewUri(vscode.Uri.joinPath(webviewRoot, cssFile))
+    webview.asWebviewUri(resolveInsideRoot(webviewRoot, cssFile))
   )
   return { scriptUri, styleUris }
+}
+
+/**
+ * 产物路径越界断言（17 方案阶段 4，P3-09 纵深防御）：manifest 的 file 字段
+ * 不应包含 `..` 等越界段；joinPath 结果必须仍在 webviewRoot 内
+ * （localResourceRoots 已兜底，此处防御 manifest 被篡改的纵深）。
+ */
+function resolveInsideRoot(webviewRoot: vscode.Uri, relativeFile: string): vscode.Uri {
+  const resolved = vscode.Uri.joinPath(webviewRoot, relativeFile)
+  const root = webviewRoot.fsPath.replace(/[\\/]+$/, '')
+  const inside =
+    resolved.fsPath === root ||
+    resolved.fsPath.startsWith(`${root}\\`) ||
+    resolved.fsPath.startsWith(`${root}/`)
+  if (!inside) {
+    throw new Error(`Webview manifest 产物路径越界：${relativeFile}`)
+  }
+  return resolved
 }

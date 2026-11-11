@@ -407,3 +407,42 @@ describe('dispose 幂等', () => {
     again.dispose()
   })
 })
+
+describe('post 投递失败留痕（17 方案阶段 4，P3-10）', () => {
+  it('postMessage 返回 false → console.warn 留痕；面板释放后 post 静默', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      const { deps, panels } = makeDeps()
+      const controller = WebviewController.createOrShow('gallery', context, deps)
+      panels[0]!.webview.postMessage = () => Promise.resolve(false)
+      controller.post({ type: 'submitAck', ok: true })
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('消息未送达'))
+
+      warnSpy.mockClear()
+      controller.dispose()
+      controller.post({ type: 'submitAck', ok: true })
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(warnSpy).not.toHaveBeenCalled()
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
+  it('postMessage reject → console.warn 留痕（不产生未处理拒绝）', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      const { deps, panels } = makeDeps()
+      const controller = WebviewController.createOrShow('gallery', context, deps)
+      panels[0]!.webview.postMessage = () => Promise.reject(new Error('panel gone'))
+      controller.post({ type: 'submitAck', ok: true })
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('消息投递失败'))
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+})
