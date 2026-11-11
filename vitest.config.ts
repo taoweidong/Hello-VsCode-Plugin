@@ -25,7 +25,7 @@ export default defineConfig({
   test: {
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html'],
+      reporter: ['text', 'html', 'json-summary'], // json-summary：机器可读，供趋势比对与阈值校准
       // R-E-6：此前只有 4 个 glob——commands / providers / features / webview 下约 200 个
       // 用例完全不计入任何阈值，「整体 93%」名不副实。纳入「无需宿主即可测」的纯逻辑：
       // 协议收窄层、表单 schema 派生、字段适配、稳定序列化、命令注册工具、HTML 外壳。
@@ -74,6 +74,9 @@ export default defineConfig({
           branches: 85,
         },
         'src/webview/host/**': { lines: 88, functions: 83, statements: 88, branches: 77 },
+        // 17 方案阶段 5（v5.1.1）：两大树+存储域单独设线防回退（阈值 = 实测减约 1pt）
+        'src/extension/features/quickCommands/**': { lines: 87.5, branches: 85.5 },
+        'src/extension/features/favorites/**': { lines: 78, branches: 69 },
       },
     },
     projects: [

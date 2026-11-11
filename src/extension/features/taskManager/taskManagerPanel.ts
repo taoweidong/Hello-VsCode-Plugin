@@ -198,10 +198,12 @@ export function createTaskManagerDeps(services: TaskManagerServices): WebviewCon
 /** 面板单例包装（模式对齐 WebviewController 的页面面板：单例 + 序列化恢复）。 */
 export class TaskManagerPanel {
   private static context: vscode.ExtensionContext | undefined
+  private static outputChannel: vscode.OutputChannel | undefined
 
-  /** extension.ts 组装时注入扩展上下文。 */
-  static configure(context: vscode.ExtensionContext): void {
+  /** extension.ts 组装时注入扩展上下文与诊断输出通道（P3-17：诊断不再走 console）。 */
+  static configure(context: vscode.ExtensionContext, outputChannel?: vscode.OutputChannel): void {
     TaskManagerPanel.context = context
+    TaskManagerPanel.outputChannel = outputChannel
   }
 
   /**
@@ -214,7 +216,12 @@ export class TaskManagerPanel {
   ): void {
     const context = TaskManagerPanel.context
     if (!context) {
-      console.error('[taskManager] createOrShow 早退：扩展上下文未注入（configure 未调用）')
+      const message = '[taskManager] createOrShow 早退：扩展上下文未注入（configure 未调用）'
+      if (TaskManagerPanel.outputChannel) {
+        TaskManagerPanel.outputChannel.appendLine(message)
+      } else {
+        console.warn(message)
+      }
       void vscode.window.showErrorMessage(
         '任务管理面板未完成装配（缺少扩展上下文），请重新加载窗口。'
       )

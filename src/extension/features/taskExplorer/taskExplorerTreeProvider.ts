@@ -23,6 +23,16 @@ import type { TaskUsageStore } from './taskUsageStore'
 
 export type TaskExplorerGroup = 'recent' | 'favorites' | 'tasks'
 
+/** 本树消费的配置键（变更即重建分组/刷新展示；P3-16 显式枚举单一来源）。 */
+const TASK_TREE_CONFIG_KEYS = [
+  CONFIG.taskGroupWithSeparator,
+  CONFIG.taskGroupSeparator,
+  CONFIG.taskGroupMaxLevel,
+  CONFIG.taskGroupStripTaskLabel,
+  CONFIG.taskNumLastTasks,
+  CONFIG.taskExpanded,
+] as const
+
 export type TaskExplorerNode =
   | { kind: 'group'; group: TaskExplorerGroup; children: TaskExplorerNode[]; count: number }
   | { kind: 'folder'; folder: vscode.WorkspaceFolder; entries: WorkspaceTaskEntry[] }
@@ -338,7 +348,13 @@ export class TaskExplorerTreeProvider
       // 树形分组/展示设置即时生效：虚拟文件夹 children 建树时缓存，必须整体
       // 重建（与 watcher 同路径走单飞 refresh；配置变更是低频操作）
       vscode.workspace.onDidChangeConfiguration((event) => {
-        if (event.affectsConfiguration(`${CONFIG.section}.task`)) {
+        // P3-16：显式枚举本树消费的配置键——不再依赖 `extStarter.task` 前缀
+        // 宽松匹配（该前缀并非真实配置键，语义脆弱）
+        if (
+          TASK_TREE_CONFIG_KEYS.some((key) =>
+            event.affectsConfiguration(`${CONFIG.section}.${key}`)
+          )
+        ) {
           void this.refresh()
         }
       }),

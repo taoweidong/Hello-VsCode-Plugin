@@ -396,3 +396,22 @@ describe('createTaskManagerDeps', () => {
     expect(deps.buildInit?.({ persistedState: undefined })).toMatchObject({ value: {} })
   })
 })
+
+describe('configure 输出通道（v5.1.1 P3-17）', () => {
+  it('早退诊断走输出通道（不再依赖 console.error）', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const output = { appendLine: vi.fn() } as unknown as vscode.OutputChannel
+    try {
+      TaskManagerPanel.configure(undefined as unknown as vscode.ExtensionContext, output)
+      const { services } = makeServices()
+      TaskManagerPanel.createOrShow(services)
+      expect(output.appendLine).toHaveBeenCalledWith(expect.stringContaining('createOrShow 早退'))
+      expect(errorSpy).not.toHaveBeenCalled()
+      expect(warnSpy).not.toHaveBeenCalled()
+    } finally {
+      errorSpy.mockRestore()
+      warnSpy.mockRestore()
+    }
+  })
+})

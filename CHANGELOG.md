@@ -4,6 +4,22 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [5.1.1] - 2026-11-11
+
+### 测试与工具链（17 方案阶段 5 前置批）
+
+- **覆盖率 reporter 增加 `json-summary`**：机器可读产物，供趋势比对与阈值校准；
+- **新增两个域分组阈值防回退**：`features/quickCommands/**`（87.5 行 / 85.5 分支）、
+  `features/favorites/**`（78 行 / 69 分支）——按 v5.1.0 后实测减约 1pt 校准；
+- **P3-16**：TaskExplorer 配置监听从 `extStarter.task` 前缀宽松匹配改为显式枚举
+  6 个真实配置键（含回归测试：命中刷新 / 无关键不刷新）；
+- **P3-17**：任务管理面板早退诊断改走输出通道（configure 可选注入，
+  无通道时回退 console），不再使用 console.error；
+- **测试补全**：errors.ts 专属 spec（9 例）、VTextarea / SelectField / TextareaField
+  专属 spec（10 例）、openQuickCommandsDataFile 错误路径；全量单测 695 例 / 63 文件绿。
+- 已知遗留：favoritesCommands / quickCommandsCommands 命令壳分支覆盖仍偏低
+  （62-71%），后续阶段继续补齐。
+
 ## [5.1.0] - 2026-11-11
 
 ### 新增（快捷命令：多行命令序列 + 逐条执行）

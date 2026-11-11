@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as vscode from 'vscode'
 import {
   QuickCommandsService,
@@ -503,5 +503,23 @@ describe('openQuickCommandsDataFile（17 方案阶段 4）', () => {
     expect(opens).toHaveLength(1)
     const openedUri = (opens[0]!.args[0] as { args: unknown[] }).args[0] as vscode.Uri
     expect(openedUri.fsPath).toBe(vscode.Uri.file('/memory/quick-commands.json').fsPath)
+  })
+})
+
+describe('openQuickCommandsDataFile 错误路径（v5.1.1）', () => {
+  it('ensureDataFile 失败（非 FileNotFound）→ showError 且不打开', async () => {
+    __resetStubs()
+    const { service, run } = makeHost()
+    await service.load()
+    const statSpy = vi
+      .spyOn(vscode.workspace.fs, 'stat')
+      .mockRejectedValue(Object.assign(new Error('EACCES'), { code: 'EACCES' }))
+    try {
+      await run('extStarter.openQuickCommandsDataFile')
+    } finally {
+      statSpy.mockRestore()
+    }
+    expect(recordedOf('showErrorMessage').length).toBeGreaterThanOrEqual(1)
+    expect(recordedOf('executeCommand')).toHaveLength(0)
   })
 })

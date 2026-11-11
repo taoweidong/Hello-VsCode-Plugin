@@ -132,7 +132,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // ---------- 任务管理（v2.6：Webview 弹框 + HTTP 打桩/真实接口；侧边栏树视图） ----------
   const taskManagerServices = createTaskManagerServices(outputChannel)
   context.subscriptions.push({ dispose: () => taskManagerServices.api.dispose() })
-  TaskManagerPanel.configure(context)
+  TaskManagerPanel.configure(context, outputChannel)
   // 「任务管理」树视图：与弹框页同源数据；可见期轮询（onDidChangeVisibility 门控）
   const taskManagerProvider = new TaskManagerTreeProvider(taskManagerServices.api)
   context.subscriptions.push(taskManagerProvider)

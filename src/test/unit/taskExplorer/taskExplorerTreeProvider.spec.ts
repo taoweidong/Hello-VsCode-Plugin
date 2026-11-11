@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as vscode from 'vscode'
 import { TaskExplorerTreeProvider } from '../../../extension/features/taskExplorer/taskExplorerTreeProvider'
 import { type WorkspaceTaskEntry } from '../../../extension/features/taskExplorer/taskSource'
@@ -809,5 +809,40 @@ describe('TaskExplorerTreeProvider（工作区任务组）', () => {
     expect(() =>
       usage.addFavorite({ scopeUri: 'file:///x', source: 'Workspace', name: 'y' })
     ).not.toThrow()
+  })
+})
+
+describe('配置变更监听（v5.1.1 P3-16：显式键枚举）', () => {
+  type ConfigChangeEvent = { affectsConfiguration(section: string): boolean }
+  const asListener = (fn: (event: ConfigChangeEvent) => unknown) =>
+    fn as unknown as (event: ConfigChangeEvent) => void
+
+  it('任务树相关配置键变更 → 触发 refresh', async () => {
+    const spy = vi.spyOn(vscode.workspace, 'onDidChangeConfiguration')
+    const { provider } = makeHarness()
+    const refresh = vi.spyOn(provider, 'refresh')
+    const listener = asListener(spy.mock.calls.at(-1)![0])
+    refresh.mockClear()
+
+    listener({ affectsConfiguration: (section) => section === 'extStarter.taskGroupSeparator' })
+    expect(refresh).toHaveBeenCalledTimes(1)
+    listener({ affectsConfiguration: (section) => section === 'extStarter.taskExpanded' })
+    expect(refresh).toHaveBeenCalledTimes(2)
+    provider.dispose()
+  })
+
+  it('无关配置键变更 → 不触发 refresh', async () => {
+    const spy = vi.spyOn(vscode.workspace, 'onDidChangeConfiguration')
+    const { provider } = makeHarness()
+    const refresh = vi.spyOn(provider, 'refresh')
+    const listener = asListener(spy.mock.calls.at(-1)![0])
+    refresh.mockClear()
+
+    listener({
+      affectsConfiguration: (section) => section === 'extStarter.quickCommandReuseTerminal',
+    })
+    listener({ affectsConfiguration: (section) => section === 'editor.fontSize' })
+    expect(refresh).not.toHaveBeenCalled()
+    provider.dispose()
   })
 })
