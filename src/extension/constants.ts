@@ -48,13 +48,6 @@ export const VIEW = {
   /** 收藏条目的 contextValue */
   favoriteContextValue: 'favorite',
 
-  /** 书签树视图 ID（v3.6：行级代码书签，14 方案） */
-  bookmarksViewId: 'extStarter.bookmarksView',
-  /** 书签文件分组节点的 contextValue */
-  bookmarkFileContextValue: 'bookmarkFile',
-  /** 书签条目的 contextValue */
-  bookmarkContextValue: 'bookmark',
-
   /** 快捷命令树视图 ID（v3.5：终端命令收藏 + 别名 + 分组 + 单击执行，16 方案） */
   quickCommandsViewId: 'extStarter.quickCommandsView',
   /** 快捷命令条目的 contextValue */
@@ -146,25 +139,6 @@ export const COMMAND = {
   /** 打开收藏数据文件（收藏夹视图标题栏 + 命令面板；15 方案：手动备份不用记路径） */
   openFavoritesDataFile: 'extStarter.openFavoritesDataFile',
 
-  // 代码书签（v3.6：行级书签 + Ctrl+Alt+K，14 方案；
-  // 与收藏夹 favorites（路径级收藏）正交——这个收藏的是代码行）
-  /** 切换书签（Ctrl+Alt+K；当前行打/取消，命令面板 + editor/context） */
-  toggleBookmark: 'extStarter.toggleBookmark',
-  /** 跳到下一个书签（Ctrl+Alt+L；跨文件循环，文件+行号序） */
-  jumpToNextBookmark: 'extStarter.jumpToNextBookmark',
-  /** 跳到上一个书签（Ctrl+Alt+J；跨文件循环，文件+行号序） */
-  jumpToPreviousBookmark: 'extStarter.jumpToPreviousBookmark',
-  /** 快速打开书签（QuickPick；命令面板 + 书签视图标题栏） */
-  quickOpenBookmarks: 'extStarter.quickOpenBookmarks',
-  /** 跳转到书签（树条目单击路由；带参命令） */
-  jumpToBookmark: 'extStarter.jumpToBookmark',
-  /** 移除书签（条目右键 + inline 悬停删除按钮；无需确认，可重新打） */
-  removeBookmark: 'extStarter.removeBookmark',
-  /** 清空全部书签（模态确认） */
-  clearBookmarks: 'extStarter.clearBookmarks',
-  /** 打开书签数据文件（书签视图标题栏 + 命令面板；15 方案口径） */
-  openBookmarksDataFile: 'extStarter.openBookmarksDataFile',
-
   // 快捷命令（v3.5：终端命令收藏 + 别名 + 显式分组 + 单击终端执行，16 方案；
   // 与收藏夹 favorites（收藏路径）、任务收藏 addTaskToFavorites（收藏 tasks.json 任务）正交）
   /** 新增快捷命令（手动输入命令文本 + 别名 + 分组；视图标题栏 + 命令面板） */
@@ -233,7 +207,7 @@ export const CONFIG = {
 
 /**
  * 存储相关常量。
- * v4.0.0：串口功能下线，相关存储键随功能删除（遗留数据由 services/serialCleanup 清理）。
+ * v4.0.0 串口 / v5.0.0 书签功能下线，相关存储键随功能删除（遗留数据由 services/legacyFeatureCleanup 清理）。
  */
 export const STORAGE = {
   /**
@@ -255,13 +229,6 @@ export const STORAGE = {
   favoritesGlobalFileName: 'favorites.json',
   /** 收藏夹旧 globalState 存储键：仅供激活期一次性迁移读取旧数据（15 方案，迁移后清除） */
   favoritesMementoKey: 'extStarter.favorites',
-  /**
-   * 书签数据文件（相对工作区根；v3.6，14 方案）。
-   * 已同步进 .gitignore。
-   */
-  bookmarksFileName: '.vscode/bookmarks.json',
-  /** 书签：未打开工作区时，globalStorage 目录下的明文 JSON 文件名（15 方案口径） */
-  bookmarksGlobalFileName: 'bookmarks.json',
   /**
    * 快捷命令数据文件（相对工作区根；v3.5，16 方案）。
    * 已同步进 .gitignore。

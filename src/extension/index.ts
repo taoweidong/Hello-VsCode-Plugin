@@ -8,8 +8,6 @@ import {
 } from './features/taskManager/taskManagerPanel'
 import { TaskManagerTreeProvider } from './features/taskManager/taskManagerTreeProvider'
 import { DraftBoxService } from './features/drafts/draftBoxService'
-import { BookmarksService, createBookmarksStore } from './features/bookmarks/bookmarksService'
-import { BookmarksTreeProvider } from './features/bookmarks/bookmarksTreeProvider'
 import { FavoritesService } from './features/favorites/favoritesService'
 import { FavoritesTreeProvider } from './features/favorites/favoritesTreeProvider'
 import {
@@ -27,7 +25,10 @@ import { InitTreeProvider } from './features/init/initTreeProvider'
 import { createInitSteps } from './features/init/initSteps'
 import { TaskExplorerController } from './features/taskExplorer/taskExplorerController'
 import { EnvironmentTreeProvider } from './providers/environmentTreeProvider'
-import { cleanupSerialLegacyData } from './services/serialCleanup'
+import {
+  cleanupBookmarksLegacyData,
+  cleanupSerialLegacyData,
+} from './services/legacyFeatureCleanup'
 import { ENVIRONMENT_TASK_ID, recheckProbeByLabel } from './tasks/environmentTask'
 import { TaskRunner } from './tasks/taskRunner'
 import { TASKS } from './tasks/taskRegistry'
@@ -85,6 +86,10 @@ export function activate(context: vscode.ExtensionContext): void {
   // v4.0.0 串口功能下线：一次性清理遗留数据（工作区数据文件 / SecretStorage 密码 /
   // globalState 旧键）；幂等，失败不阻断激活，仅输出通道留痕
   void cleanupSerialLegacyData(context, (message) => outputChannel.appendLine(`[清理] ${message}`))
+  // v5.0.0 书签功能下线：清理遗留数据文件（工作区 .vscode/bookmarks.json + globalStorage）
+  void cleanupBookmarksLegacyData(context, (message) =>
+    outputChannel.appendLine(`[清理] ${message}`)
+  )
 
   // ---------- 启动任务（环境信息） ----------
   const taskRunner = new TaskRunner(TASKS, outputChannel)
@@ -173,20 +178,6 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.createTreeView(VIEW.favoritesViewId, { treeDataProvider: favoritesProvider })
   )
 
-  // ---------- 代码书签（v3.6：行级书签 + Ctrl+Alt+K，14 方案） ----------
-  const bookmarks = new BookmarksService(
-    createBookmarksStore(context, {
-      onWarning: (message) => outputChannel.appendLine(`[书签] ${message}`),
-    })
-  )
-  context.subscriptions.push(bookmarks)
-  void bookmarks.load()
-  const bookmarksProvider = new BookmarksTreeProvider(bookmarks)
-  context.subscriptions.push(
-    bookmarksProvider,
-    vscode.window.createTreeView(VIEW.bookmarksViewId, { treeDataProvider: bookmarksProvider })
-  )
-
   // ---------- 快捷命令（v3.5：终端命令收藏 + 别名 + 分组 + 单击执行，16 方案） ----------
   const quickCommands = new QuickCommandsService(
     createQuickCommandsStore(context, {
@@ -225,7 +216,6 @@ export function activate(context: vscode.ExtensionContext): void {
     taskExplorer,
     favorites,
     quickCommands,
-    bookmarks,
   })
 }
 

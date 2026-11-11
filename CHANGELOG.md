@@ -4,6 +4,29 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [5.0.0] - 2026-11-11
+
+### ⚠ 破坏性变更（书签功能下线，改用开源 Bookmarks 扩展）
+
+- **代码书签功能整体移除**（开源 Bookmarks 扩展功能更强，不再重复开发）：
+  删除「书签」视图、`toggleBookmark` / `jumpToNextBookmark` / `jumpToPreviousBookmark` /
+  `quickOpenBookmarks` / `jumpToBookmark` / `removeBookmark` / `clearBookmarks` /
+  `openBookmarksDataFile` 8 条公开命令、`Ctrl+Alt+K/L/J` 3 条快捷键、书签服务 /
+  树视图 / 命令壳全部代码；公开面回到 **6 视图 / 43 命令 / 9 配置 / 2 页面 /
+  8 协议消息**（keybindings 归零）；
+- **遗留数据一次性清理**（激活时幂等执行，`src/extension/services/legacyFeatureCleanup.ts`
+  的 `cleanupBookmarksLegacyData`）：删除工作区 `.vscode/bookmarks.json` 与
+  globalStorage 回退文件 `bookmarks.json`；单步失败仅输出通道留痕、不阻断激活；
+- **文档同步**：删除 `docs/功能介绍/10-代码书签.md` 与 `docs/开发指南/13-代码书签.md`；
+  README、agent.md 与五层文档的视图 / 命令 / 快捷键 / 数据落点口径全部同步
+  （含侧边栏示意图重绘与端到端教程示例领域改名「网页速记」）；历史方案文档
+  （13~17 号）保持归档。
+
+### 测试
+
+- 删除书签域 3 个单测 spec 与集成冒烟书签段；清理服务测试扩展为串口 + 书签
+  两套（含幂等 / 删除失败留痕）；全量单测 444 例（宿主）/ 659 例（全量）绿。
+
 ## [4.0.1] - 2026-11-11
 
 ### 修复（树视图 inline / 右键按钮不生效）

@@ -1,12 +1,10 @@
 import * as vscode from 'vscode'
-import type { BookmarksService } from '../features/bookmarks/bookmarksService'
 import type { DraftBoxService } from '../features/drafts/draftBoxService'
 import type { FavoritesService } from '../features/favorites/favoritesService'
 import type { InitService } from '../features/init/initService'
 import type { QuickCommandsService } from '../features/quickCommands/quickCommandsService'
 import type { TaskExplorerController } from '../features/taskExplorer/taskExplorerController'
 import type { TaskRunner } from '../tasks/taskRunner'
-import { registerBookmarksCommands } from './bookmarksCommands'
 import { registerCopyCommands } from './copyCommands'
 import { registerDraftCommands } from './draftCommands'
 import { registerFavoritesCommands } from './favoritesCommands'
@@ -35,7 +33,6 @@ export interface CommandDeps {
   /** 快捷命令（v3.5：终端命令收藏 + 别名 + 分组 + 单击执行，16 方案） */
   quickCommands: QuickCommandsService
   /** 代码书签（v3.6：行级书签 + Ctrl+Alt+K，14 方案） */
-  bookmarks: BookmarksService
 }
 
 /**
@@ -57,5 +54,4 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
   registerTaskExplorerCommands(register, { controller: deps.taskExplorer }) // v2.3：任务管理器
   registerFavoritesCommands(register, { favorites: deps.favorites }) // v3.4：收藏夹
   registerQuickCommandsCommands(register, { quickCommands: deps.quickCommands }) // v3.5：快捷命令
-  registerBookmarksCommands(register, { bookmarks: deps.bookmarks }) // v3.6：代码书签
 }

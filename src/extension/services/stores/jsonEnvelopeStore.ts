@@ -6,7 +6,8 @@ import { reasonOf } from '../errors'
 
 /**
  * JSON 信封文件存储（17 方案阶段 2：收藏夹 / 书签 / 快捷命令 / 串口服务器四份
- * 逐行复制的 store 收敛为单一实现；行为契约与既有四个 store 逐字一致，
+ * 逐行复制的 store 收敛为单一实现；书签与串口服务器已分别于 v5.0.0 / v4.0.0
+ * 功能下线，现存消费方为收藏夹与快捷命令；行为契约与既有 store 逐字一致，
  * 由各自 spec 锁定——既有断言零改动即绿是本重构的验收标准）。
  *
  * 契约：
@@ -22,7 +23,7 @@ import { reasonOf } from '../errors'
 export type EnvelopeParseResult<T> = { ok: true; value: T } | { ok: false; reason: string }
 
 export interface JsonEnvelopeFileStoreOptions<T> {
-  /** 实体名（警告与错误文案，如「收藏」「书签」「快捷命令」「服务器」）。 */
+  /** 实体名（警告与错误文案，如「收藏」「快捷命令」）。 */
   label: string
   /** 空数据（FileNotFound 与损坏恢复时返回）。 */
   empty: () => T

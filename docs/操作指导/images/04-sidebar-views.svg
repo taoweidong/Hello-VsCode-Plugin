@@ -44,60 +44,48 @@
   </g>
 
   <g>
-    <text x="64" y="248" fill="#bbbbbb" font-size="11" font-weight="bold">书签</text>
-    <text x="238" y="248" fill="#cccccc" font-size="11">⋮ 📄</text>
+    <text x="64" y="248" fill="#bbbbbb" font-size="11" font-weight="bold">快捷命令</text>
+    <text x="238" y="248" fill="#cccccc" font-size="11">＋ ▶</text>
     <text x="274" y="248" fill="#cccccc" font-size="11">↻</text>
     <g font-size="12">
-      <text x="70" y="266" fill="#e6e6e6">🔖 const target = …</text>
-      <text x="196" y="266" fill="#858585">L8</text>
-      <text x="96" y="282" fill="#858585">Ctrl+Alt+K 打点 · 单击跳行</text>
+      <text x="70" y="266" fill="#e6e6e6">▸ 📦 部署</text>
+      <text x="96" y="282" fill="#858585">单击在专用终端执行</text>
     </g>
   </g>
 
   <g>
-    <text x="64" y="306" fill="#bbbbbb" font-size="11" font-weight="bold">快捷命令</text>
-    <text x="238" y="306" fill="#cccccc" font-size="11">＋ ▶</text>
-    <text x="274" y="306" fill="#cccccc" font-size="11">↻</text>
-    <g font-size="12">
-      <text x="70" y="324" fill="#e6e6e6">▸ 📦 部署</text>
-      <text x="96" y="340" fill="#858585">单击在专用终端执行</text>
-    </g>
+    <text x="64" y="306" fill="#bbbbbb" font-size="11" font-weight="bold">环境信息</text>
+    <text x="274" y="306" fill="#cccccc" font-size="11">↻ 📄</text>
+    <text x="70" y="324" fill="#858585" font-size="11">▸ 环境检测 · 正常 · 单项可重检</text>
   </g>
 
   <g>
-    <text x="64" y="364" fill="#bbbbbb" font-size="11" font-weight="bold">环境信息</text>
-    <text x="274" y="364" fill="#cccccc" font-size="11">↻ 📄</text>
-    <text x="70" y="382" fill="#858585" font-size="11">▸ 环境检测 · 正常 · 单项可重检</text>
+    <text x="64" y="348" fill="#bbbbbb" font-size="11" font-weight="bold">环境初始化</text>
+    <text x="274" y="348" fill="#cccccc" font-size="11">▶ ☑</text>
+    <text x="70" y="366" fill="#858585" font-size="11">▸ 3 个步骤 · 单步可重跑 · 失败不阻断</text>
   </g>
 
   <g>
-    <text x="64" y="406" fill="#bbbbbb" font-size="11" font-weight="bold">环境初始化</text>
-    <text x="274" y="406" fill="#cccccc" font-size="11">▶ ☑</text>
-    <text x="70" y="424" fill="#858585" font-size="11">▸ 3 个步骤 · 单步可重跑 · 失败不阻断</text>
-  </g>
-
-  <g>
-    <text x="64" y="448" fill="#bbbbbb" font-size="11" font-weight="bold">任务管理</text>
-    <text x="274" y="448" fill="#cccccc" font-size="11">↻</text>
-    <text x="70" y="466" fill="#858585" font-size="11">▸ 单击条目打开任务管理面板</text>
+    <text x="64" y="390" fill="#bbbbbb" font-size="11" font-weight="bold">任务管理</text>
+    <text x="274" y="390" fill="#cccccc" font-size="11">↻</text>
+    <text x="70" y="408" fill="#858585" font-size="11">▸ 单击条目打开任务管理面板</text>
   </g>
 
   <rect x="340" y="34" width="560" height="492" fill="#1e1e1e"/>
-  <text x="620" y="120" fill="#dcdcaa" font-size="16" text-anchor="middle" font-weight="bold">七个视图一览</text>
+  <text x="620" y="120" fill="#dcdcaa" font-size="16" text-anchor="middle" font-weight="bold">六个视图一览</text>
   <g font-size="13" fill="#cccccc">
     <text x="400" y="140">① 任务管理器 —— 工作区 tasks.json 任务树（运行/停止/收藏/定位）</text>
     <text x="400" y="168">② 收藏夹 —— 文件/文件夹路径收藏：别名、单击直达（v3.4）</text>
-    <text x="400" y="196">③ 书签 —— 行级代码书签：Ctrl+Alt+K 打点、树/QuickPick/循环跳转（v3.6）</text>
-    <text x="400" y="224">④ 快捷命令 —— 终端命令收藏：别名、分组、单击在终端执行（v3.5）</text>
-    <text x="400" y="252">⑤ 环境信息 —— 激活时自动检测 Python / Node / Git 等</text>
-    <text x="400" y="280">⑥ 环境初始化 —— 步骤清单，单击执行单步或全部</text>
-    <text x="400" y="308">⑦ 任务管理 —— CRUD 分页表格（HTTP 打桩 / 真实接口）</text>
+    <text x="400" y="196">③ 快捷命令 —— 终端命令收藏：别名、分组、单击在终端执行（v3.5）</text>
+    <text x="400" y="224">④ 环境信息 —— 激活时自动检测 Python / Node / Git 等</text>
+    <text x="400" y="252">⑤ 环境初始化 —— 步骤清单，单击执行单步或全部</text>
+    <text x="400" y="280">⑥ 任务管理 —— CRUD 分页表格（HTTP 打桩 / 真实接口）</text>
   </g>
   <rect x="380" y="356" width="480" height="140" rx="6" fill="#252526" stroke="#414141"/>
   <text x="396" y="382" fill="#dcdcaa" font-size="12" font-weight="bold">💡 建议的体验顺序</text>
-  <text x="396" y="404" fill="#cccccc" font-size="12">先看 ⑤ 环境信息、⑥ 环境初始化（激活即自动执行），</text>
-  <text x="396" y="424" fill="#cccccc" font-size="12">再玩 ② 收藏夹（右键添加）、③ 书签（Ctrl+Alt+K 打点跳转）、① 任务管理器、⑦ 任务管理，</text>
-  <text x="396" y="444" fill="#cccccc" font-size="12">以上七个视图覆盖模板的全部典型模式。</text>
+  <text x="396" y="404" fill="#cccccc" font-size="12">先看 ④ 环境信息、⑤ 环境初始化（激活即自动执行），</text>
+  <text x="396" y="424" fill="#cccccc" font-size="12">再玩 ② 收藏夹（右键添加）、③ 快捷命令、① 任务管理器、⑥ 任务管理，</text>
+  <text x="396" y="444" fill="#cccccc" font-size="12">以上六个视图覆盖模板的全部典型模式。</text>
   <text x="396" y="470" fill="#858585" font-size="12">另有 2 个 Webview 页面（组件画廊 / 任务管理）；</text>
   <text x="396" y="488" fill="#858585" font-size="12">视图标题栏按钮随视图切换（when 条件门禁已校验）。</text>
 

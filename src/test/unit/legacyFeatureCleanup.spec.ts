@@ -3,7 +3,10 @@ import * as nodeOs from 'node:os'
 import * as nodePath from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as vscode from 'vscode'
-import { cleanupSerialLegacyData } from '../../extension/services/serialCleanup'
+import {
+  cleanupBookmarksLegacyData,
+  cleanupSerialLegacyData,
+} from '../../extension/services/legacyFeatureCleanup'
 import { __resetStubs, __stubs, createExtensionContextStub } from './stubs/vscode'
 
 /**
@@ -174,6 +177,64 @@ describe('cleanupSerialLegacyData', () => {
       expect(summary.removedDataFile).toBe(false)
       expect(logs.join(String.fromCharCode(10))).toContain('删除遗留串口数据文件失败')
       expect(logs.join(String.fromCharCode(10))).toContain('清理遗留串口全局存储失败')
+    } finally {
+      deleteSpy.mockRestore()
+    }
+  })
+})
+
+describe('cleanupBookmarksLegacyData（v5.0.0 书签下线）', () => {
+  function globalBookmarksUri(): vscode.Uri {
+    const globalRoot = nodePath.join(rootDir, 'global-storage')
+    nodeFs.mkdirSync(globalRoot, { recursive: true })
+    return vscode.Uri.file(nodePath.join(globalRoot, 'bookmarks.json'))
+  }
+
+  it('删除工作区书签文件与 globalStorage 回退文件', async () => {
+    nodeFs.mkdirSync(nodePath.join(rootDir, '.vscode'), { recursive: true })
+    nodeFs.writeFileSync(nodePath.join(rootDir, '.vscode', 'bookmarks.json'), '{}', 'utf8')
+    const global = globalBookmarksUri()
+    nodeFs.writeFileSync(global.fsPath, '{}', 'utf8')
+    const context = {
+      globalStorageUri: vscode.Uri.file(nodePath.join(rootDir, 'global-storage')),
+      globalState: createExtensionContextStub().globalState,
+    } as unknown as vscode.ExtensionContext
+
+    const summary = await cleanupBookmarksLegacyData(context)
+    expect(summary).toEqual({ removedWorkspaceFile: true, removedGlobalFile: true })
+    expect(nodeFs.existsSync(nodePath.join(rootDir, '.vscode', 'bookmarks.json'))).toBe(false)
+    expect(nodeFs.existsSync(global.fsPath)).toBe(false)
+  })
+
+  it('文件不存在：幂等 no-op（不抛错、不产生多余日志）', async () => {
+    const context = {
+      globalStorageUri: vscode.Uri.file(nodePath.join(rootDir, 'global-storage')),
+      globalState: createExtensionContextStub().globalState,
+    } as unknown as vscode.ExtensionContext
+    const logs: string[] = []
+    const summary = await cleanupBookmarksLegacyData(context, (message) => logs.push(message))
+    expect(summary).toEqual({ removedWorkspaceFile: false, removedGlobalFile: false })
+    expect(logs).toEqual([])
+  })
+
+  it('删除失败（非 FileNotFound）：log 留痕、不抛错（其余目标继续清理）', async () => {
+    nodeFs.mkdirSync(nodePath.join(rootDir, '.vscode'), { recursive: true })
+    nodeFs.writeFileSync(nodePath.join(rootDir, '.vscode', 'bookmarks.json'), '{}', 'utf8')
+    const global = globalBookmarksUri()
+    nodeFs.writeFileSync(global.fsPath, '{}', 'utf8')
+    const context = {
+      globalStorageUri: vscode.Uri.file(nodePath.join(rootDir, 'global-storage')),
+      globalState: createExtensionContextStub().globalState,
+    } as unknown as vscode.ExtensionContext
+    const deleteSpy = vi
+      .spyOn(vscode.workspace.fs, 'delete')
+      .mockRejectedValueOnce(Object.assign(new Error('EPERM'), { code: 'EPERM' }))
+    const logs: string[] = []
+    try {
+      const summary = await cleanupBookmarksLegacyData(context, (message) => logs.push(message))
+      expect(summary.removedWorkspaceFile).toBe(false)
+      expect(summary.removedGlobalFile).toBe(true)
+      expect(logs.join(String.fromCharCode(10))).toContain('删除遗留书签工作区数据文件失败')
     } finally {
       deleteSpy.mockRestore()
     }

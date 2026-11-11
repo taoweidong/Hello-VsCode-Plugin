@@ -73,8 +73,7 @@ export function resolveExplorerTargets(uri: unknown, uris: unknown): vscode.Uri[
 }
 
 /**
- * 树节点入参守卫（17 方案阶段 2 收敛 favorites/bookmarks/quickCommands 三份
- * requireItem 复制）：树右键命令的第一个参数是树节点元素——形状不符时以
+ * 树节点入参守卫（17 方案阶段 2 收敛各树命令组的 requireItem 复制）：树右键命令的第一个参数是树节点元素——形状不符时以
  * info 提示（调用方传入完整文案，保持各组原提示语）并返回 undefined。
  */
 export function requireTreeItem<T>(

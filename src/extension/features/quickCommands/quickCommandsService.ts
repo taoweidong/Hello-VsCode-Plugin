@@ -214,8 +214,7 @@ export interface IQuickCommandsStore {
  * 快捷命令数据内容解析（17 方案阶段 2 收敛到共享信封存储）。
  * 顶层**不做**裸数组宽容读取：本信封是 groups + commands 双集合，裸数组语义
  * 存在歧义（按 commands 解释可能静默丢掉手写的 groups）——判损坏并复制备份
- * 更安全（原文件可从备份恢复）；单一集合的 favorites / bookmarks / servers
- * 才有明确的宽容读取口径。
+ * 更安全（原文件可从备份恢复）；单一集合的 favorites 才有明确的宽容读取口径。
  */
 function parseQuickCommandsContent(
   data: unknown,

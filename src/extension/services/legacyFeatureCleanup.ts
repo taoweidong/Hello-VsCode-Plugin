@@ -2,7 +2,7 @@ import * as vscode from 'vscode'
 import { reasonOf } from './errors'
 
 /**
- * 串口功能下线（v4.0.0）的一次性遗留数据清理。
+ * 下线功能的遗留数据清理（v4.0.0 串口 / v5.0.0 书签）。
  *
  * 清理面（均为串口功能独占的数据，不涉及其他功能）：
  * - 工作区 `.vscode/serial-servers.json`：读取服务器 id 后删除数据文件；
@@ -22,6 +22,11 @@ const SERIAL_SECRET_PREFIX = 'extStarter.serialServer.'
 const LEGACY_SERIAL_SECRET_PREFIX = 'crudStarter.serialServer.'
 const SERIAL_MEMENTO_KEY = 'extStarter.serialServers'
 const SERIAL_HISTORY_KEY = 'extStarter.serialCommandHistory'
+
+/** 书签数据文件（v3.6~v4.0 存在；v5.0.0 功能下线后清理）。 */
+const LEGACY_BOOKMARKS_FILE = '.vscode/bookmarks.json'
+/** 书签：无工作区时 globalStorage 目录下的明文 JSON 文件名。 */
+const LEGACY_BOOKMARKS_GLOBAL_FILE = 'bookmarks.json'
 
 /** 从数据文件内容中提取服务器 id（宽容形态：顶层数组或 { servers: [...] }）。 */
 function extractServerIds(raw: string): string[] {
@@ -112,6 +117,51 @@ export async function cleanupSerialLegacyData(
   if (summary.removedDataFile || summary.removedSecrets > 0) {
     log?.(
       `串口功能已下线：已清理遗留数据（数据文件${summary.removedDataFile ? '已删除' : '不存在'}，密码 ${summary.removedSecrets} 条）`
+    )
+  }
+  return summary
+}
+
+/**
+ * 书签功能下线（v5.0.0）的一次性遗留数据清理：
+ * - 工作区 `.vscode/bookmarks.json` 删除；
+ * - globalStorage 目录下 `bookmarks.json`（无工作区回退文件）删除；
+ * - 无 SecretStorage / globalState 键（书签功能从未使用）。
+ * 幂等；单步失败仅 log 留痕，不向调用方抛错。
+ */
+export async function cleanupBookmarksLegacyData(
+  context: vscode.ExtensionContext,
+  log?: (message: string) => void
+): Promise<{ removedWorkspaceFile: boolean; removedGlobalFile: boolean }> {
+  const summary = { removedWorkspaceFile: false, removedGlobalFile: false }
+  const targets: [vscode.Uri, keyof typeof summary, string][] = [
+    [
+      vscode.Uri.joinPath(context.globalStorageUri, LEGACY_BOOKMARKS_GLOBAL_FILE),
+      'removedGlobalFile',
+      '全局存储',
+    ],
+  ]
+  const root = vscode.workspace.workspaceFolders?.[0]?.uri
+  if (root) {
+    targets.unshift([
+      vscode.Uri.joinPath(root, ...LEGACY_BOOKMARKS_FILE.split('/')),
+      'removedWorkspaceFile',
+      '工作区数据文件',
+    ])
+  }
+  for (const [fileUri, key, label] of targets) {
+    try {
+      await vscode.workspace.fs.delete(fileUri, { useTrash: false })
+      summary[key] = true
+    } catch (err) {
+      if (!(err instanceof vscode.FileSystemError && err.code === 'FileNotFound')) {
+        log?.(`删除遗留书签${label}失败：${reasonOf(err)}`)
+      }
+    }
+  }
+  if (summary.removedWorkspaceFile || summary.removedGlobalFile) {
+    log?.(
+      `书签功能已下线：已清理遗留数据（工作区文件${summary.removedWorkspaceFile ? '已删除' : '不存在'}，全局文件${summary.removedGlobalFile ? '已删除' : '不存在'}）`
     )
   }
   return summary

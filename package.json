@@ -2,7 +2,7 @@
   "name": "hello-vscode-plugin",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "4.0.1",
+  "version": "5.0.0",
   "publisher": "your-publisher",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -52,10 +52,6 @@
         {
           "id": "extStarter.favoritesView",
           "name": "%view.favorites.name%"
-        },
-        {
-          "id": "extStarter.bookmarksView",
-          "name": "%view.bookmarks.name%"
         },
         {
           "id": "extStarter.quickCommandsView",
@@ -260,54 +256,6 @@
         "icon": "$(json)"
       },
       {
-        "command": "extStarter.toggleBookmark",
-        "title": "%command.toggleBookmark.title%",
-        "category": "%command.category%",
-        "icon": "$(bookmark)"
-      },
-      {
-        "command": "extStarter.jumpToNextBookmark",
-        "title": "%command.jumpToNextBookmark.title%",
-        "category": "%command.category%",
-        "icon": "$(arrow-down)"
-      },
-      {
-        "command": "extStarter.jumpToPreviousBookmark",
-        "title": "%command.jumpToPreviousBookmark.title%",
-        "category": "%command.category%",
-        "icon": "$(arrow-up)"
-      },
-      {
-        "command": "extStarter.quickOpenBookmarks",
-        "title": "%command.quickOpenBookmarks.title%",
-        "category": "%command.category%",
-        "icon": "$(list-unordered)"
-      },
-      {
-        "command": "extStarter.jumpToBookmark",
-        "title": "%command.jumpToBookmark.title%",
-        "category": "%command.category%",
-        "icon": "$(go-to-file)"
-      },
-      {
-        "command": "extStarter.removeBookmark",
-        "title": "%command.removeBookmark.title%",
-        "category": "%command.category%",
-        "icon": "$(close)"
-      },
-      {
-        "command": "extStarter.clearBookmarks",
-        "title": "%command.clearBookmarks.title%",
-        "category": "%command.category%",
-        "icon": "$(clear-all)"
-      },
-      {
-        "command": "extStarter.openBookmarksDataFile",
-        "title": "%command.openBookmarksDataFile.title%",
-        "category": "%command.category%",
-        "icon": "$(json)"
-      },
-      {
         "command": "extStarter.addQuickCommand",
         "title": "%command.addQuickCommand.title%",
         "category": "%command.category%",
@@ -432,21 +380,6 @@
           "command": "extStarter.openFavoritesDataFile",
           "when": "view == extStarter.favoritesView",
           "group": "navigation@2"
-        },
-        {
-          "command": "extStarter.quickOpenBookmarks",
-          "when": "view == extStarter.bookmarksView",
-          "group": "navigation@1"
-        },
-        {
-          "command": "extStarter.clearBookmarks",
-          "when": "view == extStarter.bookmarksView",
-          "group": "navigation@2"
-        },
-        {
-          "command": "extStarter.openBookmarksDataFile",
-          "when": "view == extStarter.bookmarksView",
-          "group": "navigation@3"
         },
         {
           "command": "extStarter.addQuickCommand",
@@ -624,26 +557,6 @@
           "command": "extStarter.removeQuickCommandGroup",
           "when": "view == extStarter.quickCommandsView && viewItem == quickCommandGroup",
           "group": "2_manage@2"
-        },
-        {
-          "command": "extStarter.jumpToBookmark",
-          "when": "view == extStarter.bookmarksView && viewItem == bookmark",
-          "group": "1_open@1"
-        },
-        {
-          "command": "extStarter.removeBookmark",
-          "when": "view == extStarter.bookmarksView && viewItem == bookmark",
-          "group": "2_manage@1"
-        },
-        {
-          "command": "extStarter.removeBookmark",
-          "when": "view == extStarter.bookmarksView && viewItem == bookmark",
-          "group": "inline@1"
-        },
-        {
-          "command": "extStarter.jumpToBookmark",
-          "when": "view == extStarter.bookmarksView && viewItem == bookmarkFile",
-          "group": "1_open@1"
         }
       ],
       "editor/context": [
@@ -676,11 +589,6 @@
           "command": "extStarter.addFavorite",
           "when": "editorIsOpen",
           "group": "9_starter@6"
-        },
-        {
-          "command": "extStarter.toggleBookmark",
-          "when": "editorTextFocus",
-          "group": "9_starter@7"
         }
       ],
       "explorer/context": [
@@ -733,26 +641,7 @@
         }
       ]
     },
-    "keybindings": [
-      {
-        "command": "extStarter.toggleBookmark",
-        "key": "ctrl+alt+k",
-        "mac": "cmd+alt+k",
-        "when": "editorTextFocus"
-      },
-      {
-        "command": "extStarter.jumpToNextBookmark",
-        "key": "ctrl+alt+l",
-        "mac": "cmd+alt+l",
-        "when": "editorTextFocus"
-      },
-      {
-        "command": "extStarter.jumpToPreviousBookmark",
-        "key": "ctrl+alt+j",
-        "mac": "cmd+alt+j",
-        "when": "editorTextFocus"
-      }
-    ],
+    "keybindings": [],
     "configuration": {
       "title": "%configuration.title%",
       "properties": {
