@@ -91,7 +91,7 @@ src/extension/（宿主侧，只 import vscode，不 import Vue）
   features/       drafts 草稿箱 / init 任务编排 / taskManager 任务管理（CRUD 实例） /
                   taskExplorer 任务树 / favorites 收藏夹 / quickCommands 快捷命令
   providers/      环境信息树视图
-  services/       serialCleanup 串口遗留数据清理 + stores/（atomicWrite 原子写、
+  services/       legacyFeatureCleanup 下线功能遗留数据清理 + stores/（atomicWrite 原子写、
                   jsonEnvelopeStore 信封存储、queuedFileStore 串行写队列）
   tasks/          StartupTask 注册表（taskRegistry）+ TaskRunner 调度 + probes 环境探针
 src/webview/（Vue 3，禁止 import vscode；唯一跨侧契约 protocol.ts）

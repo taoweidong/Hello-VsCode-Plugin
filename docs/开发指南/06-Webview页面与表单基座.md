@@ -64,7 +64,7 @@ VCheckbox / VFormField / VBadge / VEmptyState / VLoading / VTextarea…），
 
 | 内容                                             | 文件                                       |
 | ------------------------------------------------ | ------------------------------------------ |
-| 协议守卫（21 分支全覆盖，100% 阈值）             | `src/test/unit/webview/protocol.spec.ts`   |
+| 协议守卫（8 分支全覆盖，100% 阈值）              | `src/test/unit/webview/protocol.spec.ts`   |
 | 表单派生                                         | `src/test/unit/webview/formSchema.spec.ts` |
 | 控制器 / HTML / 资源解析 / SchemaForm / 字段组件 | `src/test/unit/webview/` 各 spec           |
 | 真实浏览器 e2e（含 codicon 字体断言）            | `tests/e2e/{gallery,taskManager}.spec.ts`  |

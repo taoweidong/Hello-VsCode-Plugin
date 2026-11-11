@@ -41,7 +41,7 @@ npm run gate      # 一键质量门禁：lint/类型/双构建/静态一致性/�
 ```
 
 用 VSCode 打开项目文件夹按 **F5** 启动调试窗口：装了即生效——启动脚本 + 环境检测
-自动执行（输出通道可见），活动栏出现「Hello VSCode 插件」与 8 个视图。
+自动执行（输出通道可见），活动栏出现「Hello VSCode 插件」与 6 个视图。
 
 **常用脚本**：`npm run watch`（构建监听）· `npm run test:unit`（秒级单测）·
 `npm run package:vsix`（打包离线 vsix）——完整脚本清单与逐步操作见

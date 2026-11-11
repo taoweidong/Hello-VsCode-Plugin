@@ -1,7 +1,7 @@
 <svg width="900" height="560" viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif">
   <rect width="900" height="560" rx="8" fill="#3c3c3c"/>
   <rect width="900" height="34" rx="8" fill="#3c3c3c"/>
-  <text x="450" y="22" fill="#cccccc" font-size="13" text-anchor="middle">扩展开发宿主 — Hello VSCode 插件 侧边栏（8 个视图）</text>
+  <text x="450" y="22" fill="#cccccc" font-size="13" text-anchor="middle">扩展开发宿主 — Hello VSCode 插件 侧边栏（6 个视图）</text>
 
   <rect y="34" width="52" height="526" fill="#333333"/>
   <rect x="10" y="60" width="32" height="32" rx="4" fill="#094771" stroke="#0098ff"/>
