@@ -50,7 +50,7 @@ const DEFAULT_TIMEOUT_MS = 300000
  */
 const HOST_BUNDLE_BUDGET_KB = 150
 const WEBVIEW_CHUNK_BUDGET_KB = 100
-/** vsix 内容总体积预算（serialport prebuild 全平台随包后实测约 3-4MB，留足余量）。 */
+/** vsix 内容总体积预算（v4.0.0 起无生产依赖；实际大头是 webview 产物与 media）。 */
 const VSIX_CONTENT_BUDGET_MB = 20
 
 interface StepResult {
@@ -174,22 +174,20 @@ const steps: StepDef[] = [
     timeoutMs: 180000,
     run: (timeout) => {
       // ---- 打包内容黑白名单（07 R-E-3：vsce package 零警告不能替代内容校验）----
-      // serialport（首个生产依赖，N-API prebuild）经 .vscodeignore 否定项随包分发，
-      // 因此这里不再用 --no-dependencies，运行时依赖必须出现在清单中
       const listed = exec('npx vsce ls', timeout)
         .split(/\r?\n/)
         .map((line) => line.trim())
         .filter(Boolean)
       const forbidden = [
         /^(src|tests|out|scripts|docs|\.github)\//, // 源与工具链不该进包
-        /\.map$/, // sourcemap（.vscodeignore 已挡，双保险；serialport 依赖树不含 .map）
+        /\.map$/, // sourcemap（.vscodeignore 已挡，双保险）
         /^coverage\//, // 覆盖率报告（07 R-E-2）
         /\.vsix$/, // 旧的打包产物
         /(^|\/)agent\.md$/, // 代理约定文档
         /^\.ext-starter\//, // 运行期工件目录（环境快照）
         /^package\.bat$/, // Windows 开发者快捷入口
         /^tsconfig\.node\.json$/, // 开发期类型配置
-        /^node_modules\/(?!serialport|@serialport|node-gyp-build|debug|ms)(\/|$)/, // 只放行 serialport 运行时依赖树
+        /^node_modules\//, // v4.0.0 起无生产依赖：node_modules 一律不进包
       ]
       const bad = listed.filter((file) => forbidden.some((re) => re.test(file)))
       if (bad.length > 0) {
@@ -202,10 +200,6 @@ const steps: StepDef[] = [
         'dist/extension.js',
         'dist/webview/.vite/manifest.json',
         'media/icon.png',
-        // serialport 运行时：入口 + 原生绑定 + 至少一个 N-API prebuild
-        'node_modules/serialport/package.json',
-        'node_modules/@serialport/bindings-cpp/package.json',
-        'node_modules/@serialport/bindings-cpp/prebuilds/win32-x64/node.napi.node',
       ]) {
         if (!listed.includes(must)) {
           throw new Error(`vsix 缺少运行必需文件: ${must}（确认 ③④ 步构建与 .vscodeignore）`)
@@ -264,7 +258,7 @@ const steps: StepDef[] = [
         )
       }
       return (
-        `vsce ls 黑白名单通过（${listed.length} 项，含 serialport 运行时）；` +
+        `vsce ls 黑白名单通过（${listed.length} 项）；` +
         `vsix 内容 ${(totalBytes / 1024 / 1024).toFixed(1)} MB ≤ ${VSIX_CONTENT_BUDGET_MB} MB；` +
         `宿主 ${(hostSize / 1024).toFixed(1)} KB ` +
         `≤ ${HOST_BUNDLE_BUDGET_KB} KB；${chunkCount} 个 chunk，最大 ${maxChunk.file} ` +

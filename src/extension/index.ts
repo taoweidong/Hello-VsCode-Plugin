@@ -25,11 +25,9 @@ import { QuickCommandsTreeProvider } from './features/quickCommands/quickCommand
 import { InitService } from './features/init/initService'
 import { InitTreeProvider } from './features/init/initTreeProvider'
 import { createInitSteps } from './features/init/initSteps'
-import { SerialConsoleController } from './features/serialConsole/serialConsoleController'
-import { SerialConsolePanel } from './features/serialConsole/serialConsolePanel'
 import { TaskExplorerController } from './features/taskExplorer/taskExplorerController'
 import { EnvironmentTreeProvider } from './providers/environmentTreeProvider'
-import { migrateLegacyKeys } from './services/legacyMigration'
+import { cleanupSerialLegacyData } from './services/serialCleanup'
 import { ENVIRONMENT_TASK_ID, recheckProbeByLabel } from './tasks/environmentTask'
 import { TaskRunner } from './tasks/taskRunner'
 import { TASKS } from './tasks/taskRegistry'
@@ -53,19 +51,6 @@ import type { WebviewPageId } from '../webview/pages'
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel('Hello VSCode Plugin')
   context.subscriptions.push(outputChannel)
-
-  // 阶段 5.4（09 §5.2）：v0.x 旧命名数据一次性迁移（配置 / Memento；Secret 惰性搬迁）
-  void migrateLegacyKeys(context)
-    .then((migrated) => {
-      if (migrated) {
-        void vscode.window.showInformationMessage(
-          '已将旧版（v0.x）设置与数据迁移到新命名（extStarter），旧键已清理。'
-        )
-      }
-    })
-    .catch((err: unknown) => {
-      outputChannel.appendLine(`[迁移] 旧键迁移失败（不影响使用）：${String(err)}`)
-    })
 
   // 15 方案（v3.6）：无工作区收藏数据从 globalState 一次性迁移到 globalStorage 明文 JSON
   // （与有无工作区无关地无条件执行，幂等；写成功才清旧键，失败保留旧数据如实上报）
@@ -96,6 +81,10 @@ export function activate(context: vscode.ExtensionContext): void {
     outputChannel.appendLine(`[快捷命令] 旧数据迁移失败（旧数据保留在 globalState）：${message}`)
     void vscode.window.showErrorMessage(`快捷命令数据迁移失败（旧数据已保留）：${message}`)
   })
+
+  // v4.0.0 串口功能下线：一次性清理遗留数据（工作区数据文件 / SecretStorage 密码 /
+  // globalState 旧键）；幂等，失败不阻断激活，仅输出通道留痕
+  void cleanupSerialLegacyData(context, (message) => outputChannel.appendLine(`[清理] ${message}`))
 
   // ---------- 启动任务（环境信息） ----------
   const taskRunner = new TaskRunner(TASKS, outputChannel)
@@ -154,15 +143,6 @@ export function activate(context: vscode.ExtensionContext): void {
     )
   )
   taskManagerProvider.setPolling(taskManagerTreeView.visible) // 初始可见性（事件只在变化时触发）
-
-  // ---------- 串口命令控制台：控制器（共享链路/状态）+ 树视图 ----------
-  const serialConsole = new SerialConsoleController(context, outputChannel)
-  context.subscriptions.push(serialConsole)
-  context.subscriptions.push(
-    vscode.window.createTreeView(VIEW.serialServersViewId, {
-      treeDataProvider: serialConsole.treeProvider,
-    })
-  )
 
   // ---------- 草稿箱（右键示例载体，09 §3.5） ----------
   const drafts = new DraftBoxService(() => vscode.workspace.workspaceFolders?.[0]?.uri)
@@ -224,12 +204,8 @@ export function activate(context: vscode.ExtensionContext): void {
   )
 
   // ---------- Webview 页面装配（M4）：面板上下文 + 序列化器（窗口重载恢复） ----------
-  SerialConsolePanel.configure(context)
   WebviewController.registerSerializer(context, (pageId: WebviewPageId): WebviewControllerDeps => {
     switch (pageId) {
-      case 'serialConsole':
-        // 复用控制器的面板依赖：共享串口链路与状态，恢复面板功能完整
-        return serialConsole.panelDepsOrCreate()
       case 'taskManager':
         // 恢复面板：重建表单 schema 与消息处理（查询参数 / 分页 / 增删改查）
         return createTaskManagerDeps(taskManagerServices)
@@ -244,7 +220,6 @@ export function activate(context: vscode.ExtensionContext): void {
     initService,
     openTaskManager: () => TaskManagerPanel.createOrShow(taskManagerServices),
     refreshTaskManager: () => void taskManagerProvider.refresh(),
-    serialConsole,
     drafts,
     recheckEnvironmentItem,
     taskExplorer,

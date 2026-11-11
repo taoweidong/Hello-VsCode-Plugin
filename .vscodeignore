@@ -2,12 +2,6 @@
 .vscode-test/**
 out/**
 node_modules/**
-# serialport 及其运行时依赖（首个生产依赖，N-API prebuild 随包分发）——否定项必须在排除行之后
-!node_modules/serialport/**
-!node_modules/@serialport/**
-!node_modules/node-gyp-build/**
-!node_modules/debug/**
-!node_modules/ms/**
 src/**
 docs/**
 dist/**/*.map

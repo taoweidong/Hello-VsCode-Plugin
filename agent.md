@@ -6,8 +6,8 @@
 ## 项目概述
 
 - **是什么**：Hello VSCode 插件（v1.0.0 起由「CRUD 演示集合」按 09 方案收敛重构）：
-  8 视图（任务管理器 / 收藏夹 / 书签 / 快捷命令 / 环境信息 / 环境初始化 / 任务管理 / 串口服务器）+ 3 Webview 页面
-  （gallery 组件画廊 / serialConsole 串口控制台 / taskManager 任务管理 CRUD 弹框）+ 草稿箱右键示例（8 条入口）+
+  7 视图（任务管理器 / 收藏夹 / 书签 / 快捷命令 / 环境信息 / 环境初始化 / 任务管理）+ 2 Webview 页面
+  （gallery 组件画廊 / taskManager 任务管理 CRUD 弹框）+ 草稿箱右键示例（8 条入口）+
   启动任务框架（窗口加载完成自动执行：初始化脚本 + 环境探针）。
 - **技术栈**：TypeScript（strict，tsconfig node / webview 双工程）+ esbuild（宿主构建）+
   Vite（Webview 构建）+ Vitest（单测）+ mocha/@vscode/test-electron（集成）+ Playwright（e2e）。
@@ -85,12 +85,13 @@ npm run gate
 
 ```
 src/extension/（宿主侧，只 import vscode，不 import Vue）
-  index.ts        组装：旧键迁移 → 启动任务 → 视图 → 命令（激活时机 onStartupFinished）
+  index.ts        组装：数据迁移/清理 → 启动任务 → 视图 → 命令（激活时机 onStartupFinished）
   constants.ts    命令 / 视图 / 配置 / 存储 ID 的单一来源
-  commands/       pageCommands / serialConsoleCommands / draftCommands + shared
-  features/       drafts 草稿箱 / init 任务编排 / taskManager 任务管理（CRUD 实例） / serialConsole 真实业务
+  commands/       页面 / 草稿箱 / 拷贝 / 任务 / 收藏 / 书签 / 快捷命令命令组 + shared
+  features/       drafts 草稿箱 / init 任务编排 / taskManager 任务管理（CRUD 实例） /
+                  taskExplorer 任务树 / favorites 收藏夹 / bookmarks 书签 / quickCommands 快捷命令
   providers/      环境信息树视图
-  services/       legacyMigration 旧键迁移 + stores/（atomicWrite 原子写、
+  services/       serialCleanup 串口遗留数据清理 + stores/（atomicWrite 原子写、
                   jsonEnvelopeStore 信封存储、queuedFileStore 串行写队列）
   tasks/          StartupTask 注册表（taskRegistry）+ TaskRunner 调度 + probes 环境探针
 src/webview/（Vue 3，禁止 import vscode；唯一跨侧契约 protocol.ts）
@@ -142,9 +143,11 @@ src/test/（unit: Vitest + vscode 测试桩；集成: mocha + @vscode/test-elect
 ## 已知事项
 
 - 集成测试依赖 `.vscode-test/` 缓存；删除后首次门禁/测试会重新下载 VS Code。
-- 工作区运行时数据文件（`.vscode/serial-servers.json`、`.vscode/*.drafts.json` 等）已
-  gitignore——新增落盘文件同步 `.gitignore`（v2.0 起本地脏检查随 BuildService 退役）。
-- 串口服务器数据在未打开工作区时退回全局存储（serverStore 的 Memento 双实现），属预期行为。
+- 工作区运行时数据文件（`.vscode/*.drafts.json` / `favorites.json` / `bookmarks.json` /
+  `quick-commands.json` 等）已 gitignore——新增落盘文件同步 `.gitignore`
+  （v2.0 起本地脏检查随 BuildService 退役）。
+- v4.0.0 起串口功能已下线：激活时会一次性清理遗留数据（`.vscode/serial-servers.json`、
+  SecretStorage 密码、globalState 旧键），见 `services/serialCleanup.ts`。
 - 发布到市场前：改 `publisher` 与 `repository` 即可（LICENSE / 128×128 图标 / categories
   等元数据已就绪，图标可用 `npx tsx scripts/generate-icon.ts` 从 SVG 重新生成）。
 - CI（`.github/workflows/ci.yml`）：Windows 跑完整门禁 + Playwright e2e；Ubuntu 跑

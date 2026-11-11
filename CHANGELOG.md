@@ -4,6 +4,31 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.0] - 2026-11-11
+
+### ⚠ 破坏性变更（串口功能下线）
+
+- **串口控制台功能整体移除**：删除「串口服务器」视图、`openSerialConsole` /
+  `addSerialServer` / `editSerialServer` / `deleteSerialServer` / `connectSerialServer` /
+  `refreshSerialServers` 6 条公开命令、`serialConsoleEnabled` 配置项、`serialConsole`
+  Webview 页面、串口协议消息与 `serialport` 运行时依赖（产物随之瘦身，宿主运行时
+  零第三方依赖）；公开面回到 **7 视图 / 51 命令 / 9 配置 / 2 页面 / 8 协议消息**；
+- **遗留数据一次性清理**（激活时幂等执行，`src/extension/services/serialCleanup.ts`）：
+  删除工作区 `.vscode/serial-servers.json`；按数据文件中的服务器 id 清理新旧前缀
+  （`extStarter.serialServer.` / `crudStarter.serialServer.`）的 SecretStorage 密码；
+  globalState 旧键 `extStarter.serialServers` / `extStarter.serialCommandHistory` 置空；
+  单步失败仅输出通道留痕、不阻断激活；
+- **文档同步**：删除 `docs/功能介绍/04-串口控制台.md` 与
+  `docs/开发指南/04-串口控制台.md`；视图 / 命令 / 配置 / 页面 / 协议 / 数据落点 /
+  依赖口径在 README、agent.md 与五层文档同步更新；历史方案文档（01~17 号）保持
+  归档原样。
+
+### 测试
+
+- 删除串口域单测 21 个 spec 与 e2e 串口套件、集成冒烟串口段；新增
+  `serialCleanup.spec.ts`（清理面 / 幂等 / 失败不阻断）；协议守卫测试收敛为
+  8 消息面并保留串口消息「已下线」负例锁定。
+
 ## [3.7.1] - 2026-11-11
 
 ### 测试（集成测试版本固定）

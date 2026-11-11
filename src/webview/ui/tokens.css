@@ -95,13 +95,6 @@
   --ui-shell-width-form: 560px; /* AppShell width=form */
   --ui-shell-width-settings: 720px; /* AppShell width=settings */
   --ui-shell-width-wizard: 960px; /* AppShell width=wizard */
-  /* 串口控制台（serialConsole）页面布局规格登记 */
-  --ui-console-side-width: 320px; /* 左栏（服务器管理）宽度 */
-  --ui-console-output-min-height: 160px; /* 控制台输出区最小高度 */
-  --ui-history-max-height: 180px; /* 历史命令列表滚动区最大高 */
-  --ui-status-dot-size: 8px; /* 服务器列表状态圆点尺寸 */
-  /* 第五轮：表单芯片（串口检测 chips）内边距——原 2px 字面量混写擦边过门禁 */
-  --ui-chip-pad-y: 2px;
   /* 任务管理（taskManager）页面布局规格登记（R-U-4） */
   --ui-task-message-max-width: 260px; /* 表格行 message 截断最大宽 */
   --ui-task-status-dot: 6px; /* 运行状态圆点尺寸 */

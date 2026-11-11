@@ -8,12 +8,8 @@ import { WEBVIEW_PAGES, findWebviewPage } from '../../../webview/pages'
  * id 唯一、入口文件真实存在（Vite 多入口与宿主解析的共同前提）。
  */
 describe('WEBVIEW_PAGES', () => {
-  it('注册表恰为 3 页且 id 唯一', () => {
-    expect(WEBVIEW_PAGES.map((page) => page.id)).toEqual([
-      'gallery',
-      'serialConsole',
-      'taskManager',
-    ])
+  it('注册表恰为 2 页且 id 唯一（v4.0.0 串口下线后）', () => {
+    expect(WEBVIEW_PAGES.map((page) => page.id)).toEqual(['gallery', 'taskManager'])
     expect(new Set(WEBVIEW_PAGES.map((page) => page.id)).size).toBe(WEBVIEW_PAGES.length)
   })
 

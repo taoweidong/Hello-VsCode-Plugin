@@ -33,8 +33,7 @@ export function hostMessage(message: HostMessage): void {
 }
 
 /**
- * 统一的 vscode api mock（第五轮基建：替代各 spec 手写双轨 mock——
- * serialConsole 的 createApiMock 与 taskManager 的 window.acquireVsCodeApi 直挂）。
+ * 统一的 vscode api mock（第五轮基建：替代各 spec 手写双轨 mock）。
  * 记录 postMessage 调用序列 + state 读写；经 __setVsCodeApiForTest 注入，
  * 清理由 setup.ts 统一负责。
  */

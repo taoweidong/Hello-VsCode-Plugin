@@ -217,7 +217,7 @@ export function checkManifestConsistency(root: string): void {
     }
 
     const { WEBVIEW_PAGES } = requireFromRoot('./out/webview/pages.js') as PagesModule
-    // 09 方案阶段 2：页面 5 → 2（gallery / serialConsole），下限同步收紧
+    // v4.0.0：串口下线后页面 2 → 1（gallery；taskManager 面板独立装配）
     assert(WEBVIEW_PAGES.length >= 2, `Webview 页面注册数量异常: ${WEBVIEW_PAGES.length}`)
 
     const manifestPath = path.join(root, 'dist', 'webview', '.vite', 'manifest.json')

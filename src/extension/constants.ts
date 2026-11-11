@@ -20,13 +20,6 @@ export const VIEW = {
    * TaskExplorer = 工作区 tasks.json 的任务管理器（v2.3）——两者定位不同，勿混淆。
    */
   taskManagerViewId: 'extStarter.taskManagerView',
-  /** 串口服务器树视图 ID */
-  serialServersViewId: 'extStarter.serialServersView',
-  /** 串口服务器树条目的 contextValue（未连接） */
-  serialServerContextValue: 'serialServer',
-  /** 串口服务器树条目的 contextValue（已连接，图标/菜单可区分） */
-  serialServerConnectedContextValue: 'serialServerConnected',
-
   /** 任务管理器树视图 ID（v2.3：仅加载工作区 .vscode/tasks.json 任务；见上方命名区分） */
   taskExplorerViewId: 'extStarter.taskExplorerView',
   /** 工作区文件夹节点 */
@@ -96,21 +89,6 @@ export const COMMAND = {
   // Webview 页面（Vue 3）
   /** 打开组件画廊（开发用：设计系统视觉验收基准） */
   openGallery: 'extStarter.openGallery',
-  /** 打开串口控制台页面（命令面板 / 视图标题栏） */
-  openSerialConsole: 'extStarter.openSerialConsole',
-
-  // 串口命令控制台
-  /** 新增串口服务器（打开控制台页面表单） */
-  addSerialServer: 'extStarter.addSerialServer',
-  /** 编辑串口服务器（打开控制台页面并预选） */
-  editSerialServer: 'extStarter.editSerialServer',
-  /** 删除串口服务器（树右键；模态确认 + 清理密码） */
-  deleteSerialServer: 'extStarter.deleteSerialServer',
-  /** 连接串口服务器并打开控制台（树条目单击 / inline 按钮） */
-  connectSerialServer: 'extStarter.connectSerialServer',
-  /** 刷新串口服务器树视图 */
-  refreshSerialServers: 'extStarter.refreshSerialServers',
-
   // 草稿箱（右键示例新载体，09 方案 §3.5；8 条右键入口 = editor/context 4 + explorer/context 3 + editor/title 1）
   /** 编辑器右键：登记选中文本到草稿箱 */
   draftSelection: 'extStarter.draftSelection',
@@ -227,8 +205,6 @@ export const CONFIG = {
   section: 'extStarter',
   /** 激活时是否自动执行启动任务 */
   runStartupTasks: 'runStartupTasks',
-  /** 串口控制台开关（特性开关体系退场后平铺，09 §3.4/S1） */
-  serialConsoleEnabled: 'serialConsoleEnabled',
   /**
    * 任务管理后端接口基地址（v2.6 任务管理改造）：
    * 留空（默认）= 打桩模拟；填写后切换真实接口（GET/POST/PUT/DELETE /tasks）。
@@ -255,15 +231,9 @@ export const CONFIG = {
 
 /**
  * 存储相关常量。
- * 09 方案阶段 2：条目存储键随领域删除，仅保留串口侧；新增草稿箱数据文件。
+ * v4.0.0：串口功能下线，相关存储键随功能删除（遗留数据由 services/serialCleanup 清理）。
  */
 export const STORAGE = {
-  /** 串口服务器：未打开工作区时，globalState 的存储键 */
-  serialServersMementoKey: 'extStarter.serialServers',
-  /** 串口命令历史（全局共享、自动去重）：globalState 的存储键 */
-  serialCommandHistoryKey: 'extStarter.serialCommandHistory',
-  /** 串口服务器登录密码的 SecretStorage 键前缀（完整键为 `<前缀><服务器id>.password`） */
-  serialServerSecretPrefix: 'extStarter.serialServer.',
   /**
    * 草稿箱数据文件（相对工作区根）。
    * 已同步进 .gitignore（v2.0 起脏检查随 BuildService 删除，不再有自阻断风险）。
@@ -302,10 +272,4 @@ export const STORAGE = {
   quickCommandsGlobalFileName: 'quick-commands.json',
   /** 快捷命令旧 globalState 存储键：仅供激活期一次性迁移读取旧数据（迁移后清除） */
   quickCommandsMementoKey: 'extStarter.quickCommands',
-  /**
-   * 串口服务器数据文件（相对工作区根；自 serverStore.SERVERS_FILE_RELATIVE_PATH
-   * 收编单一来源，17 方案阶段 4 / P3-05）。
-   * 已同步进 .gitignore。
-   */
-  serialServersFileName: '.vscode/serial-servers.json',
 } as const

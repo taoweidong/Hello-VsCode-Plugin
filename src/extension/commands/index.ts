@@ -4,7 +4,6 @@ import type { DraftBoxService } from '../features/drafts/draftBoxService'
 import type { FavoritesService } from '../features/favorites/favoritesService'
 import type { InitService } from '../features/init/initService'
 import type { QuickCommandsService } from '../features/quickCommands/quickCommandsService'
-import type { SerialConsoleController } from '../features/serialConsole/serialConsoleController'
 import type { TaskExplorerController } from '../features/taskExplorer/taskExplorerController'
 import type { TaskRunner } from '../tasks/taskRunner'
 import { registerBookmarksCommands } from './bookmarksCommands'
@@ -13,7 +12,6 @@ import { registerDraftCommands } from './draftCommands'
 import { registerFavoritesCommands } from './favoritesCommands'
 import { registerPageCommands } from './pageCommands'
 import { registerQuickCommandsCommands } from './quickCommandsCommands'
-import { registerSerialConsoleCommands } from './serialConsoleCommands'
 import { registerTaskExplorerCommands } from './taskExplorerCommands'
 import type { CommandRegistrar } from './shared'
 
@@ -26,8 +24,6 @@ export interface CommandDeps {
   openTaskManager: () => void
   /** 刷新任务管理树视图（v2.6）。 */
   refreshTaskManager: () => void
-  /** 串口命令控制台（树视图 + 面板 + 历史的扩展级组装单元） */
-  serialConsole: SerialConsoleController
   /** 草稿箱（右键示例载体，09 方案 §3.5） */
   drafts: DraftBoxService
   /** 单探针重检（09 方案 §6.1：环境树节点单击路由）。 */
@@ -47,7 +43,7 @@ export interface CommandDeps {
  * 场景与菜单位置的完整对照表见 README。
  *
  * 具体命令按场景维度下沉到分组文件（pageCommands 功能页面 /
- * serialConsoleCommands 串口 / draftCommands 草稿箱），共享工具在 shared.ts；
+ * draftCommands 草稿箱 / 各功能命令组），共享工具在 shared.ts；
  * 本文件只保留组装逻辑与持有 ExtensionContext 的 register 闭包。
  * 命令注册键与清单的闭合由门禁第 ⑥ 步静态校验。
  */
@@ -56,7 +52,6 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
     context.subscriptions.push(vscode.commands.registerCommand(commandId, callback))
   }
   registerPageCommands(register, { ...deps, context })
-  registerSerialConsoleCommands(register, { controller: deps.serialConsole })
   registerDraftCommands(register, { drafts: deps.drafts })
   registerCopyCommands(register) // v2.2：拷贝示例（无宿主依赖，剪贴板即全部）
   registerTaskExplorerCommands(register, { controller: deps.taskExplorer }) // v2.3：任务管理器

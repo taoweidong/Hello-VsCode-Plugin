@@ -25,9 +25,8 @@ async function main(): Promise<void> {
     platform: 'node',
     target: 'es2022',
     outfile,
-    // serialport：原生模块（N-API prebuild），打包期排除、运行时从扩展
     // node_modules 解析（createRequire），.node 二进制由 vsix 随包分发
-    external: ['vscode', 'serialport'],
+    external: ['vscode'],
     minify: production,
     sourcemap: !production,
     sourcesContent: false,

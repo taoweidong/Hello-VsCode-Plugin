@@ -218,7 +218,7 @@ describe('registerSerializer（窗口重载恢复）', () => {
     const serializerContext = createExtensionContextStub() as unknown as vscode.ExtensionContext
     // 工厂形态 deps：覆盖「按 pageId 分发」分支
     WebviewController.registerSerializer(serializerContext, () => deps)
-    expect(__stubs.registeredSerializers.size).toBe(3)
+    expect(__stubs.registeredSerializers.size).toBe(2) // v4.0.0 串口下线后剩 gallery / taskManager
 
     // 模拟窗口重载恢复 taskManager 面板（带持久化状态）
     const panel = createFakePanel(webviewViewType('taskManager'), '任务管理')

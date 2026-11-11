@@ -82,15 +82,8 @@
     <text x="70" y="466" fill="#858585" font-size="11">▸ 单击条目打开任务管理面板</text>
   </g>
 
-  <g>
-    <text x="64" y="490" fill="#bbbbbb" font-size="11" font-weight="bold">串口服务器</text>
-    <text x="252" y="490" fill="#cccccc" font-size="11">＋</text>
-    <text x="274" y="490" fill="#cccccc" font-size="11">↻</text>
-    <text x="70" y="508" fill="#858585" font-size="11">▸ 服务器列表 · 单击连接并打开控制台</text>
-  </g>
-
   <rect x="340" y="34" width="560" height="492" fill="#1e1e1e"/>
-  <text x="620" y="120" fill="#dcdcaa" font-size="16" text-anchor="middle" font-weight="bold">八个视图一览</text>
+  <text x="620" y="120" fill="#dcdcaa" font-size="16" text-anchor="middle" font-weight="bold">七个视图一览</text>
   <g font-size="13" fill="#cccccc">
     <text x="400" y="140">① 任务管理器 —— 工作区 tasks.json 任务树（运行/停止/收藏/定位）</text>
     <text x="400" y="168">② 收藏夹 —— 文件/文件夹路径收藏：别名、单击直达（v3.4）</text>
@@ -99,14 +92,13 @@
     <text x="400" y="252">⑤ 环境信息 —— 激活时自动检测 Python / Node / Git 等</text>
     <text x="400" y="280">⑥ 环境初始化 —— 步骤清单，单击执行单步或全部</text>
     <text x="400" y="308">⑦ 任务管理 —— CRUD 分页表格（HTTP 打桩 / 真实接口）</text>
-    <text x="400" y="336">⑧ 串口服务器 —— 服务器管理 + 串口控制台下发命令</text>
   </g>
   <rect x="380" y="356" width="480" height="140" rx="6" fill="#252526" stroke="#414141"/>
   <text x="396" y="382" fill="#dcdcaa" font-size="12" font-weight="bold">💡 建议的体验顺序</text>
   <text x="396" y="404" fill="#cccccc" font-size="12">先看 ⑤ 环境信息、⑥ 环境初始化（激活即自动执行），</text>
   <text x="396" y="424" fill="#cccccc" font-size="12">再玩 ② 收藏夹（右键添加）、③ 书签（Ctrl+Alt+K 打点跳转）、① 任务管理器、⑦ 任务管理，</text>
-  <text x="396" y="444" fill="#cccccc" font-size="12">最后 ⑧ 串口服务器（录入后连接下发命令）。</text>
-  <text x="396" y="470" fill="#858585" font-size="12">另有 3 个 Webview 页面（组件画廊 / 串口控制台 / 任务管理）；</text>
+  <text x="396" y="444" fill="#cccccc" font-size="12">以上七个视图覆盖模板的全部典型模式。</text>
+  <text x="396" y="470" fill="#858585" font-size="12">另有 2 个 Webview 页面（组件画廊 / 任务管理）；</text>
   <text x="396" y="488" fill="#858585" font-size="12">视图标题栏按钮随视图切换（when 条件门禁已校验）。</text>
 
   <rect y="526" width="900" height="34" fill="#007acc"/>

@@ -55,8 +55,8 @@ const TITLE_LIMIT = 40
 const MAX_CONTENT_CHARS = 64 * 1024
 
 function nextDraftId(): string {
-  // 经 globalThis.crypto 而非 node:crypto：与串口侧 models.ts 同理，避免在
-  // Webview 可达的模块里引入 Node 内建依赖
+  // 经 globalThis.crypto 而非 node:crypto：避开 Node 内建依赖（跨侧模块口径），
+  // 避免 Webview 可达的模块引入 Node 运行时
   return (globalThis.crypto as { randomUUID(): string }).randomUUID()
 }
 

@@ -3,8 +3,8 @@ import type { StepStatus } from '../features/init/initService'
 import { reasonOf } from '../services/errors'
 
 /**
- * 命令层共享工具：被各场景分组（pageCommands / serialConsoleCommands /
- * draftCommands）复用的纯函数与用户反馈入口。
+ * 命令层共享工具：被各场景分组（页面 / 收藏夹 / 书签 / 快捷命令 / 草稿箱 / 任务）
+ * 复用的纯函数与用户反馈入口。
  * 09 方案阶段 2：条目相关的 10 个符号（buildMoreActions / toMarkdown / toItem /
  * collectTargets / summarize / names / openFileForm / pickItem / MoreActionPick /
  * PREVIEW_MAX_BYTES）已随条目领域删除。

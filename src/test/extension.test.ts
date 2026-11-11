@@ -273,28 +273,6 @@ suite('任务管理（v2.6 端到端冒烟）', () => {
   })
 })
 
-suite('串口控制台（命令装配冒烟）', () => {
-  test('openSerialConsole 打开面板；打开态下 addSerialServer / refreshSerialServers 可执行', async () => {
-    // 此前 serialConsole 六条命令的装配接线无任何一层测试（第五轮评估盲区 1）：
-    // 这里走真实宿主验证「命令 → 控制器 → 面板」链路
-    await vscode.commands.executeCommand('extStarter.openSerialConsole')
-    const hasPanel = (): boolean =>
-      vscode.window.tabGroups.all
-        .flatMap((group) => group.tabs)
-        .some((tab) => {
-          const viewType = String((tab as unknown as { viewType?: string }).viewType ?? '')
-          return viewType.endsWith('.serialConsole') || (tab.label ?? '').includes('串口控制台')
-        })
-    await vi_tabWait(hasPanel)
-    assert.ok(hasPanel(), '串口控制台面板应已创建（tabGroups 可见）')
-
-    await assert.doesNotReject(async () => {
-      await vscode.commands.executeCommand('extStarter.addSerialServer')
-      await vscode.commands.executeCommand('extStarter.refreshSerialServers')
-    }, '新增 / 刷新命令应可执行（命令 → 控制器接线成功）')
-  })
-})
-
 suite('Task Explorer（v2.3 集成冒烟）', () => {
   test('8 条任务管理器命令全部注册', async () => {
     const commands = new Set(await vscode.commands.getCommands())

@@ -7,7 +7,7 @@
 
 | 职责                                        | 文件                                    | 关键符号                                                                |
 | ------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------- |
-| ★ 页面注册表（扩展点）                      | `src/webview/pages.ts`                  | `WEBVIEW_PAGES`（当前 gallery / serialConsole / taskManager）           |
+| ★ 页面注册表（扩展点）                      | `src/webview/pages.ts`                  | `WEBVIEW_PAGES`（当前 gallery / taskManager）                           |
 | 消息协议 + 运行时守卫（唯一跨侧契约）       | `src/webview/protocol.ts`               | `HostMessage` / `WebviewMessage` / `isHostMessage` / `isWebviewMessage` |
 | 表单字段派生（领域无关）                    | `src/webview/formSchema.ts`             | `deriveFormSchema` `toFieldDefs` `SchemaFieldDef`                       |
 | 宿主控制器（生命周期 / dirty / serializer） | `src/webview/host/webviewController.ts` | `WebviewController`                                                     |
@@ -62,12 +62,12 @@ VCheckbox / VFormField / VBadge / VEmptyState / VLoading / VTextarea…），
 
 ## 测试
 
-| 内容                                             | 文件                                                    |
-| ------------------------------------------------ | ------------------------------------------------------- |
-| 协议守卫（21 分支全覆盖，100% 阈值）             | `src/test/unit/webview/protocol.spec.ts`                |
-| 表单派生                                         | `src/test/unit/webview/formSchema.spec.ts`              |
-| 控制器 / HTML / 资源解析 / SchemaForm / 字段组件 | `src/test/unit/webview/` 各 spec                        |
-| 真实浏览器 e2e（含 codicon 字体断言）            | `tests/e2e/{gallery,serialConsole,taskManager}.spec.ts` |
+| 内容                                             | 文件                                       |
+| ------------------------------------------------ | ------------------------------------------ |
+| 协议守卫（21 分支全覆盖，100% 阈值）             | `src/test/unit/webview/protocol.spec.ts`   |
+| 表单派生                                         | `src/test/unit/webview/formSchema.spec.ts` |
+| 控制器 / HTML / 资源解析 / SchemaForm / 字段组件 | `src/test/unit/webview/` 各 spec           |
+| 真实浏览器 e2e（含 codicon 字体断言）            | `tests/e2e/{gallery,taskManager}.spec.ts`  |
 
 ## 常见坑
 

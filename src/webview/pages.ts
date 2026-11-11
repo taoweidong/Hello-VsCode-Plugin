@@ -14,7 +14,6 @@
  */
 export const WEBVIEW_PAGES = [
   { id: 'gallery', title: '组件画廊（开发）', entry: 'src/webview/apps/gallery/main.ts' },
-  { id: 'serialConsole', title: '串口控制台', entry: 'src/webview/apps/serialConsole/main.ts' },
   { id: 'taskManager', title: '任务管理', entry: 'src/webview/apps/taskManager/main.ts' },
 ] as const
 

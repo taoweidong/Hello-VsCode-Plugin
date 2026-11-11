@@ -195,7 +195,7 @@ export function createTaskManagerDeps(services: TaskManagerServices): WebviewCon
   }
 }
 
-/** 面板单例包装（模式对齐 SerialConsolePanel）。 */
+/** 面板单例包装（模式对齐 WebviewController 的页面面板：单例 + 序列化恢复）。 */
 export class TaskManagerPanel {
   private static context: vscode.ExtensionContext | undefined
 
