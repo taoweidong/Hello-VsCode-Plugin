@@ -214,3 +214,24 @@ describe('QuickCommandsTreeProvider（两级树）', () => {
     expect(fired).toBeGreaterThan(0)
   })
 })
+
+describe('未分组节点 contextValue（v4.0.1）', () => {
+  it('未分组使用独立 contextValue，不显示分组重命名/删除菜单', async () => {
+    const { service, provider } = makeHost({ commands: [{ id: 'c1', name: 'a', command: 'ls' }] })
+    await service.load()
+    const groups = await provider.getChildren()
+    const ungrouped = groups.find((node) => node.kind === 'group' && node.group === null)
+    expect(ungrouped).toBeDefined()
+    const treeItem = provider.getTreeItem(ungrouped!)
+    expect(treeItem.contextValue).toBe('quickCommandGroupUngrouped')
+    expect(treeItem.contextValue).not.toBe('quickCommandGroup')
+  })
+
+  it('真实分组仍使用 quickCommandGroup', async () => {
+    const { service, provider } = makeHost({ groups: [{ id: 'g1', name: 'git' }] })
+    await service.load()
+    const groups = await provider.getChildren()
+    const treeItem = provider.getTreeItem(groups[0]!)
+    expect(treeItem.contextValue).toBe('quickCommandGroup')
+  })
+})

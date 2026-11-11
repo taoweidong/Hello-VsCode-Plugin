@@ -382,6 +382,48 @@ describe('快捷命令命令壳（v3.5）', () => {
   })
 })
 
+describe('树节点包装解包（v4.0.1：inline / 右键按钮传入节点而非裸条目）', () => {
+  const groupSeed = { id: 'g1', name: 'git', createdAt: '2026-01-01T00:00:00.000Z' }
+  const nodeOf = (item: QuickCommandItem) => ({ kind: 'command' as const, item, group: null })
+
+  it('executeQuickCommand / editQuickCommand 经节点包装生效', async () => {
+    const { service, run } = makeHost({
+      groups: [groupSeed],
+      commands: [{ id: 'c1', name: 'push', command: 'git push', groupId: 'g1' }],
+    })
+    await service.load()
+    await run('extStarter.executeQuickCommand', nodeOf(service.get('c1')!))
+    expect(recordedOf('terminalSendText')).toHaveLength(1)
+
+    __stubs.dialogQueue.push('git pull')
+    await run('extStarter.editQuickCommand', nodeOf(service.get('c1')!))
+    expect(service.get('c1')!.command).toBe('git pull')
+  })
+
+  it('renameQuickCommand / removeQuickCommand 经节点包装生效', async () => {
+    const { service, run } = makeHost({ commands: [{ id: 'c1', name: 'x', command: 'ls' }] })
+    await service.load()
+    __stubs.dialogQueue.push('列目录')
+    await run('extStarter.renameQuickCommand', nodeOf(service.get('c1')!))
+    expect(service.get('c1')!.name).toBe('列目录')
+    await run('extStarter.removeQuickCommand', nodeOf(service.get('c1')!))
+    expect(service.get('c1')).toBeUndefined()
+  })
+
+  it('renameQuickCommandGroup / removeQuickCommandGroup 经分组节点包装生效', async () => {
+    const { service, run } = makeHost({ groups: [groupSeed] })
+    await service.load()
+    __stubs.dialogQueue.push('版本控制')
+    const groupNode = { kind: 'group' as const, group: service.getGroup('g1')!, children: [] }
+    await run('extStarter.renameQuickCommandGroup', groupNode)
+    expect(service.getGroup('g1')!.name).toBe('版本控制')
+
+    __stubs.dialogQueue.push('删除')
+    await run('extStarter.removeQuickCommandGroup', groupNode)
+    expect(service.getGroup('g1')).toBeUndefined()
+  })
+})
+
 describe('openQuickCommandsDataFile（17 方案阶段 4）', () => {
   it('确保数据文件存在后用编辑器打开（注册 + 行为）', async () => {
     const { service, registered, run } = makeHost()

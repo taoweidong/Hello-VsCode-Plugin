@@ -85,6 +85,18 @@ export function requireTreeItem<T>(
   if (guard(value)) {
     return value
   }
+  // view/item/context 菜单（右键 / inline 按钮）传入的是 TreeDataProvider 的节点
+  // 包装（本仓约定形态 { kind, item } 或 { kind, group }），而命令要的是原始领域
+  // 条目——先解包再按守卫校验（v4.0.1 修复：此前内联按钮全部被守卫拦截不生效）
+  if (typeof value === 'object' && value !== null) {
+    const wrapper = value as { item?: unknown; group?: unknown }
+    if (guard(wrapper.item)) {
+      return wrapper.item
+    }
+    if (guard(wrapper.group)) {
+      return wrapper.group
+    }
+  }
   void vscode.window.showInformationMessage(hint)
   return undefined
 }

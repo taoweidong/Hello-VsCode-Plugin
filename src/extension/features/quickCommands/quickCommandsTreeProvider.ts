@@ -55,7 +55,9 @@ export class QuickCommandsTreeProvider
         vscode.TreeItemCollapsibleState.Collapsed
       )
       treeItem.iconPath = new vscode.ThemeIcon(node.group ? 'folder' : 'inbox')
-      treeItem.contextValue = VIEW.quickCommandGroupContextValue
+      treeItem.contextValue = node.group
+        ? VIEW.quickCommandGroupContextValue
+        : VIEW.quickCommandGroupUngroupedContextValue
       return treeItem
     }
     const item = node.item

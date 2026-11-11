@@ -4,6 +4,27 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.1] - 2026-11-11
+
+### 修复（树视图 inline / 右键按钮不生效）
+
+- **快捷命令「执行 / 编辑」等内联与右键按钮点击无反应**（同类问题覆盖收藏夹、
+  书签、快捷命令三棵树的全部条目命令）：`view/item/context` 菜单传入的是
+  TreeDataProvider 的节点包装（`{ kind, item }` / `{ kind, group }`），而命令守卫
+  只认裸领域条目，校验失败后仅弹「请从视图操作」提示。`requireTreeItem` 现统一
+  解包节点包装后再按守卫校验（`src/extension/commands/shared.ts`），
+  单击（TreeItem.command 传裸条目）行为不变；
+- 「未分组」节点改用独立 `contextValue`（`quickCommandGroupUngrouped`）：
+  不再显示「重命名 / 删除分组」菜单（它并非真实分组）；
+- 回归测试：shared 解包 4 例 + 快捷命令节点包装 3 组 + 收藏夹打开 / 书签跳转
+  各 1 例 + 未分组 contextValue 2 例；全量单测 701 例绿。
+
+### 说明
+
+- 影响范围：v3.4~v3.5 引入树视图包装节点后，收藏夹 / 书签 / 快捷命令三树的
+  菜单按钮一直只弹提示不执行；本次一次性修复该类。任务管理器（TaskExplorer）
+  节点本身即命令入参形态，不受影响。
+
 ## [4.0.0] - 2026-11-11
 
 ### ⚠ 破坏性变更（串口功能下线）

@@ -123,6 +123,22 @@ describe('registerFavoritesCommands（收藏夹命令）', () => {
     expect(__stubs.recorded.at(-1)?.kind).toBe('showInformationMessage')
   })
 
+  it('P0 回归（v4.0.1）：菜单传入节点包装（{ kind: favorite, item }）时打开生效', async () => {
+    const favorites = makeService()
+    const registered = new Map<string, (...args: unknown[]) => unknown>()
+    registerFavoritesCommands((id, cb) => registered.set(id, cb), { favorites })
+    await favorites.add([await makeRealFile('wrapped.ts')], '包装')
+    const live = favorites.list()[0]!
+    const node = { kind: 'favorite', item: live }
+    await registered.get(COMMAND.openFavorite)?.(node)
+    expect(
+      __stubs.recorded.some(
+        (entry) =>
+          entry.kind === 'executeCommand' && JSON.stringify(entry.args).includes('vscode.open')
+      )
+    ).toBe(true)
+  })
+
   it('⑥ 复制路径写入剪贴板（解析为绝对路径）', async () => {
     const favorites = makeService()
     const registered = new Map<string, (...args: unknown[]) => unknown>()

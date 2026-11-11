@@ -61,6 +61,8 @@ export const VIEW = {
   quickCommandContextValue: 'quickCommand',
   /** 快捷命令分组节点的 contextValue */
   quickCommandGroupContextValue: 'quickCommandGroup',
+  /** 「未分组」节点的 contextValue（非真实分组：不套用分组重命名/删除菜单） */
+  quickCommandGroupUngroupedContextValue: 'quickCommandGroupUngrouped',
 } as const
 
 /**

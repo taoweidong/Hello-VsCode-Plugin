@@ -210,6 +210,10 @@ describe('registerBookmarksCommands（书签命令）', () => {
     __setDocument(fileUri, 'a\nb\nc')
     await registered.get(COMMAND.jumpToBookmark)?.(item)
     expect(__stubs.recorded.some((entry) => entry.kind === 'showTextDocument')).toBe(true)
+    // v4.0.1 回归：菜单（右键 / inline）传入节点包装时同样生效
+    __setDocument(fileUri, ['a', 'b', 'c'].join(String.fromCharCode(10)))
+    await registered.get(COMMAND.jumpToBookmark)?.({ kind: 'bookmark', item })
+    expect(__stubs.recorded.some((entry) => entry.kind === 'showTextDocument')).toBe(true)
     const before = __stubs.recorded.length
     await registered.get(COMMAND.jumpToBookmark)?.()
     expect(__stubs.recorded.length).toBe(before + 1)
