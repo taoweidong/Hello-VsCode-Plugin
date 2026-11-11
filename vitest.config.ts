@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config'
 /**
  * 单元 / 组件测试配置（NFR-07 / docs/需求与优化方案/03 §6）：
  * - `vscode` 模块统一替换为 src/test/unit/stubs/vscode.ts（双工程共用同一别名）；
- * - **双工程拆分（第五轮基建）**：仅 `src/test/unit/webview/**`（约 24 个组件 / 页面
+ * - **双工程拆分（第五轮基建）**：仅 `src/test/unit/webview/**`（约 29 个组件 / 页面
  *   用例）需要 jsdom；其余宿主侧用例在 node 环境跑——此前 jsdom 全局一刀切，
  *   64 个文件各自实例化 jsdom（实测占整轮耗时的 93%+），拆分后宿主侧零环境开销；
  * - setupFiles 全局清理：stubs 与 vscode api 单例在每个用例后复位（上收此前

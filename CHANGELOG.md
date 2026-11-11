@@ -4,6 +4,15 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.7.1] - 2026-11-11
+
+### 测试（集成测试版本固定）
+
+- **宿主集成测试固定 VS Code 版本 `1.145.3`**（`src/test/runTest.ts`，可用
+  `VSCODE_TEST_VERSION` 覆盖）——此前不固定版本时每次 VS Code 新版发布会触发
+  约 384MB 下载，内网 15s 请求超时直接让门禁第 ⑧ 步失败（本次 1.146.0 即命中）；
+  固定后复用 `.vscode-test/` 缓存，测试可稳定重复执行（12 号文档 P3-G2 留档项落地）。
+
 ## [3.7.0] - 2026-11-11
 
 ### 新增（17 方案阶段 4：快捷命令数据可迁移）

@@ -114,7 +114,7 @@ export function checkManifestConsistency(root: string): void {
       }
     }
   }
-  // keybindings 可选（09 方案阶段 2 后为 0 条）；存在时校验引用闭合
+  // keybindings 可选（v3.6.0 起书签 3 条快捷键）；存在时校验引用闭合
   for (const kb of pkg.contributes.keybindings ?? []) {
     assert(cmds.has(kb.command), `快捷键引用未声明命令: ${kb.command}`)
   }
