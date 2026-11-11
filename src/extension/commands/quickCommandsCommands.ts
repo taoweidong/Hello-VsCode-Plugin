@@ -1,7 +1,10 @@
 import * as vscode from 'vscode'
 import {
+  isCommandSequence,
   MAX_QUICK_COMMAND_GROUPS,
   MAX_QUICK_COMMANDS,
+  MAX_SEQUENCE_LINES,
+  splitCommandSequence,
   UNGROUPED_LABEL,
   type QuickCommandGroup,
   type QuickCommandItem,
@@ -114,7 +117,12 @@ async function promptAndAdd(quickCommands: QuickCommandsService, command: string
   try {
     const result = await quickCommands.addCommand({ command, name: alias, groupId: group.groupId })
     if (result.status === 'added') {
-      void vscode.window.showInformationMessage(`已收藏快捷命令「${result.item.name}」。`)
+      const lineCount = splitCommandSequence(result.item.command).length
+      void vscode.window.showInformationMessage(
+        lineCount > 1
+          ? `已收藏命令序列「${result.item.name}」（${lineCount} 条，执行时逐条发送）。`
+          : `已收藏快捷命令「${result.item.name}」。`
+      )
     } else if (result.status === 'duplicate') {
       void vscode.window.showInformationMessage(
         `已存在相同命令：「${result.existing.name}」（不重复收藏）。`
@@ -154,9 +162,11 @@ function buildRunItems(quickCommands: QuickCommandsService): RunPickItem[] {
 }
 
 function runItemOf(item: QuickCommandItem, groupName: string): RunPickItem {
+  const lines = splitCommandSequence(item.command)
+  const preview = (lines[0] ?? '').replace(/\s+/g, ' ').trim()
   return {
     label: item.name,
-    description: item.command.replace(/\s+/g, ' ').trim(),
+    description: lines.length > 1 ? `${preview}（序列 · ${lines.length} 条）` : preview,
     detail: `${groupName} · 已执行 ${item.useCount ?? 0} 次`,
     item,
   }
@@ -170,8 +180,8 @@ export function registerQuickCommandsCommands(
 
   register(COMMAND.addQuickCommand, async () => {
     const command = await vscode.window.showInputBox({
-      prompt: '要收藏的命令（支持多行）',
-      placeHolder: '例如：git push origin main',
+      prompt: '要收藏的命令（单条）',
+      placeHolder: '例如：git push origin main；多行序列请用「新增命令序列（剪贴板多行）」',
     })
     if (command === undefined) {
       return
@@ -181,6 +191,32 @@ export function registerQuickCommandsCommands(
       return
     }
     await promptAndAdd(quickCommands, command)
+  })
+
+  // v5.1.0：新增命令序列——读剪贴板多行文本，每行一条，保存为一个多行条目；
+  // 执行时按行拆分、逐条 sendText（300ms 间隔），见 QuickCommandsService.execute
+  register(COMMAND.addQuickCommandSequence, async () => {
+    let text: string
+    try {
+      text = await vscode.env.clipboard.readText()
+    } catch (err) {
+      showError(err)
+      return
+    }
+    const lines = splitCommandSequence(text)
+    if (lines.length === 0) {
+      void vscode.window.showInformationMessage(
+        '剪贴板为空：请先复制多行命令（每行一条），再执行「新增命令序列」。'
+      )
+      return
+    }
+    if (lines.length > MAX_SEQUENCE_LINES) {
+      void vscode.window.showWarningMessage(
+        `命令序列最多 ${MAX_SEQUENCE_LINES} 条（剪贴板当前 ${lines.length} 条）。`
+      )
+      return
+    }
+    await promptAndAdd(quickCommands, lines.join(String.fromCharCode(10)))
   })
 
   register(COMMAND.captureTerminalSelection, async () => {
@@ -241,10 +277,42 @@ export function registerQuickCommandsCommands(
     if (!item) {
       return
     }
-    const command = await vscode.window.showInputBox({
-      prompt: '新的命令文本',
-      value: item.command,
-    })
+    let command: string | undefined
+    if (isCommandSequence(item.command)) {
+      // 多行序列无法用单行输入框安全编辑：先把新内容复制到剪贴板，再确认替换
+      const lines = splitCommandSequence(item.command)
+      const replaceLabel = '从剪贴板替换命令序列'
+      const choice = await vscode.window.showQuickPick([replaceLabel, '取消'], {
+        placeHolder: `当前为命令序列（${lines.length} 条）：请先把新内容复制到剪贴板`,
+      })
+      if (choice !== replaceLabel) {
+        return
+      }
+      let text: string
+      try {
+        text = await vscode.env.clipboard.readText()
+      } catch (err) {
+        showError(err)
+        return
+      }
+      const nextLines = splitCommandSequence(text)
+      if (nextLines.length === 0) {
+        void vscode.window.showWarningMessage('剪贴板为空，命令序列未修改。')
+        return
+      }
+      if (nextLines.length > MAX_SEQUENCE_LINES) {
+        void vscode.window.showWarningMessage(
+          `命令序列最多 ${MAX_SEQUENCE_LINES} 条（剪贴板当前 ${nextLines.length} 条）。`
+        )
+        return
+      }
+      command = nextLines.join(String.fromCharCode(10))
+    } else {
+      command = await vscode.window.showInputBox({
+        prompt: '新的命令文本',
+        value: item.command,
+      })
+    }
     if (command === undefined) {
       return
     }
@@ -252,6 +320,11 @@ export function registerQuickCommandsCommands(
       const result = await quickCommands.updateCommandText(item.id, command)
       if (result === 'duplicate') {
         void vscode.window.showInformationMessage('已存在相同命令，不重复收藏。')
+      } else if (result === 'updated') {
+        const lineCount = splitCommandSequence(command).length
+        void vscode.window.showInformationMessage(
+          lineCount > 1 ? `已更新命令序列（${lineCount} 条）。` : '已更新命令文本。'
+        )
       } else if (result === 'empty') {
         void vscode.window.showWarningMessage('命令文本不能为空。')
       } else if (result === 'notfound') {

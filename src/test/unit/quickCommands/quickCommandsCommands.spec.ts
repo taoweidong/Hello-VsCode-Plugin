@@ -382,6 +382,72 @@ describe('快捷命令命令壳（v3.5）', () => {
   })
 })
 
+describe('命令序列（v5.1.0：剪贴板多行新增 / 逐条执行条目）', () => {
+  const NL = String.fromCharCode(10)
+
+  it('addQuickCommandSequence：剪贴板多行 → 单条目保存（保留换行）+ 别名 + 分组', async () => {
+    const { service, run } = makeHost({ groups: [{ id: 'g1', name: '构建' }] })
+    await service.load()
+    __stubs.clipboard = ['npm ci', 'npm run build', 'npm test'].join(NL)
+    __stubs.dialogQueue.push('build-all', groupPick('g1'))
+
+    await run('extStarter.addQuickCommandSequence')
+
+    const items = service.listCommands()
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({
+      name: 'build-all',
+      groupId: 'g1',
+      command: ['npm ci', 'npm run build', 'npm test'].join(NL),
+    })
+    expect(recordedOf('showInformationMessage').at(-1)!.args[0]).toMatchObject({
+      message: expect.stringContaining('命令序列'),
+    })
+  })
+
+  it('addQuickCommandSequence：剪贴板为空 → 信息提示且不弹任何输入框', async () => {
+    const { service, run } = makeHost()
+    await service.load()
+    __stubs.clipboard = '   '
+    await run('extStarter.addQuickCommandSequence')
+    expect(service.listCommands()).toEqual([])
+    expect(recordedOf('showInputBox')).toHaveLength(0)
+    expect(recordedOf('showInformationMessage').at(-1)!.args[0]).toMatchObject({
+      message: expect.stringContaining('剪贴板为空'),
+    })
+  })
+
+  it('addQuickCommandSequence：超过 50 条上限 → 告警且不入库', async () => {
+    const { service, run } = makeHost()
+    await service.load()
+    __stubs.clipboard = Array.from({ length: 51 }, (_, index) => `cmd-${index}`).join(NL)
+    await run('extStarter.addQuickCommandSequence')
+    expect(service.listCommands()).toEqual([])
+    expect(recordedOf('showWarningMessage').at(-1)!.args[0]).toMatchObject({
+      message: expect.stringContaining('最多 50 条'),
+    })
+  })
+
+  it('editQuickCommand：命令序列经剪贴板替换（弹确认 QuickPick）；空剪贴板不改动', async () => {
+    const { service, run } = makeHost({
+      commands: [{ id: 'c1', name: 'build', command: ['a', 'b'].join(NL) }],
+    })
+    await service.load()
+    __stubs.dialogQueue.push('从剪贴板替换命令序列')
+    __stubs.clipboard = ['a', 'c', 'd'].join(NL)
+    await run('extStarter.editQuickCommand', service.get('c1')!)
+    expect(service.get('c1')!.command).toBe(['a', 'c', 'd'].join(NL))
+
+    __stubs.dialogQueue.push('从剪贴板替换命令序列')
+    __stubs.clipboard = ''
+    await run('extStarter.editQuickCommand', service.get('c1')!)
+    expect(service.get('c1')!.command).toBe(['a', 'c', 'd'].join(NL))
+    expect(recordedOf('showWarningMessage').at(-1)!.args[0]).toMatchObject({
+      message: expect.stringContaining('剪贴板为空'),
+    })
+  })
+})
+
 describe('树节点包装解包（v4.0.1：inline / 右键按钮传入节点而非裸条目）', () => {
   const groupSeed = { id: 'g1', name: 'git', createdAt: '2026-01-01T00:00:00.000Z' }
   const nodeOf = (item: QuickCommandItem) => ({ kind: 'command' as const, item, group: null })

@@ -1028,10 +1028,11 @@ suite('收藏夹（v3.4 集成冒烟）', () => {
 })
 
 suite('快捷命令（v3.5 集成冒烟）', () => {
-  test('13 条快捷命令命令全部注册', async () => {
+  test('14 条快捷命令命令全部注册', async () => {
     const commands = new Set(await vscode.commands.getCommands())
     for (const id of [
       'extStarter.addQuickCommand',
+      'extStarter.addQuickCommandSequence',
       'extStarter.captureTerminalSelection',
       'extStarter.quickRunCommands',
       'extStarter.executeQuickCommand',

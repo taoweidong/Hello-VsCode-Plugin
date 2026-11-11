@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import { COMMAND, VIEW } from '../../constants'
-import { UNGROUPED_LABEL } from './quickCommandsService'
+import { splitCommandSequence, UNGROUPED_LABEL } from './quickCommandsService'
 import type {
   QuickCommandGroup,
   QuickCommandItem,
@@ -61,8 +61,12 @@ export class QuickCommandsTreeProvider
       return treeItem
     }
     const item = node.item
+    const lines = splitCommandSequence(item.command)
     const treeItem = new vscode.TreeItem(item.name, vscode.TreeItemCollapsibleState.None)
-    treeItem.description = singleLine(item.command)
+    treeItem.description =
+      lines.length > 1
+        ? `${singleLine(lines[0] ?? '')}（序列 · ${lines.length} 条）`
+        : singleLine(item.command)
     treeItem.iconPath = new vscode.ThemeIcon('terminal')
     // 单击直达：在专用终端执行（带参路由同一命令）
     treeItem.command = {
@@ -71,10 +75,17 @@ export class QuickCommandsTreeProvider
       arguments: [item],
     }
     treeItem.contextValue = VIEW.quickCommandContextValue
+    const commandSection =
+      lines.length > 1
+        ? [
+            '- 命令序列（执行时逐条发送）：',
+            ...lines.map((line, index) => `  ${index + 1}. \`${line.replace(/`/g, '\\`')}\``),
+          ]
+        : [`- 命令：\`${item.command.replace(/`/g, '\\`')}\``]
     treeItem.tooltip = new vscode.MarkdownString(
       [
         `**${item.name}**`,
-        `- 命令：\`${item.command.replace(/`/g, '\\`')}\``,
+        ...commandSection,
         `- 分组：${node.group ? node.group.name : UNGROUPED_LABEL}`,
         `- 已执行：${item.useCount ?? 0} 次${item.lastUsedAt ? `（最近 ${new Date(item.lastUsedAt).toLocaleString()}）` : ''}`,
         `- 收藏于：${new Date(item.addedAt).toLocaleString()}`,

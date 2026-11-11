@@ -171,7 +171,7 @@ describe('QuickCommandsTreeProvider（两级树）', () => {
 
   it('命令节点：label=别名、description=命令单行、icon=terminal、contextValue、单击路由 executeQuickCommand', async () => {
     const provider = await loaded({
-      commands: [{ id: 'c1', name: 'push', command: 'git push\norigin main', groupId: null }],
+      commands: [{ id: 'c1', name: 'push', command: 'git push    origin main', groupId: null }],
     })
     const groupNode = (await provider.getChildren())[0]!
     expect(groupNode.kind).toBe('group')
@@ -233,5 +233,32 @@ describe('未分组节点 contextValue（v4.0.1）', () => {
     const groups = await provider.getChildren()
     const treeItem = provider.getTreeItem(groups[0]!)
     expect(treeItem.contextValue).toBe('quickCommandGroup')
+  })
+})
+
+describe('命令序列展示（v5.1.0）', () => {
+  const NL = String.fromCharCode(10)
+
+  it('多行条目：description 带序列条数，tooltip 逐条编号', async () => {
+    const { service, provider } = makeHost({
+      commands: [{ id: 'c1', name: 'build', command: ['npm ci', 'npm test'].join(NL) }],
+    })
+    await service.load()
+    const groups = await provider.getChildren()
+    const nodes = await provider.getChildren(groups[0]!)
+    const treeItem = provider.getTreeItem(nodes[0]!)
+    expect(treeItem.description).toContain('序列 · 2 条')
+    const tooltip = (treeItem.tooltip as { value: string }).value
+    expect(tooltip).toContain('命令序列（执行时逐条发送）')
+    expect(tooltip).toContain('1. `npm ci`')
+    expect(tooltip).toContain('2. `npm test`')
+  })
+
+  it('单行条目：description 不含序列标记', async () => {
+    const { service, provider } = makeHost({ commands: [{ id: 'c1', name: 'a', command: 'ls' }] })
+    await service.load()
+    const groups = await provider.getChildren()
+    const nodes = await provider.getChildren(groups[0]!)
+    expect(provider.getTreeItem(nodes[0]!).description).toBe('ls')
   })
 })

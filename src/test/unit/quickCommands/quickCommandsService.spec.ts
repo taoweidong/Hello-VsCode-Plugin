@@ -1,12 +1,14 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as vscode from 'vscode'
 import {
   defaultAlias,
+  isCommandSequence,
   MAX_QUICK_COMMAND_GROUPS,
   MAX_QUICK_COMMANDS,
   normalizeQuickCommandData,
   QUICK_COMMANDS_SCHEMA_VERSION,
   QuickCommandsService,
+  splitCommandSequence,
   type IQuickCommandsStore,
   type QuickCommandGroup,
   type QuickCommandsData,
@@ -487,6 +489,83 @@ describe('QuickCommandsService（业务服务）', () => {
     })
     await service.addCommand({ command: 'ls', groupId: null })
     expect(fired).toBeGreaterThan(0)
+  })
+})
+
+describe('命令序列（v5.1.0：多行条目逐条执行）', () => {
+  const NL = String.fromCharCode(10)
+
+  it('splitCommandSequence：按行拆分 / trim / 去空行；单行返回 1 条', () => {
+    expect(splitCommandSequence(['  npm ci ', '', 'npm test'].join(NL))).toEqual([
+      'npm ci',
+      'npm test',
+    ])
+    expect(splitCommandSequence(`a${String.fromCharCode(13)}${NL}b`)).toEqual(['a', 'b'])
+    expect(splitCommandSequence('ls')).toEqual(['ls'])
+    expect(splitCommandSequence('   ')).toEqual([])
+    expect(isCommandSequence(['a', 'b'].join(NL))).toBe(true)
+    expect(isCommandSequence('ls')).toBe(false)
+  })
+
+  function makeSequenceService(lines: string[]): {
+    service: QuickCommandsService
+    store: FakeStore
+  } {
+    const store = new FakeStore()
+    store.data = {
+      groups: [],
+      commands: [
+        {
+          id: 'c1',
+          name: 'build',
+          command: lines.join(NL),
+          groupId: null,
+          addedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    }
+    const service = new QuickCommandsService(store, {
+      getReuseTerminal: () => false,
+      getSequenceIntervalMs: () => 0,
+    })
+    return { service, store }
+  }
+
+  it('execute：按行逐条 sendText（顺序与文本一致），执行记录只回写一次', async () => {
+    __resetStubs()
+    __stubs.workspaceFolders = [{ uri: vscode.Uri.file('/ws-root'), name: 'ws', index: 0 }]
+    const { service } = makeSequenceService(['npm ci', 'npm run build', 'npm test'])
+    await service.load()
+    await service.execute(service.get('c1')!)
+
+    const sends = __stubs.recorded
+      .filter((entry) => entry.kind === 'terminalSendText')
+      .map((entry) => (entry.args[0] as { text: string; shouldExecute: boolean }).text)
+    expect(sends).toEqual(['npm ci', 'npm run build', 'npm test'])
+    expect(service.get('c1')!.useCount).toBe(1)
+  })
+
+  it('execute：某条发送异常 → 立即停止并抛出带序号错误，不回写执行次数', async () => {
+    __resetStubs()
+    const terminal = {
+      show: vi.fn(),
+      exitStatus: undefined,
+      sendText: vi.fn((text: string) => {
+        if (text === 'bad') {
+          throw new Error('terminal disposed')
+        }
+      }),
+    }
+    const spy = vi.spyOn(vscode.window, 'createTerminal').mockReturnValue(terminal as never)
+    try {
+      const { service } = makeSequenceService(['ok-1', 'bad', 'ok-3'])
+      await service.load()
+      await expect(service.execute(service.get('c1')!)).rejects.toThrow('命令序列第 2 条发送失败')
+      expect(terminal.sendText).toHaveBeenCalledTimes(2)
+      expect(service.get('c1')!.useCount).toBeUndefined()
+    } finally {
+      spy.mockRestore()
+    }
   })
 })
 

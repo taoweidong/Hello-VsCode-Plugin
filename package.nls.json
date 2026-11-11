@@ -42,6 +42,7 @@
   "command.renameFavorite.title": "Rename Favorite Alias",
   "command.removeFavorite.title": "Remove Favorite",
   "command.openFavoritesDataFile.title": "Open Favorites Data File",
+  "command.addQuickCommandSequence.title": "Add Command Sequence (Multi-line Clipboard)",
   "command.addQuickCommand.title": "Add Quick Command",
   "command.captureTerminalSelection.title": "Capture Terminal Selection as Quick Command",
   "command.quickRunCommands.title": "Run Quick Command…",

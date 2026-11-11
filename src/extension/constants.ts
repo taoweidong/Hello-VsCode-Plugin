@@ -141,8 +141,10 @@ export const COMMAND = {
 
   // 快捷命令（v3.5：终端命令收藏 + 别名 + 显式分组 + 单击终端执行，16 方案；
   // 与收藏夹 favorites（收藏路径）、任务收藏 addTaskToFavorites（收藏 tasks.json 任务）正交）
-  /** 新增快捷命令（手动输入命令文本 + 别名 + 分组；视图标题栏 + 命令面板） */
+  /** 新增快捷命令（手动输入单条命令 + 别名 + 分组；视图标题栏 + 命令面板） */
   addQuickCommand: 'extStarter.addQuickCommand',
+  /** 新增命令序列（v5.1.0：读剪贴板多行，每行一条 → 保存为一个多行条目并逐条执行） */
+  addQuickCommandSequence: 'extStarter.addQuickCommandSequence',
   /** 收藏终端选中命令（剪贴板桥接读选区，无选区降级粘贴输入框；命令面板 + 终端右键） */
   captureTerminalSelection: 'extStarter.captureTerminalSelection',
   /** 快速执行快捷命令（QuickPick 模糊搜索，回车即在专用终端执行） */

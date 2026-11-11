@@ -362,6 +362,33 @@ export const QUICK_COMMAND_TERMINAL_NAME = 'QuickCommand'
 /** 未分组节点的展示标签（groupId=null；此前 6 处字面量，P3-03 收敛）。 */
 export const UNGROUPED_LABEL = '未分组'
 
+/** 命令序列的逐条发送间隔（毫秒）：让每条命令在终端独立回车、便于观察顺序执行。 */
+export const SEQUENCE_INTERVAL_MS = 300
+/** 单条命令序列的命令数上限（防止误粘贴超长脚本批量下发）。 */
+export const MAX_SEQUENCE_LINES = 50
+
+/**
+ * 命令序列拆分（v5.1.0）：按行拆分 → 逐行 trim → 去空行。
+ * 单条命令返回长度 1 的数组；`command` 字段本身保持原始存储形态
+ * （多行序列以换行连接存储，与单条命令同一字段，无 schema 变更）。
+ */
+export function splitCommandSequence(command: string): string[] {
+  return command
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+}
+
+/** 是否为多行命令序列（拆出 >1 条）。 */
+export function isCommandSequence(command: string): boolean {
+  return splitCommandSequence(command).length > 1
+}
+
+/** 延时（测试可注入 0 间隔）。 */
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 /** 快捷命令业务服务：命令与树视图的唯一数据入口。 */
 export class QuickCommandsService implements vscode.Disposable {
   private groups: QuickCommandGroup[] = []
@@ -401,6 +428,8 @@ export class QuickCommandsService implements vscode.Disposable {
       getWorkspaceRoot?: () => vscode.Uri | undefined
       /** 是否复用专用终端（可注入；默认读 quickCommandReuseTerminal 配置，缺省 true）。 */
       getReuseTerminal?: () => boolean
+      /** 命令序列逐条发送间隔（毫秒，可注入；默认 SEQUENCE_INTERVAL_MS）。 */
+      getSequenceIntervalMs?: () => number
     } = {}
   ) {}
 
@@ -638,8 +667,12 @@ export class QuickCommandsService implements vscode.Disposable {
   }
 
   /**
-   * 在终端执行快捷命令（16 方案 §5）：复用名为 QuickCommand 的专用终端
-   * （被关闭后自动重建）；cwd = 工作区首目录；命令原样 sendText，不做任何改写。
+   * 在终端执行快捷命令（16 方案 §5；v5.1.0 支持命令序列）：复用名为
+   * QuickCommand 的专用终端（被关闭后自动重建）；cwd = 工作区首目录。
+   * - 单条命令：原样 sendText（不做任何改写）；
+   * - 命令序列（多行）：按行拆分为独立命令，逐条 sendText（各自回车执行），
+   *   每条之间间隔 getSequenceIntervalMs（默认 300ms）便于观察；
+   *   某条发送异常时立即停止并抛出带序号的可读错误（命令层 showError 呈现）。
    */
   async execute(item: QuickCommandItem): Promise<void> {
     const reuse = this.options.getReuseTerminal
@@ -656,7 +689,24 @@ export class QuickCommandsService implements vscode.Disposable {
       })
     }
     this.terminal.show()
-    this.terminal.sendText(item.command, true)
+    const lines = splitCommandSequence(item.command)
+    const intervalMs = this.options.getSequenceIntervalMs?.() ?? SEQUENCE_INTERVAL_MS
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index] ?? ''
+      try {
+        this.terminal.sendText(line, true)
+      } catch (err) {
+        throw new Error(
+          lines.length > 1
+            ? `命令序列第 ${index + 1} 条发送失败：${reasonOf(err)}`
+            : `命令发送失败：${reasonOf(err)}`,
+          { cause: err }
+        )
+      }
+      if (index < lines.length - 1) {
+        await delay(intervalMs)
+      }
+    }
     await this.recordExecution(item.id)
   }
 
