@@ -1049,11 +1049,11 @@ suite('快捷命令（v3.5 集成冒烟）', () => {
     }
   })
 
-  test('快捷命令空态安全路径可执行（quickRunCommands）', async () => {
-    // 只执行空态即返回的命令；addQuickCommand / captureTerminalSelection 均会在
-    // 真实宿主弹出输入框阻塞等待，不入冒烟（注册完整性由上一用例覆盖）
+  test('快捷命令无参安全路径可执行（executeQuickCommand）', async () => {
+    // 无参调用走「请从视图操作」信息提示分支，与工作区是否已有快捷命令数据无关
+    // （quickRunCommands 在已有数据时会弹 QuickPick 等待输入，不适合冒烟）
     await assert.doesNotReject(async () => {
-      await vscode.commands.executeCommand('extStarter.quickRunCommands')
+      await vscode.commands.executeCommand('extStarter.executeQuickCommand')
     })
   })
 })

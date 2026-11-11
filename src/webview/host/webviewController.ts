@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import * as vscode from 'vscode'
+import { reasonOf } from '../../extension/services/errors'
 import { findWebviewPage, WEBVIEW_PAGES, type WebviewPageDef, type WebviewPageId } from '../pages'
 import { isWebviewMessage, type FieldDef, type HostMessage, type WebviewMessage } from '../protocol'
 import {
@@ -146,26 +147,35 @@ export class WebviewController {
   /**
    * 注册所有页面的面板序列化器（窗口重载后恢复面板：重建 HTML、发 init 带持久化状态）。
    * deps 可传固定依赖，也可传按 pageId 分发的工厂（各页面 onSubmit/buildInit 不同时用工厂）。
+   * v5.0.1：单页注册失败（典型为与其他扩展的 webview ID 冲突）降级——经 onError
+   * 留痕后继续注册其余页面，不再让整个激活失败。
    */
   static registerSerializer(
     context: vscode.ExtensionContext,
-    deps: WebviewControllerDeps | ((pageId: WebviewPageId) => WebviewControllerDeps) = {}
+    deps: WebviewControllerDeps | ((pageId: WebviewPageId) => WebviewControllerDeps) = {},
+    onError?: (message: string) => void
   ): void {
     for (const page of WEBVIEW_PAGES) {
-      const pageDeps = typeof deps === 'function' ? deps(page.id) : deps
-      const serializer: vscode.WebviewPanelSerializer = {
-        deserializeWebviewPanel: async (
-          panel: vscode.WebviewPanel,
-          state: unknown
-        ): Promise<void> => {
-          const controller = new WebviewController(page.id, context, pageDeps)
-          WebviewController.controllers.set(controller.page.id, controller)
-          await controller.attachPanel(panel, state)
-        },
+      try {
+        const pageDeps = typeof deps === 'function' ? deps(page.id) : deps
+        const serializer: vscode.WebviewPanelSerializer = {
+          deserializeWebviewPanel: async (
+            panel: vscode.WebviewPanel,
+            state: unknown
+          ): Promise<void> => {
+            const controller = new WebviewController(page.id, context, pageDeps)
+            WebviewController.controllers.set(controller.page.id, controller)
+            await controller.attachPanel(panel, state)
+          },
+        }
+        context.subscriptions.push(
+          vscode.window.registerWebviewPanelSerializer(webviewViewType(page.id), serializer)
+        )
+      } catch (err) {
+        const message = `页面「${page.id}」序列化器注册失败：${reasonOf(err)}（可能与其他扩展的 webview ID 冲突）`
+        onError?.(message)
+        console.warn(`[webview] ${message}`)
       }
-      context.subscriptions.push(
-        vscode.window.registerWebviewPanelSerializer(webviewViewType(page.id), serializer)
-      )
     }
   }
 

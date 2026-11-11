@@ -1,4 +1,5 @@
 import * as vscode from 'vscode'
+import { reasonOf } from '../services/errors'
 import type { DraftBoxService } from '../features/drafts/draftBoxService'
 import type { FavoritesService } from '../features/favorites/favoritesService'
 import type { InitService } from '../features/init/initService'
@@ -45,8 +46,23 @@ export interface CommandDeps {
  * 命令注册键与清单的闭合由门禁第 ⑥ 步静态校验。
  */
 export function registerCommands(context: vscode.ExtensionContext, deps: CommandDeps): void {
+  let conflictWarned = false
+  // v5.0.1：与其他扩展的命令 ID 冲突（典型：旧包 vscode-starter-template 并存）时
+  // 逐条降级——输出通道留痕 + 首次可操作告警，其余命令继续注册，不再让整个激活失败
   const register: CommandRegistrar = (commandId, callback) => {
-    context.subscriptions.push(vscode.commands.registerCommand(commandId, callback))
+    try {
+      context.subscriptions.push(vscode.commands.registerCommand(commandId, callback))
+    } catch (err) {
+      const message = reasonOf(err)
+      deps.outputChannel.appendLine(`[命令] ${commandId} 注册失败：${message}`)
+      if (!conflictWarned && message.includes('already exists')) {
+        conflictWarned = true
+        void vscode.window.showWarningMessage(
+          '部分命令与已安装的其他扩展冲突（如旧版模板扩展 vscode-starter-template），' +
+            '请卸载旧扩展后重载窗口。'
+        )
+      }
+    }
   }
   registerPageCommands(register, { ...deps, context })
   registerDraftCommands(register, { drafts: deps.drafts })

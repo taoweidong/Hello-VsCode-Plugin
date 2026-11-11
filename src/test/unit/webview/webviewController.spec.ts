@@ -1,6 +1,13 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import type * as vscode from 'vscode'
-import { createExtensionContextStub, __resetStubs, __stubs, Uri } from '../stubs/vscode'
+import {
+  createExtensionContextStub,
+  __resetStubs,
+  __stubs,
+  Uri,
+  window as vscodeWindow,
+} from '../stubs/vscode'
+import { WEBVIEW_PAGES } from '../../../webview/pages'
 import {
   WebviewController,
   webviewViewType,
@@ -405,6 +412,33 @@ describe('dispose 幂等', () => {
     expect(panels).toHaveLength(2)
     controller.dispose()
     again.dispose()
+  })
+})
+
+describe('registerSerializer 容错（v5.0.1：webview ID 冲突降级）', () => {
+  it('单页序列化器注册失败：不抛错、onError 留痕、其余页面继续注册', () => {
+    const serializerContext = createExtensionContextStub() as unknown as vscode.ExtensionContext
+    const errors: string[] = []
+    let calls = 0
+    const spy = vi.spyOn(vscodeWindow, 'registerWebviewPanelSerializer').mockImplementation((() => {
+      calls += 1
+      if (calls === 1) {
+        throw new Error("Serializer for 'extStarter.webview.gallery' already registered.")
+      }
+      return { dispose(): void {} }
+    }) as never)
+    try {
+      expect(() =>
+        WebviewController.registerSerializer(serializerContext, {}, (message) =>
+          errors.push(message)
+        )
+      ).not.toThrow()
+      expect(calls).toBe(WEBVIEW_PAGES.length)
+      expect(errors).toHaveLength(1)
+      expect(errors[0]).toContain('序列化器注册失败')
+    } finally {
+      spy.mockRestore()
+    }
   })
 })
 

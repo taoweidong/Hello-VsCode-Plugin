@@ -4,6 +4,32 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [5.0.1] - 2026-11-11
+
+### 修复（与旧包并存导致激活失败）
+
+- **现象**：安装本版本后激活报 `No view is registered with id:
+extStarter.quickCommandsView`（或 `Serializer for 'extStarter.webview.gallery'
+already registered`）。
+- **根因**（已用真实 VS Code 双装复现）：旧包
+  `your-publisher.vscode-starter-template`（≤ 2.5.0）仍安装时，与本扩展共享
+  `extStarter` 命名空间的视图容器 / 视图 / webview ID；工作台只保留一份注册，
+  本扩展的树视图与序列化器注册抛错，整个 `activate` 失败。
+  **处置：卸载旧扩展并重载窗口即可**（VS Code 扩展面板搜索
+  `vscode-starter-template` 卸载）。
+- **健壮性**：新增 `services/treeViewRegistration.registerTreeView`——单视图注册
+  失败降级为输出通道留痕 + 可操作告警，其余视图与功能继续激活；
+  `WebviewController.registerSerializer` 改为逐页 try/catch（单页冲突不影响其他页）；
+  命令注册（`commands/index.ts`）逐条 try/catch（命令 ID 冲突时仅首次告警）。
+  已用真实 VS Code「新版 + 旧包 2.5.0 双装」验证：激活成功（不再崩溃），
+  冲突项降级为告警，卸载旧包并重载窗口后功能完整。
+- 文档：agent.md「已知事项」与开发指南 00「已知限制」补充冲突说明与处置步骤。
+
+### 测试
+
+- 新增 `treeViewRegistration.spec.ts`（成功订阅 / 失败降级 2 例）与
+  webviewController serializer 容错回归 1 例；全量单测绿。
+
 ## [5.0.0] - 2026-11-11
 
 ### ⚠ 破坏性变更（书签功能下线，改用开源 Bookmarks 扩展）

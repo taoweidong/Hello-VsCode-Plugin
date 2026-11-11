@@ -149,6 +149,10 @@ src/test/（unit: Vitest + vscode 测试桩；集成: mocha + @vscode/test-elect
 - v4.0.0 串口 / v5.0.0 书签功能已下线：激活时会一次性清理遗留数据
   （串口：数据文件 + SecretStorage 密码 + globalState 旧键；书签：工作区与
   globalStorage 数据文件），见 `services/legacyFeatureCleanup.ts`。
+- **不要与旧包 `vscode-starter-template`（≤ 2.5.0）同时安装**：两者共享 `extStarter`
+  命名空间的视图容器 / 视图 / webview ID，新版激活会报 `No view is registered with id: …`
+  或 `Serializer … already registered`；卸载旧扩展并重载窗口即可（v5.0.1 起单视图注册
+  失败会降级为告警，不再拖垮整个激活，但视图仍无法注册，必须卸载旧包）。
 - 发布到市场前：改 `publisher` 与 `repository` 即可（LICENSE / 128×128 图标 / categories
   等元数据已就绪，图标可用 `npx tsx scripts/generate-icon.ts` 从 SVG 重新生成）。
 - CI（`.github/workflows/ci.yml`）：Windows 跑完整门禁 + Playwright e2e；Ubuntu 跑

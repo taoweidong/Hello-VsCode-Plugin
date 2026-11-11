@@ -3,7 +3,12 @@ import * as vscode from 'vscode'
 import { registerCommands, type CommandDeps } from '../../extension/commands'
 import { notifySuccess } from '../../extension/commands/shared'
 import { COMMAND } from '../../extension/constants'
-import { __resetStubs, __stubs, createExtensionContextStub } from './stubs/vscode'
+import {
+  __resetStubs,
+  __stubs,
+  commands as vscodeCommands,
+  createExtensionContextStub,
+} from './stubs/vscode'
 
 /**
  * 命令层单测（09 方案阶段 2 后）：
@@ -34,6 +39,48 @@ describe('registerCommands（注册完整性）', () => {
     const registered = [...__stubs.registeredCommands.keys()]
     expect(registered.slice().sort()).toEqual(Object.values(COMMAND).slice().sort())
     expect(registered).toHaveLength(Object.keys(COMMAND).length)
+  })
+})
+
+describe('registerCommands 容错（v5.0.1：命令 ID 冲突降级）', () => {
+  it('单条命令注册失败：不抛错、输出通道留痕、告警一次、其余命令继续注册', () => {
+    __resetStubs()
+    const context = createExtensionContextStub()
+    const output = { appendLine: vi.fn() } as unknown as vscode.OutputChannel
+    const original = vscodeCommands.registerCommand
+    let failed = false
+    const spy = vi.spyOn(vscodeCommands, 'registerCommand').mockImplementation(((
+      command: string,
+      callback: (...args: unknown[]) => unknown
+    ) => {
+      if (!failed && command === COMMAND.openGallery) {
+        failed = true
+        throw new Error(`command '${command}' already exists.`)
+      }
+      return original(command, callback)
+    }) as typeof vscodeCommands.registerCommand)
+    try {
+      expect(() =>
+        registerCommands(
+          context as unknown as vscode.ExtensionContext,
+          {
+            outputChannel: output,
+          } as unknown as CommandDeps
+        )
+      ).not.toThrow()
+      expect(output.appendLine).toHaveBeenCalledWith(
+        expect.stringContaining(`${COMMAND.openGallery} 注册失败`)
+      )
+      const warnings = __stubs.recorded.filter((entry) => entry.kind === 'showWarningMessage')
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0]?.args[0]).toMatchObject({
+        message: expect.stringContaining('卸载旧扩展后重载窗口'),
+      })
+      // 其余命令全部注册（冲突的 1 条除外）
+      expect(__stubs.registeredCommands.size).toBe(Object.keys(COMMAND).length - 1)
+    } finally {
+      spy.mockRestore()
+    }
   })
 })
 

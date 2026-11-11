@@ -29,6 +29,7 @@ import {
   cleanupBookmarksLegacyData,
   cleanupSerialLegacyData,
 } from './services/legacyFeatureCleanup'
+import { registerTreeView } from './services/treeViewRegistration'
 import { ENVIRONMENT_TASK_ID, recheckProbeByLabel } from './tasks/environmentTask'
 import { TaskRunner } from './tasks/taskRunner'
 import { TASKS } from './tasks/taskRegistry'
@@ -95,10 +96,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const taskRunner = new TaskRunner(TASKS, outputChannel)
   context.subscriptions.push(taskRunner)
   const envProvider = new EnvironmentTreeProvider(taskRunner)
-  context.subscriptions.push(
-    envProvider,
-    vscode.window.createTreeView(VIEW.envViewId, { treeDataProvider: envProvider })
-  )
+  context.subscriptions.push(envProvider)
+  registerTreeView(context, outputChannel, VIEW.envViewId, envProvider)
   if (
     vscode.workspace.getConfiguration(CONFIG.section).get<boolean>(CONFIG.runStartupTasks, true)
   ) {
@@ -126,9 +125,9 @@ export function activate(context: vscode.ExtensionContext): void {
   const initProvider = new InitTreeProvider(() => initService.getStates())
   context.subscriptions.push(
     initService.onDidChangeItems(() => initProvider.refresh()),
-    initProvider,
-    vscode.window.createTreeView(VIEW.initViewId, { treeDataProvider: initProvider })
+    initProvider
   )
+  registerTreeView(context, outputChannel, VIEW.initViewId, initProvider)
 
   // ---------- 任务管理（v2.6：Webview 弹框 + HTTP 打桩/真实接口；侧边栏树视图） ----------
   const taskManagerServices = createTaskManagerServices(outputChannel)
@@ -138,16 +137,20 @@ export function activate(context: vscode.ExtensionContext): void {
   const taskManagerProvider = new TaskManagerTreeProvider(taskManagerServices.api)
   context.subscriptions.push(taskManagerProvider)
   taskManagerServices.onAfterChange = () => void taskManagerProvider.refresh()
-  const taskManagerTreeView = vscode.window.createTreeView(VIEW.taskManagerViewId, {
-    treeDataProvider: taskManagerProvider,
-  })
-  context.subscriptions.push(
-    taskManagerTreeView,
-    taskManagerTreeView.onDidChangeVisibility((event) =>
-      taskManagerProvider.setPolling(event.visible)
-    )
+  const taskManagerTreeView = registerTreeView(
+    context,
+    outputChannel,
+    VIEW.taskManagerViewId,
+    taskManagerProvider
   )
-  taskManagerProvider.setPolling(taskManagerTreeView.visible) // 初始可见性（事件只在变化时触发）
+  if (taskManagerTreeView) {
+    context.subscriptions.push(
+      taskManagerTreeView.onDidChangeVisibility((event) =>
+        taskManagerProvider.setPolling(event.visible)
+      )
+    )
+  }
+  taskManagerProvider.setPolling(taskManagerTreeView?.visible ?? false) // 初始可见性（事件只在变化时触发）
 
   // ---------- 草稿箱（右键示例载体，09 §3.5） ----------
   const drafts = new DraftBoxService(() => vscode.workspace.workspaceFolders?.[0]?.uri)
@@ -157,12 +160,9 @@ export function activate(context: vscode.ExtensionContext): void {
   // ---------- 任务管理器（v2.3：仅工作区 .vscode/tasks.json 任务，10 方案） ----------
   const taskExplorer = new TaskExplorerController(context.workspaceState, outputChannel)
   context.subscriptions.push(taskExplorer)
-  context.subscriptions.push(
-    vscode.window.createTreeView(VIEW.taskExplorerViewId, {
-      treeDataProvider: taskExplorer.treeProvider,
-      showCollapseAll: true,
-    })
-  )
+  registerTreeView(context, outputChannel, VIEW.taskExplorerViewId, taskExplorer.treeProvider, {
+    showCollapseAll: true,
+  })
 
   // ---------- 收藏夹（v3.4：文件/文件夹路径收藏 + 别名 + 单击跳转，13 方案） ----------
   const favorites = new FavoritesService(
@@ -173,10 +173,8 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(favorites)
   void favorites.load()
   const favoritesProvider = new FavoritesTreeProvider(favorites)
-  context.subscriptions.push(
-    favoritesProvider,
-    vscode.window.createTreeView(VIEW.favoritesViewId, { treeDataProvider: favoritesProvider })
-  )
+  context.subscriptions.push(favoritesProvider)
+  registerTreeView(context, outputChannel, VIEW.favoritesViewId, favoritesProvider)
 
   // ---------- 快捷命令（v3.5：终端命令收藏 + 别名 + 分组 + 单击执行，16 方案） ----------
   const quickCommands = new QuickCommandsService(
@@ -187,23 +185,23 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(quickCommands)
   void quickCommands.load()
   const quickCommandsProvider = new QuickCommandsTreeProvider(quickCommands)
-  context.subscriptions.push(
-    quickCommandsProvider,
-    vscode.window.createTreeView(VIEW.quickCommandsViewId, {
-      treeDataProvider: quickCommandsProvider,
-    })
-  )
+  context.subscriptions.push(quickCommandsProvider)
+  registerTreeView(context, outputChannel, VIEW.quickCommandsViewId, quickCommandsProvider)
 
   // ---------- Webview 页面装配（M4）：面板上下文 + 序列化器（窗口重载恢复） ----------
-  WebviewController.registerSerializer(context, (pageId: WebviewPageId): WebviewControllerDeps => {
-    switch (pageId) {
-      case 'taskManager':
-        // 恢复面板：重建表单 schema 与消息处理（查询参数 / 分页 / 增删改查）
-        return createTaskManagerDeps(taskManagerServices)
-      default:
-        return {} // gallery 无宿主侧业务
-    }
-  })
+  WebviewController.registerSerializer(
+    context,
+    (pageId: WebviewPageId): WebviewControllerDeps => {
+      switch (pageId) {
+        case 'taskManager':
+          // 恢复面板：重建表单 schema 与消息处理（查询参数 / 分页 / 增删改查）
+          return createTaskManagerDeps(taskManagerServices)
+        default:
+          return {} // gallery 无宿主侧业务
+      }
+    },
+    (message) => outputChannel.appendLine(`[webview] ${message}`)
+  )
 
   registerCommands(context, {
     taskRunner,
