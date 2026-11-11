@@ -90,7 +90,8 @@ src/extension/（宿主侧，只 import vscode，不 import Vue）
   commands/       pageCommands / serialConsoleCommands / draftCommands + shared
   features/       drafts 草稿箱 / init 任务编排 / taskManager 任务管理（CRUD 实例） / serialConsole 真实业务
   providers/      环境信息树视图
-  services/       legacyMigration 旧键迁移 + stores/atomicWrite 原子写
+  services/       legacyMigration 旧键迁移 + stores/（atomicWrite 原子写、
+                  jsonEnvelopeStore 信封存储、queuedFileStore 串行写队列）
   tasks/          StartupTask 注册表（taskRegistry）+ TaskRunner 调度 + probes 环境探针
 src/webview/（Vue 3，禁止 import vscode；唯一跨侧契约 protocol.ts）
   pages.ts 页面注册表 / host/ 宿主控制器 / components/ SchemaForm / ui/ 设计系统 / apps/ 页面
