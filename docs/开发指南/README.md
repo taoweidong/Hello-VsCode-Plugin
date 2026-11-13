@@ -28,10 +28,10 @@
 1. **跑起来**：`npm install && npm run gate` → VSCode 打开项目按 `F5`（详见
    [../操作指导/01](../操作指导/01-环境准备与代码下载.md)）；
 2. **认架构**：读 [00 · 架构与目录](00-架构与目录.md)——记住两条边界规则：
-   `src/extension/**` 只碰 `vscode`，`src/webview/**` 不碰 `vscode`，唯一跨侧契约是
-   `src/webview/protocol.ts`；
+   `src/extension/**` 只碰 `vscode`，`src/webview/**`（host/ 宿主控制器除外）不碰
+   `vscode`，唯一跨侧契约是 `src/webview/protocol.ts`；
 3. **抄样板**：每个功能的「扩展实操」都是从仓库内现有样板出发的复制-修改：
-   启动脚本抄 `helloTask.ts`、表单领域抄 `serverSchema.ts`、Webview 页面抄 `apps/gallery/`；
+   启动脚本抄 `helloTask.ts`、表单领域抄 `taskSchema.ts`、Webview 页面抄 `apps/gallery/`；
 4. **交作业**：改完跑 `npm run gate -- --fast`，按 [agent.md 版本号规约](../../agent.md)
    升版本 + 记 CHANGELOG，再提交。
 

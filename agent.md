@@ -35,7 +35,7 @@ npm run gate
   ⑦ 单元测试（Vitest + 覆盖率阈值，不启动 VSCode）→ ⑧ 宿主集成测试（@vscode/test-electron）
   → ⑨ 打包内容与产物体积校验（vsce ls 黑白名单 + bundle 预算）；
   另有第⑩步 Webview E2E（Playwright），仅 `--with-e2e` 显式触发，默认不进门禁。
-- **首次运行会自动下载测试用 VS Code**（约 1GB，缓存在 `.vscode-test/`，已被 gitignore），
+- **首次运行会自动下载测试用 VS Code**（约 384MB，缓存在 `.vscode-test/`，已被 gitignore），
   之后复用缓存，属正常现象。
 - 任一步骤失败：修复后重跑；确实无法修复时，必须在交付说明中如实披露失败步骤与原因，
   禁止静默跳过或伪造通过。
@@ -94,7 +94,7 @@ src/extension/（宿主侧，只 import vscode，不 import Vue）
   services/       legacyFeatureCleanup 下线功能遗留数据清理 + stores/（atomicWrite 原子写、
                   jsonEnvelopeStore 信封存储、queuedFileStore 串行写队列）
   tasks/          StartupTask 注册表（taskRegistry）+ TaskRunner 调度 + probes 环境探针
-src/webview/（Vue 3，禁止 import vscode；唯一跨侧契约 protocol.ts）
+src/webview/（Vue 3，host/ 之外禁止 import vscode；唯一跨侧契约 protocol.ts）
   pages.ts 页面注册表 / host/ 宿主控制器 / components/ SchemaForm / ui/ 设计系统 / apps/ 页面
 src/ui/（宿主侧共享：markdown 转义）
 src/test/（unit: Vitest + vscode 测试桩；集成: mocha + @vscode/test-electron）
@@ -105,7 +105,7 @@ src/test/（unit: Vitest + vscode 测试桩；集成: mocha + @vscode/test-elect
 1. **单一来源**：命令 ID / 视图 ID / 配置键只在 `src/extension/constants.ts` 定义，
    `package.json` 的 contributes 必须与之同步（门禁第 ⑥ 步会校验，新增命令三处缺一不可：
    constants → package.json → src/extension/commands/ 的 `register(COMMAND.xxx`）。
-2. **表单 Schema 派生**：领域字段表（如 `serverSchema.ts` 的 `SERVER_FIELD_DEFS`）经
+2. **表单 Schema 派生**：领域字段表（如 `taskSchema.ts` 的 `TASK_FIELD_DEFS`）经
    `deriveFormSchema`（src/webview/formSchema.ts）派生表单字段，加字段只改领域一处；
    Webview 页面 Vue 3 组件化，禁止在页面硬编码业务字段。
 3. **图标语言**：webview 侧 codicon 语义名单一来源为 `src/webview/ui/iconNames.ts`；

@@ -15,7 +15,7 @@
   <text x="24" y="222" fill="#e6e6e6" font-size="13">▶ 7/10 单元测试（vitest run --coverage）</text>
   <text x="24" y="243" fill="#23d18b" font-size="13">  Test Files 63 passed · Tests 695 passed</text>
   <text x="24" y="264" fill="#e6e6e6" font-size="13">▶ 8/10 宿主集成测试（@vscode/test-electron）</text>
-  <text x="24" y="285" fill="#23d18b" font-size="13">  23 passing (15s)</text>
+  <text x="24" y="285" fill="#23d18b" font-size="13">  23 passing (12s)</text>
   <text x="24" y="306" fill="#e6e6e6" font-size="13">▶ 9/10 打包内容与产物体积校验（vsce ls + bundle 预算）</text>
   <text x="24" y="327" fill="#858585" font-size="13">（10/10 Webview E2E 为可选步，npm run gate -- --with-e2e 时执行）</text>
 
@@ -28,7 +28,7 @@
     <text x="24" y="470" fill="#3fb950">│ ✓ 5/10 测试编译         通过 6.2s │</text>
     <text x="24" y="492" fill="#3fb950">│ ✓ 6/10 静态一致性       通过 0.1s │</text>
     <text x="24" y="514" fill="#3fb950">│ ✓ 7/10 单元测试         通过 21.6s │</text>
-    <text x="24" y="536" fill="#3fb950">│ ✓ 8/10 宿主集成测试     通过 259.8s │</text>
+    <text x="24" y="536" fill="#3fb950">│ ✓ 8/10 宿主集成测试     通过 24.5s │</text>
     <text x="24" y="558" fill="#3fb950">│ ✓ 9/10 打包与体积校验   通过 11.1s │</text>
     <text x="24" y="580" fill="#cccccc">└──────────────────────────────────────────┘</text>
   </g>

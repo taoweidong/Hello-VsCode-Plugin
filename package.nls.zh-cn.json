@@ -1,6 +1,6 @@
 {
   "extension.displayName": "Hello VSCode 插件",
-  "extension.description": "Hello VSCode 插件：可插拔环境探针、初始化任务编排、任务管理（CRUD）、串口控制台与任务管理器。树视图 + Webview 页面，开箱即用、易于扩展。",
+  "extension.description": "Hello VSCode 插件：可插拔环境探针、初始化任务编排、任务管理（CRUD）、任务管理器、收藏夹与快捷命令。树视图 + Webview 页面，开箱即用、易于扩展。",
   "viewsContainers.title": "Hello VSCode 插件",
   "view.env.name": "环境信息",
   "view.init.name": "环境初始化",

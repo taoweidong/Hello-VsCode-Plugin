@@ -77,14 +77,14 @@ npm run gate      # 一键质量门禁：lint/类型/双构建/静态一致性/�
 | 加命令 / 视图 / 改文案               | `commands/` + constants                | [指南 07](docs/开发指南/07-命令视图与i18n.md)        |
 
 架构与目录、三条边界规则（`src/extension/**` 只碰 `vscode`、`src/webview/**`
-不碰 `vscode`、跨侧契约唯一在 `protocol.ts`）与完整脚本说明：
+（host/ 宿主控制器除外）不碰 `vscode`、跨侧契约唯一在 `protocol.ts`）与完整脚本说明：
 [docs/开发指南/00-架构与目录.md](docs/开发指南/00-架构与目录.md)。
 
 ## 📄 说明
 
 - 运行时零第三方依赖（v4.0.0 移除 serialport）；Webview 为 Vue 3 + 自研
   VSCode 原生设计系统，未引入通用 UI 框架；
-- 完整 `npm run gate` 首次运行会下载测试用 VS Code（约 1GB，缓存在 `.vscode-test/`
+- 完整 `npm run gate` 首次运行会下载测试用 VS Code（约 384MB，缓存在 `.vscode-test/`
   复用）；其余已知限制见 [架构与开发须知](docs/开发指南/00-架构与目录.md)；
 - 打包发布：`npm run package:vsix` → `release/*.vsix`，发布到市场需 publisher
   账号 + PAT（`npx vsce publish`），详见[开发指南 08](docs/开发指南/08-测试门禁与打包.md)。

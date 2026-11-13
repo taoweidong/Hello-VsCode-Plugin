@@ -49,7 +49,7 @@ docs/
 4. **抄样板**：[开发指南](开发指南/README.md)「我要做什么」路由表——
    - 加启动脚本 → 抄 `helloTask.ts`（[指南 01](开发指南/01-启动任务与环境探针.md)）
    - 加 Webview 页面 → 抄 `apps/gallery/`（[指南 06](开发指南/06-Webview页面与表单基座.md)）
-   - 加带表单的领域 → 抄 `serverSchema.ts`（[指南 06](开发指南/06-Webview页面与表单基座.md)）
+   - 加带表单的领域 → 抄 `taskSchema.ts`（[指南 06](开发指南/06-Webview页面与表单基座.md)）
    - 加命令 / 右键菜单 →（[指南 07](开发指南/07-命令视图与i18n.md)）
    - 加拷贝类命令 → 抄 `copyCommands.ts`（[指南 05](开发指南/05-草稿箱与右键菜单.md)）
    - 加任务类树视图 → 抄 `features/taskExplorer/`（[指南 09](开发指南/09-任务管理器.md)）

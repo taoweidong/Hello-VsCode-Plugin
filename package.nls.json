@@ -1,6 +1,6 @@
 {
   "extension.displayName": "Hello VSCode Plugin",
-  "extension.description": "Hello VSCode Plugin - a VSCode extension starter template: pluggable env probes, init task orchestration, task management CRUD, serial console and task explorer. Tree views + Webview pages, ready to extend.",
+  "extension.description": "Hello VSCode Plugin - a VSCode extension starter template: pluggable env probes, init task orchestration, task management CRUD, task explorer, favorites and quick commands. Tree views + Webview pages, ready to extend.",
   "viewsContainers.title": "Hello VSCode Plugin",
   "view.env.name": "Environment",
   "view.init.name": "Environment Setup",

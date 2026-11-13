@@ -5,16 +5,16 @@
 
 ## 代码地图
 
-| 职责                                        | 文件                                    | 关键符号                                                                |
-| ------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------- |
-| ★ 页面注册表（扩展点）                      | `src/webview/pages.ts`                  | `WEBVIEW_PAGES`（当前 gallery / taskManager）                           |
-| 消息协议 + 运行时守卫（唯一跨侧契约）       | `src/webview/protocol.ts`               | `HostMessage` / `WebviewMessage` / `isHostMessage` / `isWebviewMessage` |
-| 表单字段派生（领域无关）                    | `src/webview/formSchema.ts`             | `deriveFormSchema` `toFieldDefs` `SchemaFieldDef`                       |
-| 宿主控制器（生命周期 / dirty / serializer） | `src/webview/host/webviewController.ts` | `WebviewController`                                                     |
-| HTML 外壳（CSP 矩阵，纯函数可单测）         | `src/webview/host/webviewHtml.ts`       | `renderWebviewHtml`                                                     |
-| 资源解析（manifest 递归收集 CSS）           | `src/webview/host/assetResolver.ts`     | `resolveEntryAssets`                                                    |
-| SchemaForm + 字段组件                       | `src/webview/components/`               | `SchemaForm.vue` + `fields/` 5 组件 + `fieldAdapter.ts`                 |
-| 设计系统（12 组件 + 令牌）                  | `src/webview/ui/`                       | `AppShell` / `VButton` / `tokens.css` / `iconNames.ts`                  |
+| 职责                                           | 文件                                    | 关键符号                                                                |
+| ---------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------- |
+| ★ 页面注册表（扩展点）                         | `src/webview/pages.ts`                  | `WEBVIEW_PAGES`（当前 gallery / taskManager）                           |
+| 消息协议 + 运行时守卫（唯一跨侧契约）          | `src/webview/protocol.ts`               | `HostMessage` / `WebviewMessage` / `isHostMessage` / `isWebviewMessage` |
+| 表单字段派生（领域无关）                       | `src/webview/formSchema.ts`             | `deriveFormSchema` `toFieldDefs` `SchemaFieldDef`                       |
+| 宿主控制器（生命周期 / 提交幂等 / serializer） | `src/webview/host/webviewController.ts` | `WebviewController`                                                     |
+| HTML 外壳（CSP 矩阵，纯函数可单测）            | `src/webview/host/webviewHtml.ts`       | `renderWebviewHtml`                                                     |
+| 资源解析（manifest 递归收集 CSS）              | `src/webview/host/assetResolver.ts`     | `resolveEntryAssets`                                                    |
+| SchemaForm + 字段组件                          | `src/webview/components/`               | `SchemaForm.vue` + `fields/` 5 组件 + `fieldAdapter.ts`                 |
+| 设计系统（12 组件 + 令牌）                     | `src/webview/ui/`                       | `AppShell` / `VButton` / `tokens.css` / `iconNames.ts`                  |
 
 ## 核心机制
 
@@ -26,12 +26,12 @@ pages.ts 登记 → vite rollupOptions.input 自动纳入 → 构建出 .vite/ma
   → e2e harness 镜像 PAGE_ENTRY_PATHS 自动可测
 ```
 
-- **面板生命周期**：`createOrShow` 单例、dirty 守卫（关闭前确认）、提交幂等、
-  `registerWebviewPanelSerializer` 窗口重载恢复；
+- **面板生命周期**：`createOrShow` 单例、提交幂等（在途 submit 不重复受理，无关闭前
+  确认模态——v3.3.0 起移除 dirty 守卫）、`registerWebviewPanelSerializer` 窗口重载恢复；
 - **消息守卫**：两侧收到消息先过 `isWebviewMessage` / `isHostMessage`，未知消息只记日志；
 - **表单基座**：领域声明 `SchemaFieldDef[]` → `deriveFormSchema` 派生 → `toFieldDefs`
   组装 init 载荷 → `SchemaForm` 渲染 / 校验 / 回填（字段类型 text / textarea / select /
-  tags / boolean，缺控件在 `fields/` 加组件并在 SchemaForm 注册分发）；
+  tags / boolean / password，缺控件在 `fields/` 加组件并在 SchemaForm 注册分发）；
 - **样式门禁**（构建期红线）：颜色只用 `--vscode-*` 令牌；尺寸只用 `--ui-*`（禁 px 字面量）；
   禁 `v-html` / `innerHTML` / 模板静态 style 属性 / 白名单外 import；产物 CSS 禁止
   `url(/…)`（vite `base: './'` 的配套红线——违反即字体 404、图标全灭）。
