@@ -532,3 +532,169 @@ describe('taskManager 页面：上行消息契约（17 方案阶段 1，P1-3）'
     }
   })
 })
+
+describe('taskManager 页面：状态持久化（P2-F2，17 方案阶段 5 补测）', () => {
+  it('init 恢复 persisted：查询条件 / 页码 / 每页条数回填，首次请求携带恢复值', async () => {
+    const w = mount(App)
+    expect(postedTypes()).toEqual(['ready'])
+    sendInit({
+      persisted: {
+        query: { keyword: '编译', status: 'running', buildType: 'full' },
+        page: 3,
+        pageSize: 20,
+      },
+    })
+    await w.vm.$nextTick()
+    expect(postedOf('taskListRequest')[0]).toMatchObject({
+      query: { page: 3, pageSize: 20, keyword: '编译', status: 'running', buildType: 'full' },
+    })
+    expect(inputValue(w.find('input[placeholder^="按任务名称"]').element)).toBe('编译')
+    // 列表应答未到：total=0 → 总页数按 1 显示
+    expect(w.text()).toContain('第 3 / 1 页')
+  })
+
+  it('恢复值逐一窄化：非法值按缺省处理（不整体作废）', async () => {
+    const w = mount(App)
+    sendInit({
+      persisted: {
+        query: { keyword: 42, status: 'bogus', buildType: 'bogus' },
+        page: -1,
+        pageSize: 0,
+      },
+    })
+    await w.vm.$nextTick()
+    expect(postedOf('taskListRequest')[0]).toMatchObject({ query: { page: 1, pageSize: 10 } })
+    expect(inputValue(w.find('input[placeholder^="按任务名称"]').element)).toBe('')
+  })
+
+  it('init 无 persisted（非对象形态）→ 全部按缺省恢复', async () => {
+    const w = mount(App)
+    sendInit({ persisted: 'bogus' })
+    await w.vm.$nextTick()
+    expect(postedOf('taskListRequest')[0]).toMatchObject({ query: { page: 1, pageSize: 10 } })
+    expect(w.find('.task-dialog').exists()).toBe(false)
+  })
+
+  it('init 恢复打开中的弹框：editingId 为字符串 → 编辑态回填', async () => {
+    const w = mount(App)
+    sendInit({
+      persisted: {
+        dialog: {
+          editingId: 'task-9',
+          draft: { name: '恢复任务', branch: 'dev', buildType: 'full', notes: 'n' },
+        },
+      },
+    })
+    await w.vm.$nextTick()
+    expect(w.find('.task-dialog').exists()).toBe(true)
+    expect(inputValue(w.find('input[placeholder^="如 主干每日构建"]').element)).toBe('恢复任务')
+    // 保存 → submit 带恢复的 editingId（编辑语义）
+    await w
+      .findAll('button')
+      .find((b) => b.text().includes('保存'))
+      ?.trigger('click')
+    await w.vm.$nextTick()
+    const submit = postedOf('submit')[0]
+    expect(submit).toMatchObject({ draft: { id: 'task-9', name: '恢复任务' } })
+  })
+
+  it('init 恢复弹框：editingId 非字符串 → 新增态（submit 不带 id）', async () => {
+    const w = mount(App)
+    sendInit({
+      persisted: {
+        dialog: {
+          editingId: 42,
+          draft: { name: '恢复任务', branch: 'dev', buildType: 'full', notes: '' },
+        },
+      },
+    })
+    await w.vm.$nextTick()
+    expect(w.find('.task-dialog').exists()).toBe(true)
+    await w
+      .findAll('button')
+      .find((b) => b.text().includes('保存'))
+      ?.trigger('click')
+    await w.vm.$nextTick()
+    const submit = postedOf('submit')[0]
+    expect((submit as { draft?: { id?: unknown } }).draft?.id).toBeUndefined()
+  })
+
+  it('init 后改动查询 / 弹框：500ms 防抖 setState 持久化（弹框打开态含 dialog）', async () => {
+    vi.useFakeTimers()
+    const w = openAndInit()
+    await w.find('input[placeholder^="按任务名称"]').setValue('编译')
+    await w.vm.$nextTick()
+    vi.advanceTimersByTime(500)
+    expect(api.state).toMatchObject({
+      query: { keyword: '编译', status: '', buildType: '' },
+      page: 1,
+      pageSize: 10,
+    })
+    expect((api.state as { dialog?: unknown }).dialog).toBeUndefined()
+
+    // 打开新增弹框：下一次防抖写入包含 dialog 草稿
+    await w
+      .findAll('button')
+      .find((b) => b.text().includes('新建任务'))
+      ?.trigger('click')
+    await w.vm.$nextTick()
+    vi.advanceTimersByTime(500)
+    expect((api.state as { dialog?: { editingId?: unknown } }).dialog).toMatchObject({
+      editingId: null,
+    })
+  })
+
+  it('init 前（initialized=false）：watched 状态变化不 setState', async () => {
+    vi.useFakeTimers()
+    const w = mount(App)
+    expect(postedTypes()).toEqual(['ready'])
+    // init 未到达：列表应答写 page/pageSize（触发 watch），但不落 setState
+    hostMessage({ type: 'taskList', page: { items: [], total: 0, page: 2, pageSize: 50 } })
+    await w.vm.$nextTick()
+    vi.advanceTimersByTime(1000)
+    expect(api.state).toBeUndefined()
+  })
+
+  it('gotoPage：越界钳制到末页；同页不重复请求；翻页正常请求', async () => {
+    const w = openAndInit()
+    await w.vm.$nextTick()
+    hostMessage({ type: 'taskList', page: { items: [task()], total: 30, page: 3, pageSize: 10 } })
+    await w.vm.$nextTick()
+    expect(w.text()).toContain('第 3 / 3 页')
+    const before = postedOf('taskListRequest').length
+    // 已在末页：点「下一页」（禁用态）→ 钳制同页，不重复请求
+    await w
+      .findAll('button')
+      .find((b) => b.attributes('title') === '下一页')
+      ?.trigger('click')
+    await w.vm.$nextTick()
+    expect(postedOf('taskListRequest').length).toBe(before)
+    // 点「上一页」→ 正常请求第 2 页
+    await w
+      .findAll('button')
+      .find((b) => b.attributes('title') === '上一页')
+      ?.trigger('click')
+    await w.vm.$nextTick()
+    expect(postedOf('taskListRequest').at(-1)).toMatchObject({ query: { page: 2, pageSize: 10 } })
+  })
+
+  it('存在错误反馈时任务全部落定：清空反馈（watch hasActiveTask）', async () => {
+    const w = openAndInit()
+    await w.vm.$nextTick()
+    hostMessage({
+      type: 'taskList',
+      page: { items: [task({ status: 'running', progress: 30 })], total: 1, page: 1, pageSize: 10 },
+    })
+    await w.vm.$nextTick()
+    hostMessage({ type: 'error', message: '刷新失败，请重试。' })
+    await w.vm.$nextTick()
+    expect(w.find('.task-feedback--error').exists()).toBe(true)
+    // 任务落定（无 queued/running）：反馈清空
+    hostMessage({
+      type: 'taskList',
+      page: { items: [task({ status: 'success' })], total: 1, page: 1, pageSize: 10 },
+    })
+    await w.vm.$nextTick()
+    expect(w.find('.task-feedback--error').exists()).toBe(false)
+  })
+})

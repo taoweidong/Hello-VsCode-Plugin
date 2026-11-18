@@ -4,6 +4,28 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [5.1.2] - 2026-11-19
+
+### 测试与文档（17 方案阶段 5 收尾 + 阶段 6，方案全部落地）
+
+- **命令壳层洼地补全（阶段 5 残余）**：favoritesCommands 命令分支 62.5% → 82.5%、
+  quickCommandsCommands 71% → 91.7%——补测错误路径（service 抛错 → showError）、
+  取消路径（输入框 / QuickPick / 模态取消）、服务状态矩阵（added / duplicate / cap /
+  invalid / empty / notfound / moved=false / renamed=false / removed=false）与
+  剪贴板桥接失败分支；全仓新增 45 例，总量 695 → 740 例全绿；
+- **任务页状态持久化补测（P2-F2）**：`useTaskPage` 分支 50% → 90.4%——init 恢复
+  persisted（查询条件 / 页码 / 每页条数 / 打开中的弹框，含逐字段窄化非法值）、
+  500ms 防抖 setState 写入（含弹框草稿）、init 前不持久化守卫；
+- **其余小洼地**：useVsCodeApi 真机 acquireVsCodeApi 路径补测（75% → 100%）；
+- **阈值加固**：新增 `src/extension/commands/**` 域分组阈值（94 / 86.5 / 97 / 94，
+  实测 94.95 行 / 87.26 分支）；全局阈值随基线上抬重校——整体实测
+  96.05 行 / 90.88 分支 / 94.45 函数 / 95.87 语句，阈值 = 实测减约 1pt
+  （95 / 89.8 / 93.4 / 94.8）；
+- **阶段 6 文档收尾**：agent.md 协作规范逐句核对（三点要求齐全，无需修改）；
+  03 号 §6.2 覆盖率表按 v5.1.2 重测重校 + stub 举例去串口 / 书签化；
+  vitest.config.ts 头注释用例数修正（29 → 24）；17 号执行记录与 README 索引
+  标记阶段 0-6 全部落地。
+
 ## [5.1.1] - 2026-11-11
 
 ### 测试与工具链（17 方案阶段 5 前置批）

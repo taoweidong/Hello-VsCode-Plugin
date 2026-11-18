@@ -523,3 +523,421 @@ describe('openQuickCommandsDataFile 错误路径（v5.1.1）', () => {
     expect(recordedOf('executeCommand')).toHaveLength(0)
   })
 })
+
+/**
+ * 服务状态矩阵与错误分支（17 方案阶段 5 补测：命令壳分支 71% → 补齐）。
+ * 用最小假服务驱动 service 各返回状态 / 抛错路径，专测命令壳的分发与提示逻辑。
+ */
+describe('快捷命令命令壳：服务状态矩阵与错误分支', () => {
+  const err = new Error('EIO: store unavailable')
+  let calls: Record<string, unknown[]> = {}
+
+  function makeFakeHost(overrides: Record<string, (...args: unknown[]) => unknown> = {}): Host {
+    calls = {}
+    const record =
+      (name: string) =>
+      (...args: unknown[]) => {
+        calls[name] = args
+        return undefined
+      }
+    const item: QuickCommandItem = {
+      id: 'c1',
+      name: 'push',
+      command: 'git push',
+      groupId: null,
+      addedAt: '2026-01-01T00:00:00.000Z',
+    }
+    const methods: Record<string, (...args: unknown[]) => unknown> = {
+      load: async () => ({ groups: [], commands: [] }),
+      listCommands: () => [] as QuickCommandItem[],
+      listGroups: () => [] as never[],
+      addCommand: async () => ({ status: 'added', item }),
+      execute: () => undefined,
+      updateCommandText: async () => 'updated',
+      renameCommand: async () => true,
+      moveCommandToGroup: async () => true,
+      removeCommand: async () => true,
+      createGroup: async () => ({
+        status: 'created',
+        group: { id: 'gn', name: '新组', createdAt: '2026-01-01T00:00:00.000Z' },
+      }),
+      renameGroup: async () => 'renamed',
+      removeGroup: async () => true,
+      ensureDataFile: () => undefined,
+      dataFileUri: () => vscode.Uri.file('/memory/quick-commands.json'),
+    }
+    // 全部方法（含覆写）统一「先录制再委托」，calls 可断言
+    const wrapped = Object.fromEntries(
+      Object.entries({ ...methods, ...overrides }).map(([name, fn]) => [
+        name,
+        (...args: unknown[]) => {
+          record(name)(...args)
+          return fn(...args)
+        },
+      ])
+    )
+    const service = wrapped as unknown as QuickCommandsService
+    const registered = new Map<string, (...args: unknown[]) => unknown>()
+    const register: CommandRegistrar = (id, callback) => registered.set(id, callback)
+    registerQuickCommandsCommands(register, { quickCommands: service })
+    return {
+      service,
+      registered,
+      run: (id, ...args) => Promise.resolve(registered.get(id)!(...args)),
+    }
+  }
+
+  const recordedOf = (kind: string) => __stubs.recorded.filter((entry) => entry.kind === kind)
+  const groupNode = {
+    kind: 'group' as const,
+    group: { id: 'g1', name: 'git', createdAt: '2026-01-01T00:00:00.000Z' },
+    children: [],
+  }
+  const itemNode = {
+    kind: 'command' as const,
+    item: {
+      id: 'c1',
+      name: 'push',
+      command: 'git push',
+      groupId: null,
+      addedAt: '2026-01-01T00:00:00.000Z',
+    } satisfies QuickCommandItem,
+    group: null,
+  }
+
+  beforeEach(() => {
+    __resetStubs()
+    void vscode.commands.registerCommand('vscode.open', () => undefined)
+  })
+
+  describe('addQuickCommand（别名 / 分组步骤取消与状态分支）', () => {
+    it('命令文本全空白 → 告警且不进入别名步骤', async () => {
+      const { run } = makeFakeHost()
+      __stubs.dialogQueue.push('   ')
+      await run('extStarter.addQuickCommand')
+      expect(calls['addCommand']).toBeUndefined()
+      expect(recordedOf('showWarningMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('命令文本不能为空'),
+      })
+    })
+
+    it('别名步骤取消 → 不进入分组选择', async () => {
+      const { run } = makeFakeHost()
+      __stubs.dialogQueue.push('git push', undefined)
+      await run('extStarter.addQuickCommand')
+      expect(recordedOf('showQuickPick')).toHaveLength(0)
+      expect(calls['addCommand']).toBeUndefined()
+    })
+
+    it('addCommand 返回 cap → 告警上限且不入库', async () => {
+      const { run } = makeFakeHost({ addCommand: async () => ({ status: 'cap' }) })
+      __stubs.dialogQueue.push('git push', 'push', groupPick(null))
+      await run('extStarter.addQuickCommand')
+      expect(recordedOf('showWarningMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('上限'),
+      })
+    })
+
+    it('addCommand 抛错 → showError', async () => {
+      const { run } = makeFakeHost({ addCommand: async () => Promise.reject(err) })
+      __stubs.dialogQueue.push('git push', 'push', groupPick(null))
+      await expect(run('extStarter.addQuickCommand')).resolves.toBeUndefined()
+      expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('EIO'),
+      })
+    })
+  })
+
+  describe('pickGroup（新建分组的四个返回状态）', () => {
+    it('duplicate → 提示已存在并直接使用既有分组', async () => {
+      const { run } = makeFakeHost({
+        createGroup: async () => ({
+          status: 'duplicate',
+          existing: { id: 'g1', name: 'git', createdAt: '2026-01-01T00:00:00.000Z' },
+        }),
+      })
+      __stubs.dialogQueue.push('git push', 'push', createGroupPick, 'git')
+      await run('extStarter.addQuickCommand')
+      expect(
+        recordedOf('showInformationMessage').some((entry) =>
+          String((entry.args[0] as { message?: string }).message).includes('已存在')
+        )
+      ).toBe(true)
+      expect(calls['addCommand']?.[0]).toMatchObject({ groupId: 'g1' })
+    })
+
+    it('invalid（空白名）→ 取消建组，不入库', async () => {
+      const { run } = makeFakeHost()
+      __stubs.dialogQueue.push('git push', 'push', createGroupPick, '   ')
+      await run('extStarter.addQuickCommand')
+      expect(calls['createGroup']).toBeUndefined()
+      expect(calls['addCommand']).toBeUndefined()
+    })
+
+    it('cap → 告警分组上限且不入库', async () => {
+      const { run } = makeFakeHost({ createGroup: async () => ({ status: 'cap' }) })
+      __stubs.dialogQueue.push('git push', 'push', createGroupPick, '构建')
+      await run('extStarter.addQuickCommand')
+      expect(recordedOf('showWarningMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('上限'),
+      })
+      expect(calls['addCommand']).toBeUndefined()
+    })
+  })
+
+  describe('addQuickCommandSequence（剪贴板读取失败）', () => {
+    it('clipboard.readText 抛错 → showError 且不弹输入框', async () => {
+      const { run } = makeFakeHost()
+      const readSpy = vi.spyOn(vscode.env.clipboard, 'readText').mockRejectedValue(err)
+      try {
+        await run('extStarter.addQuickCommandSequence')
+      } finally {
+        readSpy.mockRestore()
+      }
+      expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('EIO'),
+      })
+      expect(recordedOf('showInputBox')).toHaveLength(0)
+    })
+  })
+
+  describe('quickRunCommands / executeQuickCommand（取消与执行失败）', () => {
+    it('QuickPick 取消 → 不执行', async () => {
+      const { run } = makeFakeHost({
+        listCommands: () => [itemNode.item],
+      })
+      __stubs.dialogQueue.push(undefined)
+      await run('extStarter.quickRunCommands')
+      expect(calls['execute']).toBeUndefined()
+    })
+
+    it('quickRunCommands：execute 抛错 → showError', async () => {
+      const { run } = makeFakeHost({
+        listCommands: () => [itemNode.item],
+        execute: async () => Promise.reject(err),
+      })
+      __stubs.dialogQueue.push({ label: 'push', item: itemNode.item })
+      await run('extStarter.quickRunCommands')
+      expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('EIO'),
+      })
+    })
+
+    it('executeQuickCommand：execute 抛错 → showError', async () => {
+      const { run } = makeFakeHost({ execute: async () => Promise.reject(err) })
+      await run('extStarter.executeQuickCommand', itemNode.item)
+      expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('EIO'),
+      })
+    })
+  })
+
+  describe('editQuickCommand（序列替换取消 / 剪贴板失败 / 结果状态）', () => {
+    const NL = String.fromCharCode(10)
+    const seqItem = {
+      kind: 'command' as const,
+      item: {
+        id: 'c1',
+        name: 'build',
+        command: ['a', 'b'].join(NL),
+        groupId: null,
+        addedAt: '2026-01-01T00:00:00.000Z',
+      } satisfies QuickCommandItem,
+      group: null,
+    }
+
+    it('替换确认 QuickPick 选「取消」→ 不改动', async () => {
+      const { run } = makeFakeHost()
+      __stubs.dialogQueue.push('取消')
+      await run('extStarter.editQuickCommand', seqItem)
+      expect(calls['updateCommandText']).toBeUndefined()
+    })
+
+    it('序列替换：clipboard.readText 抛错 → showError', async () => {
+      const { run } = makeFakeHost()
+      __stubs.dialogQueue.push('从剪贴板替换命令序列')
+      const readSpy = vi.spyOn(vscode.env.clipboard, 'readText').mockRejectedValue(err)
+      try {
+        await run('extStarter.editQuickCommand', seqItem)
+      } finally {
+        readSpy.mockRestore()
+      }
+      expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('EIO'),
+      })
+      expect(calls['updateCommandText']).toBeUndefined()
+    })
+
+    it('序列替换：超过 50 条上限 → 告警且不改动', async () => {
+      const { run } = makeFakeHost()
+      __stubs.dialogQueue.push('从剪贴板替换命令序列')
+      __stubs.clipboard = Array.from({ length: 51 }, (_, index) => `cmd-${index}`).join(NL)
+      await run('extStarter.editQuickCommand', seqItem)
+      expect(recordedOf('showWarningMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('最多 50 条'),
+      })
+      expect(calls['updateCommandText']).toBeUndefined()
+    })
+
+    it('单条编辑：updateCommandText 返回 empty / notfound 各给提示', async () => {
+      const { run } = makeFakeHost({ updateCommandText: async () => 'empty' as const })
+      __stubs.dialogQueue.push('   ')
+      await run('extStarter.editQuickCommand', itemNode)
+      expect(recordedOf('showWarningMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('命令文本不能为空'),
+      })
+
+      const notfound = makeFakeHost({ updateCommandText: async () => 'notfound' as const })
+      __stubs.dialogQueue.push('git pull')
+      await notfound.run('extStarter.editQuickCommand', itemNode)
+      expect(recordedOf('showInformationMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('已不存在'),
+      })
+    })
+
+    it('单条编辑：updateCommandText 抛错 → showError', async () => {
+      const { run } = makeFakeHost({ updateCommandText: async () => Promise.reject(err) })
+      __stubs.dialogQueue.push('git pull')
+      await run('extStarter.editQuickCommand', itemNode)
+      expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('EIO'),
+      })
+    })
+  })
+
+  describe('带参命令状态矩阵（false → 静默或提示 / 抛错 → showError）', () => {
+    it('renameQuickCommand：renamed=false → 提示别名无效', async () => {
+      const { run } = makeFakeHost({ renameCommand: async () => false })
+      __stubs.dialogQueue.push('新名')
+      await run('extStarter.renameQuickCommand', itemNode)
+      expect(recordedOf('showInformationMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('别名不能为空'),
+      })
+    })
+
+    it('moveQuickCommandToGroup：分组不存在（moved=false）→ 提示；抛错 → showError', async () => {
+      const { run } = makeFakeHost({ moveCommandToGroup: async () => false })
+      __stubs.dialogQueue.push(groupPick('gone'))
+      await run('extStarter.moveQuickCommandToGroup', itemNode)
+      expect(recordedOf('showInformationMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('分组不存在'),
+      })
+
+      const failing = makeFakeHost({ moveCommandToGroup: async () => Promise.reject(err) })
+      __stubs.dialogQueue.push(groupPick('g1'))
+      await failing.run('extStarter.moveQuickCommandToGroup', itemNode)
+      expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('EIO'),
+      })
+    })
+
+    it('copyQuickCommand：clipboard.writeText 抛错 → showError', async () => {
+      const { run } = makeFakeHost()
+      const writeSpy = vi
+        .spyOn(vscode.env.clipboard, 'writeText')
+        .mockRejectedValue(new Error('clipboard denied'))
+      try {
+        await run('extStarter.copyQuickCommand', itemNode)
+      } finally {
+        writeSpy.mockRestore()
+      }
+      expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('clipboard denied'),
+      })
+    })
+
+    it('removeQuickCommand：removed=false → 静默；抛错 → showError', async () => {
+      const { run } = makeFakeHost({ removeCommand: async () => false })
+      await run('extStarter.removeQuickCommand', itemNode)
+      expect(recordedOf('showInformationMessage')).toHaveLength(0)
+
+      const failing = makeFakeHost({ removeCommand: async () => Promise.reject(err) })
+      await failing.run('extStarter.removeQuickCommand', itemNode)
+      expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('EIO'),
+      })
+    })
+  })
+
+  describe('分组管理命令（create / rename / remove 全状态）', () => {
+    it('createQuickCommandGroup：空白名直接返回；invalid → 提示；cap → 告警；抛错 → showError', async () => {
+      const { run } = makeFakeHost()
+      __stubs.dialogQueue.push('   ')
+      await run('extStarter.createQuickCommandGroup')
+      expect(calls['createGroup']).toBeUndefined()
+
+      const invalid = makeFakeHost({ createGroup: async () => ({ status: 'invalid' }) })
+      __stubs.dialogQueue.push('构建')
+      await invalid.run('extStarter.createQuickCommandGroup')
+      expect(recordedOf('showInformationMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('分组名不能为空'),
+      })
+
+      const cap = makeFakeHost({ createGroup: async () => ({ status: 'cap' }) })
+      __stubs.dialogQueue.push('构建')
+      await cap.run('extStarter.createQuickCommandGroup')
+      expect(recordedOf('showWarningMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('上限'),
+      })
+
+      const failing = makeFakeHost({ createGroup: async () => Promise.reject(err) })
+      __stubs.dialogQueue.push('构建')
+      await failing.run('extStarter.createQuickCommandGroup')
+      expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('EIO'),
+      })
+    })
+
+    it('renameQuickCommandGroup：取消 / duplicate / notfound / 抛错', async () => {
+      const { run } = makeFakeHost()
+      await run('extStarter.renameQuickCommandGroup', groupNode) // 队列空 → 取消
+      expect(calls['renameGroup']).toBeUndefined()
+
+      const duplicate = makeFakeHost({ renameGroup: async () => 'duplicate' as const })
+      __stubs.dialogQueue.push('git')
+      await duplicate.run('extStarter.renameQuickCommandGroup', groupNode)
+      expect(recordedOf('showInformationMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('同名'),
+      })
+
+      const notfound = makeFakeHost({ renameGroup: async () => 'notfound' as const })
+      __stubs.dialogQueue.push('git')
+      await notfound.run('extStarter.renameQuickCommandGroup', groupNode)
+      expect(recordedOf('showInformationMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('不存在'),
+      })
+
+      const failing = makeFakeHost({ renameGroup: async () => Promise.reject(err) })
+      __stubs.dialogQueue.push('git')
+      await failing.run('extStarter.renameQuickCommandGroup', groupNode)
+      expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('EIO'),
+      })
+    })
+
+    it('removeQuickCommandGroup：分组已不存在（removed=false）→ 静默；抛错 → showError', async () => {
+      const { run } = makeFakeHost({ removeGroup: async () => false })
+      __stubs.dialogQueue.push('删除')
+      await run('extStarter.removeQuickCommandGroup', groupNode)
+      expect(recordedOf('showInformationMessage')).toHaveLength(0)
+
+      const failing = makeFakeHost({ removeGroup: async () => Promise.reject(err) })
+      __stubs.dialogQueue.push('删除')
+      await failing.run('extStarter.removeQuickCommandGroup', groupNode)
+      expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('EIO'),
+      })
+    })
+  })
+
+  describe('openQuickCommandsDataFile（非 Error 抛错）', () => {
+    it('抛出非 Error 值 → 「操作失败：」前缀呈现', async () => {
+      const { run } = makeFakeHost({ ensureDataFile: async () => Promise.reject('字符串错误') })
+      await run('extStarter.openQuickCommandsDataFile')
+      expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+        message: expect.stringContaining('操作失败'),
+      })
+      expect(recordedOf('executeCommand')).toHaveLength(0)
+    })
+  })
+})

@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config'
 /**
  * 单元 / 组件测试配置（NFR-07 / docs/需求与优化方案/03 §6）：
  * - `vscode` 模块统一替换为 src/test/unit/stubs/vscode.ts（双工程共用同一别名）；
- * - **双工程拆分（第五轮基建）**：仅 `src/test/unit/webview/**`（约 29 个组件 / 页面
+ * - **双工程拆分（第五轮基建）**：仅 `src/test/unit/webview/**`（约 24 个组件 / 页面
  *   用例）需要 jsdom；其余宿主侧用例在 node 环境跑——此前 jsdom 全局一刀切，
  *   64 个文件各自实例化 jsdom（实测占整轮耗时的 93%+），拆分后宿主侧零环境开销；
  * - setupFiles 全局清理：stubs 与 vscode api 单例在每个用例后复位（上收此前
@@ -51,14 +51,14 @@ export default defineConfig({
         'src/webview/shared/env.d.ts',
         'src/test/**',
       ],
-      // 阈值为实测值减约 1pt 余量（12 方案阶段 4 实测：整体 92.13S/85.73B/90.89F/92.62L；
-      // 见 docs/需求与优化方案/12-代码质量评估报告与分阶段优化方案.md §6）。
-      // 新增模块原则上应达到全局阈值；taskManager / webview-host 两组历史缺口单独设线防回退。
+      // 阈值为实测值减约 1pt 余量（17 方案阶段 5 收尾重测：整体 96.05/90.88/94.45/95.87；
+      // favorites / quickCommands 命令壳与 useTaskPage 持久化补测后基线上抬）。
+      // 新增模块原则上应达到全局阈值；历史缺口分组单独设线防回退。
       thresholds: {
-        lines: 91.5,
-        functions: 90,
-        statements: 91,
-        branches: 84.5,
+        lines: 95,
+        functions: 93.4,
+        statements: 94.8,
+        branches: 89.8,
         'src/extension/services/**': { lines: 90, functions: 90, statements: 90, branches: 85 },
         'src/webview/protocol.ts': { lines: 100, functions: 100, statements: 100, branches: 100 },
         'src/extension/features/taskExplorer/**': {
@@ -77,6 +77,9 @@ export default defineConfig({
         // 17 方案阶段 5（v5.1.1）：两大树+存储域单独设线防回退（阈值 = 实测减约 1pt）
         'src/extension/features/quickCommands/**': { lines: 87.5, branches: 85.5 },
         'src/extension/features/favorites/**': { lines: 78, branches: 69 },
+        // 17 方案阶段 5 收尾（v5.1.2）：命令壳层单独设线防回退
+        // （ favorites/quickCommands 错误与取消分支补测后实测 94.95 行 / 87.26 分支）
+        'src/extension/commands/**': { lines: 94, branches: 86.5, functions: 97, statements: 94 },
       },
     },
     projects: [

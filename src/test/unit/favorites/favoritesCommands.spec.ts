@@ -225,3 +225,190 @@ describe('registerFavoritesCommands（收藏夹命令）', () => {
     ).toBe(true)
   })
 })
+
+/**
+ * 错误与取消分支（17 方案阶段 5 补测：命令壳分支覆盖 62.5% → 补齐）。
+ * 用最小假服务（只实现命令消费面）驱动 service 抛错 / 状态分支，避免真实存储装配。
+ */
+describe('registerFavoritesCommands：错误与取消分支', () => {
+  const err = new Error('EIO: store unavailable')
+  let calls: Record<string, unknown[]> = {}
+
+  /** 按用例需要覆写方法的最小 FavoritesService 形状。 */
+  function makeFakeService(overrides: Record<string, (...args: unknown[]) => unknown> = {}): {
+    favorites: FavoritesService
+    registered: Map<string, (...args: unknown[]) => unknown>
+    run: (id: string, ...args: unknown[]) => Promise<unknown>
+  } {
+    calls = {}
+    const record =
+      (name: string) =>
+      (...args: unknown[]) => {
+        calls[name] = args
+        return undefined
+      }
+    const base = {
+      list: () => [] as FavoriteItem[],
+      add: async () => ({ added: 0, skipped: 0 }),
+      open: record('open'),
+      reveal: record('reveal'),
+      absolutePath: async () => '/abs/path',
+      rename: async () => true,
+      remove: async () => true,
+      ensureDataFile: record('ensureDataFile'),
+      dataFileUri: () => vscode.Uri.file('/memory/favorites.json'),
+      // 覆写方法同样先录制再委托，保持 calls 可断言
+      ...Object.fromEntries(
+        Object.entries(overrides).map(([name, fn]) => [
+          name,
+          (...args: unknown[]) => {
+            record(name)(...args)
+            return fn(...args)
+          },
+        ])
+      ),
+    }
+    const favorites = base as unknown as FavoritesService
+    const registered = new Map<string, (...args: unknown[]) => unknown>()
+    registerFavoritesCommands((id, cb) => registered.set(id, cb), { favorites })
+    return {
+      favorites,
+      registered,
+      run: (id, ...args) => Promise.resolve(registered.get(id)?.(...args)),
+    }
+  }
+
+  const recordedOf = (kind: string) => __stubs.recorded.filter((entry) => entry.kind === kind)
+  const item = (overrides: Partial<FavoriteItem> = {}): FavoriteItem => ({
+    id: 'f1',
+    name: '文件甲',
+    path: '/ws/a.ts',
+    isFolder: false,
+    addedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  })
+
+  beforeEach(() => {
+    __resetStubs()
+    void vscode.commands.registerCommand('vscode.open', (uri: unknown) => uri)
+    void vscode.commands.registerCommand('revealInExplorer', (uri: unknown) => uri)
+  })
+
+  it('addFavorite：无可用目标（无编辑器 / 非 Uri 入参）→ 提示且不调用 service', async () => {
+    const { run } = makeFakeService()
+    await run(COMMAND.addFavorite, 'not-a-uri')
+    expect(recordedOf('showInformationMessage').at(-1)?.args[0]).toMatchObject({
+      message: expect.stringContaining('没有可收藏'),
+    })
+    expect(recordedOf('showInputBox')).toHaveLength(0)
+  })
+
+  it('addFavorite：service.add 抛错 → showError 不抛出', async () => {
+    const { run } = makeFakeService({ add: async () => Promise.reject(err) })
+    const fileUri = await makeRealFile('boom.ts')
+    __stubs.dialogQueue.push('别名')
+    await expect(run(COMMAND.addFavorite, fileUri)).resolves.toBeUndefined()
+    expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+      message: expect.stringContaining('EIO'),
+    })
+  })
+
+  it('addFavorite：added/skipped 均为 0 → 不弹汇总提示', async () => {
+    const { run } = makeFakeService()
+    const fileUri = await makeRealFile('dup.ts')
+    __stubs.dialogQueue.push('别名')
+    await run(COMMAND.addFavorite, fileUri)
+    expect(recordedOf('showInformationMessage')).toHaveLength(0)
+  })
+
+  it('quickOpenFavorites：QuickPick 取消 → 不调用 open', async () => {
+    const { run } = makeFakeService({ list: () => [item()] })
+    __stubs.dialogQueue.push(undefined)
+    await run(COMMAND.quickOpenFavorites)
+    expect(calls['open']).toBeUndefined()
+    expect(recordedOf('showErrorMessage')).toHaveLength(0)
+  })
+
+  it('quickOpenFavorites：open 抛错 → showError', async () => {
+    const { run } = makeFakeService({
+      list: () => [item()],
+      open: async () => Promise.reject(err),
+    })
+    __stubs.dialogQueue.push({ label: '文件甲', item: item() })
+    await run(COMMAND.quickOpenFavorites)
+    expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+      message: expect.stringContaining('EIO'),
+    })
+  })
+
+  it('openFavorite / revealFavorite：service 抛错 → showError；reveal 主路径生效', async () => {
+    const { run } = makeFakeService({
+      open: async () => Promise.reject(err),
+      reveal: async () => Promise.reject(err),
+    })
+    await expect(run(COMMAND.openFavorite, item())).resolves.toBeUndefined()
+    expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+      message: expect.stringContaining('EIO'),
+    })
+    await expect(run(COMMAND.revealFavorite, item())).resolves.toBeUndefined()
+    expect(recordedOf('showErrorMessage').length).toBe(2)
+  })
+
+  it('copyFavoritePath：absolutePath 抛错 → showError 且剪贴板不变', async () => {
+    const { run } = makeFakeService({ absolutePath: async () => Promise.reject(err) })
+    __stubs.clipboard = '原内容'
+    await run(COMMAND.copyFavoritePath, item())
+    expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+      message: expect.stringContaining('EIO'),
+    })
+    expect(__stubs.clipboard).toBe('原内容')
+  })
+
+  it('renameFavorite：取消输入 / 重命名失败（空名或条目已不存在）各给一次处理', async () => {
+    const { run } = makeFakeService({ rename: async () => false })
+    __stubs.dialogQueue.push(undefined)
+    await run(COMMAND.renameFavorite, item())
+    expect(calls['rename']).toBeUndefined() // 取消：不进 service
+
+    __stubs.dialogQueue.push('   ')
+    await run(COMMAND.renameFavorite, item())
+    expect(calls['rename']).toBeDefined()
+    expect(recordedOf('showInformationMessage').at(-1)?.args[0]).toMatchObject({
+      message: expect.stringContaining('别名不能为空'),
+    })
+  })
+
+  it('renameFavorite：service 抛错 → showError', async () => {
+    const { run } = makeFakeService({ rename: async () => Promise.reject(err) })
+    __stubs.dialogQueue.push('新名')
+    await run(COMMAND.renameFavorite, item())
+    expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+      message: expect.stringContaining('EIO'),
+    })
+  })
+
+  it('removeFavorite：条目已不存在（removed=false）→ 静默；抛错 → showError', async () => {
+    const { run } = makeFakeService({ remove: async () => false })
+    await run(COMMAND.removeFavorite, item())
+    expect(recordedOf('showInformationMessage')).toHaveLength(0)
+
+    const failing = makeFakeService({ remove: async () => Promise.reject(err) })
+    await failing.run(COMMAND.removeFavorite, item())
+    expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+      message: expect.stringContaining('EIO'),
+    })
+  })
+
+  it('openFavoritesDataFile：ensureDataFile 抛错 → showError 且不打开编辑器', async () => {
+    const { run } = makeFakeService({ ensureDataFile: async () => Promise.reject(err) })
+    await run(COMMAND.openFavoritesDataFile)
+    expect(recordedOf('showErrorMessage').at(-1)?.args[0]).toMatchObject({
+      message: expect.stringContaining('EIO'),
+    })
+    expect(
+      recordedOf('executeCommand').filter(
+        (entry) => (entry.args[0] as { command?: string }).command === 'vscode.open'
+      )
+    ).toHaveLength(0)
+  })
+})
